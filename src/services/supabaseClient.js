@@ -18,12 +18,66 @@ export const supabaseSync = {
     return Boolean(url && anonKey && url.startsWith('http'));
   },
 
+  init(onNewOrder, onStatusChange) {
+    if (!this.isConfigured()) return () => {};
+
+    let lastChecked = new Date(Date.now() - 60000).toISOString();
+
+    const poll = async () => {
+      if (!this.isConfigured()) return;
+      const { url, anonKey } = this.getCredentials();
+      try {
+        const queryUrl = url + '/rest/v1/orders?created_at=gt.' + encodeURIComponent(lastChecked) + '&order=created_at.asc';
+        const res = await fetch(queryUrl, {
+          headers: {
+            'apikey': anonKey,
+            'Authorization': 'Bearer ' + anonKey
+          }
+        });
+        if (res.ok) {
+          const orders = await res.json();
+          if (Array.isArray(orders) && orders.length > 0) {
+            lastChecked = new Date().toISOString();
+            orders.forEach(o => {
+              if (typeof onNewOrder === 'function') {
+                onNewOrder({
+                  id: o.id,
+                  orderNumber: o.order_number,
+                  channel: o.channel,
+                  tableNumber: o.table_number,
+                  customer: o.customer,
+                  items: o.items || [],
+                  subtotal: Number(o.subtotal) || 0,
+                  deliveryFee: Number(o.delivery_fee) || 0,
+                  total: Number(o.total) || 0,
+                  paymentMethod: o.payment_method,
+                  cashPaid: o.cash_paid,
+                  cashChange: o.cash_change,
+                  transferProof: o.transfer_proof,
+                  transferConfirmed: o.transfer_confirmed,
+                  status: o.status || 'pendiente',
+                  statusTimestamps: o.status_timestamps || {},
+                  createdAt: o.created_at
+                });
+              }
+            });
+          }
+        }
+      } catch (e) {
+        // Silently skip if offline
+      }
+    };
+
+    const intervalId = setInterval(poll, 12000);
+    return () => clearInterval(intervalId);
+  },
+
   async testConnection(url, anonKey) {
     try {
-      const res = await fetch(`${url}/rest/v1/products?select=id&limit=1`, {
+      const res = await fetch(url + '/rest/v1/products?select=id&limit=1', {
         headers: {
           'apikey': anonKey,
-          'Authorization': `Bearer ${anonKey}`
+          'Authorization': 'Bearer ' + anonKey
         }
       });
       return res.ok;
@@ -38,10 +92,10 @@ export const supabaseSync = {
     if (!this.isConfigured()) return null;
     const { url, anonKey } = this.getCredentials();
     try {
-      const res = await fetch(`${url}/rest/v1/products?select=*&is_active=eq.true&order=category.asc`, {
+      const res = await fetch(url + '/rest/v1/products?select=*&is_active=eq.true&order=category.asc', {
         headers: {
           'apikey': anonKey,
-          'Authorization': `Bearer ${anonKey}`
+          'Authorization': 'Bearer ' + anonKey
         }
       });
       if (res.ok) {
@@ -81,11 +135,11 @@ export const supabaseSync = {
         updated_at: new Date().toISOString()
       }));
 
-      await fetch(`${url}/rest/v1/products`, {
+      await fetch(url + '/rest/v1/products', {
         method: 'POST',
         headers: {
           'apikey': anonKey,
-          'Authorization': `Bearer ${anonKey}`,
+          'Authorization': 'Bearer ' + anonKey,
           'Content-Type': 'application/json',
           'Prefer': 'resolution=merge-duplicates'
         },
@@ -101,11 +155,11 @@ export const supabaseSync = {
     if (!this.isConfigured()) return;
     const { url, anonKey } = this.getCredentials();
     try {
-      await fetch(`${url}/rest/v1/orders`, {
+      await fetch(url + '/rest/v1/orders', {
         method: 'POST',
         headers: {
           'apikey': anonKey,
-          'Authorization': `Bearer ${anonKey}`,
+          'Authorization': 'Bearer ' + anonKey,
           'Content-Type': 'application/json',
           'Prefer': 'resolution=merge-duplicates'
         },
@@ -138,11 +192,11 @@ export const supabaseSync = {
     if (!this.isConfigured()) return;
     const { url, anonKey } = this.getCredentials();
     try {
-      await fetch(`${url}/rest/v1/orders?id=eq.${orderId}`, {
+      await fetch(url + '/rest/v1/orders?id=eq.' + orderId, {
         method: 'PATCH',
         headers: {
           'apikey': anonKey,
-          'Authorization': `Bearer ${anonKey}`,
+          'Authorization': 'Bearer ' + anonKey,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ status, updated_at: new Date().toISOString() })
