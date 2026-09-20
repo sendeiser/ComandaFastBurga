@@ -23,20 +23,61 @@ export default function App() {
   const [cashShift, setCashShift] = useState(null);
   const [settings, setSettings] = useState(null);
 
-  // Owner authentication state
+  // Owner authentication & secret portal state
   const [isOwnerAuthenticated, setIsOwnerAuthenticated] = useState(() => authService.isAuthenticated());
+  const [isOwnerPortalRoute, setIsOwnerPortalRoute] = useState(() => {
+    const hash = window.location.hash.toLowerCase();
+    const search = window.location.search.toLowerCase();
+    return hash === '#admin' || hash === '#dueno' || hash === '#dueño' || hash === '#auditoria' || search.includes('portal=admin') || search.includes('portal=dueno');
+  });
 
-  // Listen to hash changes (e.g. #admin)
+  // Secret URL listener and secret keyboard shortcut (Ctrl + Shift + D)
   useEffect(() => {
     const handleHash = () => {
-      if (window.location.hash === '#admin' || window.location.hash === '#auditoria') {
-        setCurrentTab('admin');
-      }
+      const hash = window.location.hash.toLowerCase();
+      const search = window.location.search.toLowerCase();
+      const isMatch = hash === '#admin' || hash === '#dueno' || hash === '#dueño' || hash === '#auditoria' || search.includes('portal=admin') || search.includes('portal=dueno');
+      setIsOwnerPortalRoute(isMatch);
     };
     handleHash();
     window.addEventListener('hashchange', handleHash);
-    return () => window.removeEventListener('hashchange', handleHash);
+    window.addEventListener('popstate', handleHash);
+
+    // Secret shortcut: Ctrl + Shift + D (Dueño)
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && e.shiftKey && (e.key === 'D' || e.key === 'd' || e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        setIsOwnerPortalRoute(prev => {
+          const next = !prev;
+          if (next) {
+            window.location.hash = '#dueno';
+          } else {
+            window.location.hash = '';
+          }
+          return next;
+        });
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('hashchange', handleHash);
+      window.removeEventListener('popstate', handleHash);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
+
+  const handleExitOwnerPortal = () => {
+    window.location.hash = '';
+    setIsOwnerPortalRoute(false);
+    setCurrentTab('pos');
+  };
+
+  const handleOwnerLogout = () => {
+    authService.logout();
+    setIsOwnerAuthenticated(false);
+    handleExitOwnerPortal();
+  };
 
   // Modals
   const [isCashModalOpen, setIsCashModalOpen] = useState(false);
@@ -174,6 +215,26 @@ export default function App() {
   };
 
   if (!settings) return null;
+
+  // SECRET OWNER AUDIT PORTAL (Completely independent page without POS header)
+  if (isOwnerPortalRoute) {
+    return (
+      <div className="owner-portal-fullscreen" style={{ minHeight: '100vh', background: 'var(--bg-main)', color: 'var(--text-primary)', padding: '1rem', overflowY: 'auto' }}>
+        {isOwnerAuthenticated ? (
+          <OwnerAuditPortal 
+            orders={orders}
+            onBackToPos={handleExitOwnerPortal}
+            onLogout={handleOwnerLogout}
+          />
+        ) : (
+          <OwnerLogin 
+            onLoginSuccess={() => setIsOwnerAuthenticated(true)}
+            onBackToPos={handleExitOwnerPortal}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="app-layout">
