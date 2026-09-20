@@ -31,10 +31,12 @@ export default function App() {
 
   // Initialize data
   useEffect(() => {
-    storageService.init();
+    if (typeof storageService.init === 'function') {
+      storageService.init();
+    }
     setProducts(storageService.getProducts());
     setOrders(storageService.getOrders());
-    setCashShift(storageService.getCurrentCashShift());
+    setCashShift(storageService.getCashShift ? storageService.getCashShift() : (storageService.getCurrentCashShift ? storageService.getCurrentCashShift() : null));
     setSettings(storageService.getSettings());
 
     // Initialize Supabase realtime sync

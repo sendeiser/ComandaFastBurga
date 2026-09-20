@@ -136,6 +136,15 @@ const KEYS = {
 };
 
 export const storageService = {
+  init() {
+    this.getProducts();
+    this.getSettings();
+    return true;
+  },
+
+  getCurrentCashShift() {
+    return this.getCashShift();
+  },
   getProducts() {
     const raw = localStorage.getItem(KEYS.PRODUCTS);
     if (!raw) {
