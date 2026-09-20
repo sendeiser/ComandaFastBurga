@@ -140,6 +140,8 @@ body {
 
 .main-content {
   flex: 1;
+  min-height: 0;
+  height: calc(100vh - 64px);
   overflow: hidden;
   display: flex;
   position: relative;
@@ -325,26 +327,179 @@ body {
    ========================================================= */
 
 .pos-container {
-  display: grid;
-  grid-template-columns: 1fr 420px;
+  display: flex;
+  flex-direction: row;
   width: 100%;
   height: 100%;
+  min-height: 0;
   overflow: hidden;
+  position: relative;
 }
 
-@media (max-width: 1100px) {
-  .pos-container {
-    grid-template-columns: 1fr 380px;
-  }
-}
-
+/* Catalog takes all remaining space */
 .pos-catalog-panel {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  height: 100%;
   overflow: hidden;
-  border-right: 1px solid var(--border-subtle);
   background: transparent;
+}
+
+/* Sidebar Cart: Pinned to the right ('Al Lado') */
+.pos-cart-sidebar {
+  width: 410px;
+  min-width: 370px;
+  max-width: 460px;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border-left: 1px solid var(--border-subtle);
+  overflow: hidden;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+/* Floating Bottom Bar for Modal Mode */
+.floating-cart-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-card);
+  border: 1px solid var(--accent-amber);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65), 0 0 24px var(--accent-amber-glow);
+  border-radius: var(--radius-full);
+  padding: 0.6rem 1rem 0.6rem 1.4rem;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  z-index: 500;
+  animation: floatPopIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(16px);
+}
+
+@keyframes floatPopIn {
+  from { transform: translateX(-50%) translateY(30px) scale(0.9); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+}
+
+.floating-cart-bar:hover {
+  border-color: var(--accent-amber-hover);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75), 0 0 30px var(--accent-amber-glow);
+}
+
+.floating-cart-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.floating-cart-badge {
+  background: var(--accent-amber);
+  color: #000;
+  font-family: var(--font-mono);
+  font-weight: 900;
+  font-size: 0.85rem;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.floating-cart-total {
+  font-family: var(--font-mono);
+  font-size: 1.2rem;
+  font-weight: 900;
+  color: var(--accent-emerald);
+}
+
+.btn-open-cart-modal {
+  padding: 0.65rem 1.25rem;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, var(--accent-amber), var(--accent-orange));
+  border: none;
+  color: #000;
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 900;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all var(--transition-fast);
+}
+.btn-open-cart-modal:hover {
+  transform: scale(1.04);
+}
+
+/* Slide-Over Drawer Modal for Order */
+.cart-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  justify-content: flex-end;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.cart-drawer-panel {
+  width: 460px;
+  max-width: 90vw;
+  height: 100vh;
+  background: var(--bg-card);
+  border-left: 1px solid var(--border-card);
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideDrawer 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDrawer {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+/* Layout View Mode Switcher in Catalog Header */
+.layout-mode-toggle {
+  display: flex;
+  align-items: center;
+  background: rgba(10, 15, 26, 0.6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 2px;
+}
+
+.layout-mode-btn {
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all var(--transition-fast);
+}
+
+.layout-mode-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.layout-mode-btn.active {
+  background: var(--bg-card-hover);
+  color: var(--accent-amber);
+  border: 1px solid var(--border-card);
 }
 
 /* Search & Categories Bar */
