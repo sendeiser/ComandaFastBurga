@@ -1,21 +1,7 @@
 import React from 'react';
-import { 
-  Flame, 
-  ShoppingCart, 
-  ChefHat, 
-  DollarSign, 
-  History, 
-  UtensilsCrossed, 
-  Settings, 
-  Maximize2, 
-  CheckCircle2, 
-  AlertCircle, 
-  Cloud, 
-  Keyboard 
-} from 'lucide-react';
+import { Flame, ShoppingCart, ChefHat, DollarSign, History, UtensilsCrossed, Settings, Maximize2, CheckCircle2, AlertCircle, Database, Cloud } from 'lucide-react';
 import { printerService } from '../../services/printerService';
 import { supabaseSync } from '../../services/supabaseClient';
-import { toastService } from '../../services/toastService';
 
 export default function Header({ 
   currentTab, 
@@ -24,8 +10,7 @@ export default function Header({
   cashShift, 
   settings,
   onOpenCashModal, 
-  onOpenSettings,
-  onOpenShortcuts
+  onOpenSettings 
 }) {
   const isCloudSynced = supabaseSync.isConfigured();
 
@@ -39,43 +24,36 @@ export default function Header({
 
   const handleOpenDrawer = () => {
     printerService.kickCashDrawer(settings);
-    toastService.success('Comando de apertura de cajón enviado');
   };
 
   return (
     <header className="top-header">
-      {/* BRAND */}
       <div className="brand-section">
         <div className="brand-logo-icon">
-          <Flame size={22} />
+          <Flame size={24} />
         </div>
         <div>
           <div className="brand-name">
             COMANDA<span style={{ color: 'var(--accent-amber)' }}>FAST</span>
-            <span className="brand-badge">BURGA POS</span>
+            <span className="brand-badge">POS & KDS</span>
           </div>
         </div>
       </div>
 
-      {/* TABS */}
       <nav className="nav-tabs">
         <button 
-          type="button"
           className={`nav-tab-btn ${currentTab === 'pos' ? 'active' : ''}`}
           onClick={() => setCurrentTab('pos')}
-          title="F1 / Mostrador"
         >
-          <ShoppingCart size={17} />
+          <ShoppingCart size={18} />
           <span>Mostrador</span>
         </button>
 
         <button 
-          type="button"
           className={`nav-tab-btn ${currentTab === 'kds' ? 'active' : ''}`}
           onClick={() => setCurrentTab('kds')}
-          title="F2 / Cocina"
         >
-          <ChefHat size={17} />
+          <ChefHat size={18} />
           <span>Cocina / KDS</span>
           {pendingKitchenCount > 0 && (
             <span className="nav-badge-count">{pendingKitchenCount}</span>
@@ -83,100 +61,78 @@ export default function Header({
         </button>
 
         <button 
-          type="button"
           className={`nav-tab-btn ${currentTab === 'history' ? 'active' : ''}`}
           onClick={() => setCurrentTab('history')}
-          title="F3 / Historial"
         >
-          <History size={17} />
+          <History size={18} />
           <span>Historial</span>
         </button>
 
         <button 
-          type="button"
           className={`nav-tab-btn ${currentTab === 'menu' ? 'active' : ''}`}
           onClick={() => setCurrentTab('menu')}
-          title="F4 / Menú"
         >
-          <UtensilsCrossed size={17} />
+          <UtensilsCrossed size={18} />
           <span>Menú</span>
         </button>
       </nav>
 
-      {/* RIGHT ACTIONS */}
       <div className="header-right-actions">
-        {/* Open Drawer Button */}
+        {/* Cash Drawer Kick Button */}
         <button 
           type="button" 
-          className="icon-action-btn"
-          style={{ width: 'auto', padding: '0 0.75rem', gap: '6px', color: 'var(--accent-emerald)', fontWeight: 700 }}
+          className="qty-btn"
+          style={{ width: 'auto', padding: '0.4rem 0.75rem', gap: '4px', color: 'var(--accent-emerald)' }}
           onClick={handleOpenDrawer}
-          title="Abrir cajón de dinero"
+          title="Abrir cajón de dinero (ESC/POS)"
         >
           <DollarSign size={16} />
-          <span style={{ fontSize: '0.8rem' }}>Cajón</span>
+          <span>Abrir Cajón</span>
         </button>
 
         {/* Shift status pill */}
         {cashShift && !cashShift.isClosed ? (
-          <div 
-            className="shift-status-pill" 
-            onClick={onOpenCashModal} 
-            title="Caja Abierta — Click para arqueo y control"
-          >
-            <CheckCircle2 size={15} />
-            <span>Caja: ${cashShift.initialCash.toLocaleString('es-AR')}</span>
+          <div className="shift-status-pill" onClick={onOpenCashModal} title="Click para ver control de caja">
+            <CheckCircle2 size={16} />
+            <span>Caja Abierta (${cashShift.initialCash.toLocaleString('es-AR')})</span>
           </div>
         ) : (
-          <div 
-            className="shift-status-pill closed" 
-            onClick={onOpenCashModal} 
-            title="Caja Cerrada — Click para abrir turno"
-          >
-            <AlertCircle size={15} />
+          <div className="shift-status-pill closed" onClick={onOpenCashModal} title="Click para abrir turno de caja">
+            <AlertCircle size={16} />
             <span>Caja Cerrada</span>
           </div>
         )}
 
         {/* Cloud Status */}
         <div 
-          className="icon-action-btn"
-          style={{ color: isCloudSynced ? 'var(--accent-blue)' : 'var(--text-muted)' }}
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            color: isCloudSynced ? 'var(--accent-blue)' : 'var(--text-muted)', 
+            cursor: 'pointer' 
+          }}
           onClick={onOpenSettings}
-          title={isCloudSynced ? 'Sincronizado con Supabase Cloud' : 'Modo Local (Offline-first)'}
+          title={isCloudSynced ? 'Sincronizado con Supabase Cloud' : 'Operando en modo local (Offline)'}
         >
           <Cloud size={18} />
         </div>
 
-        {/* Shortcuts button */}
         <button 
-          type="button"
-          className="icon-action-btn" 
-          onClick={onOpenShortcuts}
-          title="Atajos de teclado rápidos"
-        >
-          <Keyboard size={18} />
-        </button>
-
-        {/* Settings button */}
-        <button 
-          type="button"
           className="nav-tab-btn" 
           onClick={onOpenSettings}
-          title="Configuración de impresora y sistema"
+          title="Configuración general e impresión"
           style={{ padding: '0.5rem 0.75rem' }}
         >
           <Settings size={18} />
         </button>
 
-        {/* Fullscreen toggle */}
         <button 
-          type="button"
-          className="icon-action-btn" 
+          className="nav-tab-btn" 
           onClick={toggleFullscreen}
           title="Pantalla completa"
+          style={{ padding: '0.5rem 0.75rem' }}
         >
-          <Maximize2 size={17} />
+          <Maximize2 size={18} />
         </button>
       </div>
     </header>

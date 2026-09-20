@@ -1,28 +1,9 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { 
-  Search, 
-  ShoppingBag, 
-  Plus, 
-  Trash2, 
-  Send, 
-  MessageSquare, 
-  Utensils, 
-  DollarSign, 
-  Sparkles, 
-  Bike, 
-  Store, 
-  Layers,
-  ChevronRight,
-  Sliders,
-  Columns,
-  Maximize2,
-  X,
-  CreditCard
-} from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Search, ShoppingBag, Plus, Trash2, Send, MessageSquare, Utensils, DollarSign, Sparkles } from 'lucide-react';
 import ItemModifierModal from './ItemModifierModal';
 import PaymentModal from './PaymentModal';
 import WhatsAppImportModal from './WhatsAppImportModal';
-import { toastService } from '../../services/toastService';
+import { printerService } from '../../services/printerService';
 
 export default function FastOrderPad({ 
   products, 
@@ -35,15 +16,8 @@ export default function FastOrderPad({
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isWhatsAppImportOpen, setIsWhatsAppImportOpen] = useState(false);
 
-  // Layout mode: 'sidebar' (Al Lado) vs 'modal' (En Modal flotante/drawer)
-  const [layoutMode, setLayoutMode] = useState(() => {
-    return localStorage.getItem('comandafast_layout_mode') || 'sidebar';
-  });
-
-  // Modal drawer state when in 'modal' mode
-  const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
-
-  const searchInputRef = useRef(null);
+  // Mobile tab state ('catalog' or 'cart') - only affects mobile screens <= 768px
+  const [mobileTab, setMobileTab] = useState('catalog');
 
   // Cart State
   const [cartItems, setCartItems] = useState([]);
@@ -56,39 +30,6 @@ export default function FastOrderPad({
     notes: ''
   });
   const [deliveryFee, setDeliveryFee] = useState(settings?.deliveryDefaultFee || 1000);
-
-  // Switch layout mode and persist
-  const handleToggleLayout = (mode) => {
-    setLayoutMode(mode);
-    localStorage.setItem('comandafast_layout_mode', mode);
-    toastService.info(mode === 'sidebar' ? 'Modo Comanda: Al Lado (Fijo)' : 'Modo Comanda: En Modal Flotante');
-  };
-
-  // Global search shortcut Ctrl+K or /
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.ctrlKey && e.key.toLowerCase() === 'k') || (e.key === '/' && document.activeElement.tagName !== 'INPUT')) {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      }
-
-      // F9 or Alt+P opens checkout or cart modal
-      if (e.key === 'F9' || (e.altKey && e.key.toLowerCase() === 'p')) {
-        e.preventDefault();
-        if (cartItems.length > 0) {
-          if (layoutMode === 'modal') {
-            setIsCartDrawerOpen(true);
-          } else {
-            handleOpenPayment();
-          }
-        } else {
-          toastService.warning('La comanda está vacía.');
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cartItems, layoutMode]);
 
   // Categories list
   const categories = useMemo(() => {
@@ -105,15 +46,6 @@ export default function FastOrderPad({
     });
   }, [products, selectedCategory, searchQuery]);
 
-  // Cart count by productId for quick badges
-  const cartCounts = useMemo(() => {
-    const counts = {};
-    cartItems.forEach(item => {
-      counts[item.productId] = (counts[item.productId] || 0) + item.qty;
-    });
-    return counts;
-  }, [cartItems]);
-
   // Cart calculations
   const subtotal = useMemo(() => {
     return cartItems.reduce((acc, item) => acc + (item.unitPrice * item.qty), 0);
@@ -121,35 +53,11 @@ export default function FastOrderPad({
 
   const effectiveDelivery = channel === 'whatsapp' ? (Number(deliveryFee) || 0) : 0;
   const total = subtotal + effectiveDelivery;
+  const totalItemsCount = useMemo(() => cartItems.reduce((acc, i) => acc + i.qty, 0), [cartItems]);
 
   // Handlers
-  const handleProductCardClick = (product) => {
-    if (product.modifiers && product.modifiers.length > 0) {
-      setSelectedProductForModal(product);
-    } else {
-      handleAddDirectItem(product);
-    }
-  };
-
-  const handleAddDirectItem = (product) => {
-    setCartItems(prev => {
-      const idx = prev.findIndex(i => i.productId === product.id && (!i.modifiers || i.modifiers.length === 0));
-      if (idx !== -1) {
-        const updated = [...prev];
-        updated[idx].qty += 1;
-        return updated;
-      }
-      return [...prev, {
-        id: 'item-' + Date.now() + '-' + Math.random().toString(36).substring(2, 5),
-        productId: product.id,
-        name: product.name,
-        unitPrice: product.price,
-        qty: 1,
-        modifiers: [],
-        notes: ''
-      }];
-    });
-    toastService.success(`+1 ${product.name} agregado`);
+  const handleAddDirect = (product) => {
+    setSelectedProductForModal(product);
   };
 
   const handleAddToCartFromModal = (cartItem) => {
@@ -164,9 +72,8 @@ export default function FastOrderPad({
         updated[idx].qty += cartItem.qty;
         return updated;
       }
-      return [...prev, { ...cartItem, id: 'item-' + Date.now() + '-' + Math.random().toString(36).substring(2, 5) }];
+      return [...prev, { ...cartItem, id: 'item-' + Date.now() + '-' + Math.random() }];
     });
-    toastService.success(`+${cartItem.qty} ${cartItem.name} agregado`);
   };
 
   const updateItemQty = (index, delta) => {
@@ -186,17 +93,13 @@ export default function FastOrderPad({
   };
 
   const clearCart = () => {
-    if (cartItems.length > 0) {
-      setCartItems([]);
-      setCustomer({ name: '', address: '', phone: '', notes: '' });
-      toastService.info('Comanda limpiada');
-      setIsCartDrawerOpen(false);
-    }
+    setCartItems([]);
+    setCustomer({ name: '', address: '', phone: '', notes: '' });
   };
 
   const handleOpenPayment = () => {
     if (cartItems.length === 0) {
-      toastService.warning('La comanda está vacía. Selecciona productos primero.');
+      alert('El pedido está vacío. Agrega productos primero.');
       return;
     }
     setIsPaymentModalOpen(true);
@@ -216,9 +119,8 @@ export default function FastOrderPad({
 
     onSaveOrder(orderPayload);
     setIsPaymentModalOpen(false);
-    setIsCartDrawerOpen(false);
     clearCart();
-    toastService.success('¡Comanda confirmada y enviada a cocina! 🚀');
+    setMobileTab('catalog');
   };
 
   const handleApplyWhatsAppImport = (parsed) => {
@@ -229,381 +131,318 @@ export default function FastOrderPad({
       phone: parsed.customer?.phone || '',
       notes: ''
     });
-    setCartItems(parsed.items.map(it => ({ ...it, id: 'item-' + Date.now() + '-' + Math.random().toString(36).substring(2, 5) })));
-    toastService.success('Pedido importado desde WhatsApp ✨');
-    if (layoutMode === 'modal') {
-      setIsCartDrawerOpen(true);
-    }
+    setCartItems(parsed.items.map(it => ({ ...it, id: 'item-' + Date.now() + '-' + Math.random() })));
   };
 
-  // Reusable Cart Content Component (Used both in Sidebar and in Modal)
-  const renderCartContent = (isModal = false) => (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {/* CART HEADER */}
-      <div className="cart-header">
-        <div className="cart-title">
-          <ShoppingBag size={20} style={{ color: 'var(--accent-amber)' }} />
-          <span>Comanda Actual</span>
-          {cartItems.length > 0 && (
-            <span className="product-in-cart-badge" style={{ position: 'static' }}>
-              {cartItems.reduce((sum, i) => sum + i.qty, 0)}
-            </span>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          {cartItems.length > 0 && (
-            <button 
-              type="button"
-              className="icon-action-btn"
-              onClick={clearCart}
-              title="Vaciar comanda"
-              style={{ color: 'var(--accent-rose)' }}
-            >
-              <Trash2 size={16} />
-            </button>
-          )}
-
-          {isModal && (
-            <button 
-              type="button"
-              className="modal-close-btn"
-              onClick={() => setIsCartDrawerOpen(false)}
-            >
-              <X size={18} />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* CHANNEL SELECTOR */}
-      <div className="channel-selector-bar">
-        <button 
-          type="button"
-          className={`channel-btn ${channel === 'whatsapp' ? 'active' : ''}`}
-          onClick={() => setChannel('whatsapp')}
-        >
-          <Bike size={15} />
-          <span>Delivery</span>
-        </button>
-
-        <button 
-          type="button"
-          className={`channel-btn ${channel === 'mostrador' ? 'active' : ''}`}
-          onClick={() => setChannel('mostrador')}
-        >
-          <Store size={15} />
-          <span>Mostrador</span>
-        </button>
-
-        <button 
-          type="button"
-          className={`channel-btn ${channel === 'mesa' ? 'active' : ''}`}
-          onClick={() => setChannel('mesa')}
-        >
-          <Layers size={15} />
-          <span>Mesa</span>
-        </button>
-      </div>
-
-      {/* QUICK TOOLBAR: WHATSAPP PARSER */}
-      <div className="cart-quick-toolbar">
-        <button 
-          type="button"
-          className="btn-whatsapp-import"
-          onClick={() => setIsWhatsAppImportOpen(true)}
-          title="Pegar mensaje de WhatsApp (Alt+W)"
-        >
-          <MessageSquare size={16} />
-          <span>Importar de WhatsApp</span>
-        </button>
-      </div>
-
-      {/* CUSTOMER INFO FOR DELIVERY OR MESA */}
-      {channel === 'whatsapp' && (
-        <div className="cart-customer-box">
-          <input 
-            type="text"
-            className="cart-customer-input"
-            placeholder="Nombre del Cliente..."
-            value={customer.name}
-            onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
-          />
-          <input 
-            type="text"
-            className="cart-customer-input"
-            placeholder="Dirección / Calle y Número..."
-            value={customer.address}
-            onChange={(e) => setCustomer({ ...customer, address: e.target.value })}
-          />
-        </div>
-      )}
-
-      {channel === 'mesa' && (
-        <div className="cart-customer-box" style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Mesa Nº:</span>
-          <input 
-            type="number"
-            className="cart-customer-input"
-            style={{ width: '80px', textAlign: 'center', fontFamily: 'var(--font-mono)', fontWeight: 800 }}
-            value={tableNumber}
-            onChange={(e) => setTableNumber(e.target.value)}
-          />
-        </div>
-      )}
-
-      {/* CART ITEMS LIST */}
-      <div className="cart-items-scroll">
-        {cartItems.length === 0 ? (
-          <div className="cart-empty-state">
-            <ShoppingBag size={42} style={{ opacity: 0.3 }} />
-            <div style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>La comanda está vacía</div>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Haz clic en los productos para agregarlos o importa un mensaje de WhatsApp.</p>
-          </div>
-        ) : (
-          cartItems.map((item, idx) => (
-            <div key={item.id || idx} className="cart-item-card">
-              <div className="cart-item-row">
-                <div className="cart-item-name">{item.name}</div>
-                <div className="cart-item-price">
-                  ${(item.unitPrice * item.qty).toLocaleString('es-AR')}
-                </div>
-              </div>
-
-              {item.modifiers && item.modifiers.length > 0 && (
-                <div className="cart-item-modifiers">
-                  {item.modifiers.map((mod, mIdx) => (
-                    <span key={mIdx} className="modifier-pill">
-                      {mod.name} {mod.price > 0 ? `(+$${mod.price})` : ''}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {item.notes && (
-                <div className="cart-item-notes">
-                  "{item.notes}"
-                </div>
-              )}
-
-              <div className="cart-item-row" style={{ marginTop: '4px' }}>
-                <div className="cart-item-stepper">
-                  <button 
-                    type="button" 
-                    className="stepper-btn" 
-                    onClick={() => updateItemQty(idx, -1)}
-                  >
-                    -
-                  </button>
-                  <span className="stepper-qty">{item.qty}</span>
-                  <button 
-                    type="button" 
-                    className="stepper-btn" 
-                    onClick={() => updateItemQty(idx, 1)}
-                  >
-                    +
-                  </button>
-                </div>
-
-                <button 
-                  type="button" 
-                  className="icon-action-btn"
-                  style={{ width: '26px', height: '26px', border: 'none', color: 'var(--text-muted)' }}
-                  onClick={() => removeItem(idx)}
-                >
-                  <Trash2 size={13} />
-                </button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* CART FOOTER / CHECKOUT */}
-      <div className="cart-footer">
-        <div className="cart-summary-lines">
-          <div className="summary-row">
-            <span>Subtotal Productos:</span>
-            <span style={{ fontFamily: 'var(--font-mono)' }}>${subtotal.toLocaleString('es-AR')}</span>
-          </div>
-
-          {channel === 'whatsapp' && (
-            <div className="summary-row">
-              <span>Costo de Envío:</span>
-              <span style={{ fontFamily: 'var(--font-mono)' }}>${effectiveDelivery.toLocaleString('es-AR')}</span>
-            </div>
-          )}
-
-          <div className="summary-row total">
-            <span>Total a Cobrar:</span>
-            <span className="total-amount">${total.toLocaleString('es-AR')}</span>
-          </div>
-        </div>
-
-        <button 
-          type="button"
-          className="btn-checkout-primary"
-          disabled={cartItems.length === 0}
-          onClick={handleOpenPayment}
-        >
-          <DollarSign size={20} />
-          <span>Cobrar / Confirmar Pedido</span>
-          <ChevronRight size={18} />
-        </button>
-      </div>
-    </div>
-  );
+  const handleKickDrawer = () => {
+    printerService.kickCashDrawer(settings);
+  };
 
   return (
     <div className="pos-container">
-      {/* LEFT: PRODUCTS CATALOG (Takes full width if layoutMode is modal, or flex 1 if sidebar) */}
-      <div className="pos-catalog-panel">
-        <div className="search-filter-bar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div className="search-input-wrapper" style={{ flex: 1 }}>
-              <Search size={18} />
-              <input 
-                ref={searchInputRef}
-                type="text"
-                className="search-input"
-                placeholder="Buscar hamburguesas, bebidas, agregados... (Ctrl+K)"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-
-            {/* LAYOUT VIEW MODE TOGGLE (Al Lado vs En Modal) */}
-            <div className="layout-mode-toggle" title="Elegir disposición de comanda">
-              <button 
-                type="button"
-                className={`layout-mode-btn ${layoutMode === 'sidebar' ? 'active' : ''}`}
-                onClick={() => handleToggleLayout('sidebar')}
-                title="Mostrar comanda fija al lado"
-              >
-                <Columns size={14} />
-                <span>Al Lado</span>
-              </button>
-
-              <button 
-                type="button"
-                className={`layout-mode-btn ${layoutMode === 'modal' ? 'active' : ''}`}
-                onClick={() => handleToggleLayout('modal')}
-                title="Mostrar comanda en modal flotante / pantalla completa"
-              >
-                <Maximize2 size={14} />
-                <span>En Modal</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="category-chips-scroll">
-            {categories.map(cat => (
-              <button
-                key={cat}
-                type="button"
-                className={`category-chip ${selectedCategory === cat ? 'active' : ''}`}
-                onClick={() => setSelectedCategory(cat)}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* PRODUCTS GRID */}
-        <div className="products-grid-scroll">
-          {filteredProducts.map(product => {
-            const countInCart = cartCounts[product.id] || 0;
-            return (
-              <div 
-                key={product.id}
-                className="product-card"
-                onClick={() => handleProductCardClick(product)}
-              >
-                {countInCart > 0 && (
-                  <div className="product-in-cart-badge">
-                    {countInCart}x
-                  </div>
-                )}
-
-                <div className="product-card-top">
-                  <span className="product-category-tag">{product.category}</span>
-                  {product.modifiers && product.modifiers.length > 0 && (
-                    <button
-                      type="button"
-                      className="icon-action-btn"
-                      style={{ width: '24px', height: '24px', border: 'none' }}
-                      title="Personalizar modificadores"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedProductForModal(product);
-                      }}
-                    >
-                      <Sliders size={13} style={{ color: 'var(--accent-amber)' }} />
-                    </button>
-                  )}
-                </div>
-
-                <div className="product-card-title">{product.name}</div>
-                {product.description && (
-                  <div className="product-card-desc">{product.description}</div>
-                )}
-
-                <div className="product-card-bottom">
-                  <div className="product-card-price">
-                    ${product.price.toLocaleString('es-AR')}
-                  </div>
-                  <div className="product-card-add-btn">
-                    <Plus size={18} />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      {/* MOBILE SWITCHER TABS (Only visible on screens <= 768px via CSS) */}
+      <div className="pos-mobile-tabs">
+        <button 
+          type="button" 
+          className={`pos-mobile-tab-btn ${mobileTab === 'catalog' ? 'active' : ''}`}
+          onClick={() => setMobileTab('catalog')}
+        >
+          <span>🍔 Menú ({filteredProducts.length})</span>
+        </button>
+        <button 
+          type="button" 
+          className={`pos-mobile-tab-btn ${mobileTab === 'cart' ? 'active' : ''}`}
+          onClick={() => setMobileTab('cart')}
+        >
+          <span>🛒 Pedido ({totalItemsCount})</span>
+          {total > 0 && <span style={{ fontWeight: 800 }}>${total.toLocaleString('es-AR')}</span>}
+        </button>
       </div>
 
-      {/* OPTION 1: RIGHT SIDEBAR CART ('AL LADO') */}
-      {layoutMode === 'sidebar' && (
-        <aside className="pos-cart-sidebar">
-          {renderCartContent(false)}
-        </aside>
-      )}
-
-      {/* OPTION 2: FLOATING CART BAR (when in 'modal' mode) */}
-      {layoutMode === 'modal' && cartItems.length > 0 && (
-        <div className="floating-cart-bar">
-          <div className="floating-cart-info">
-            <span className="floating-cart-badge">
-              {cartItems.reduce((sum, i) => sum + i.qty, 0)} ítems
-            </span>
-            <span className="floating-cart-total">
-              ${total.toLocaleString('es-AR')}
-            </span>
+      {/* LEFT: PRODUCTS CATALOG */}
+      <div className={`pos-catalog-panel ${mobileTab === 'catalog' ? 'mobile-active' : ''}`}>
+        <div className="search-filter-bar">
+          <div className="search-input-wrapper">
+            <Search size={18} className="search-icon-inside" />
+            <input 
+              type="text" 
+              placeholder="Buscar hamburguesa, bebida, combo..." 
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
           </div>
 
           <button 
-            type="button"
-            className="btn-open-cart-modal"
-            onClick={() => setIsCartDrawerOpen(true)}
+            type="button" 
+            className="cat-pill-btn"
+            style={{ background: 'linear-gradient(135deg, #15803d, #16a34a)', color: '#fff', border: 'none', gap: '6px' }}
+            onClick={() => setIsWhatsAppImportOpen(true)}
+            title="Pegar y parsear texto de WhatsApp"
           >
-            <ShoppingBag size={18} />
-            <span>Ver Comanda / Cobrar</span>
-            <ChevronRight size={16} />
+            <Sparkles size={16} />
+            <span>Pegar WhatsApp</span>
           </button>
         </div>
-      )}
 
-      {/* OPTION 2: SLIDE-OVER DRAWER MODAL (when opened in 'modal' mode) */}
-      {layoutMode === 'modal' && isCartDrawerOpen && (
-        <div className="cart-drawer-backdrop" onClick={() => setIsCartDrawerOpen(false)}>
-          <div className="cart-drawer-panel" onClick={e => e.stopPropagation()}>
-            {renderCartContent(true)}
+        {/* Category Filter Pills */}
+        <div className="category-scroll-pills">
+          {categories.map(cat => (
+            <button
+              key={cat}
+              className={`cat-pill-btn ${selectedCategory === cat ? 'active' : ''}`}
+              onClick={() => setSelectedCategory(cat)}
+            >
+              <span>{cat}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Products Grid */}
+        <div className="product-grid">
+          {filteredProducts.map(prod => (
+            <div 
+              key={prod.id} 
+              className="product-card"
+              onClick={() => handleAddDirect(prod)}
+            >
+              <div>
+                <div className="product-emoji-icon">{prod.emoji || '🍔'}</div>
+                <div className="product-name">{prod.name}</div>
+                <div className="product-desc">{prod.description}</div>
+              </div>
+              <div className="product-footer">
+                <div className="product-price">${prod.price.toLocaleString('es-AR')}</div>
+                <div className="product-add-badge">
+                  <Plus size={18} />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Floating Cart Summary Bar for Mobile */}
+        {cartItems.length > 0 && (
+          <div className="pos-mobile-cart-bar" onClick={() => setMobileTab('cart')}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShoppingBag size={18} style={{ color: 'var(--accent-amber)' }} />
+              <span style={{ fontWeight: 700 }}>{totalItemsCount} ítems</span>
+              <span style={{ color: 'var(--accent-emerald)', fontWeight: 800 }}>${total.toLocaleString('es-AR')}</span>
+            </div>
+            <span style={{ fontWeight: 800, color: 'var(--accent-amber)', fontSize: '0.85rem' }}>
+              Ver Pedido ➔
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* RIGHT: LIVE CART & TICKET PAD */}
+      <div className={`pos-cart-panel ${mobileTab === 'cart' ? 'mobile-active' : ''}`}>
+        <div className="cart-header">
+          {/* Mobile Back Button to return to menu */}
+          <button 
+            type="button" 
+            className="mobile-back-btn"
+            onClick={() => setMobileTab('catalog')}
+          >
+            ← Volver al Menú
+          </button>
+
+          {/* Channel Selector */}
+          <div className="channel-selector">
+            <button 
+              type="button"
+              className={`channel-btn whatsapp ${channel === 'whatsapp' ? 'active' : ''}`}
+              onClick={() => setChannel('whatsapp')}
+            >
+              <MessageSquare size={16} />
+              <span>WhatsApp / Delivery</span>
+            </button>
+
+            <button 
+              type="button"
+              className={`channel-btn ${channel === 'mostrador' ? 'active' : ''}`}
+              onClick={() => setChannel('mostrador')}
+            >
+              <ShoppingBag size={16} />
+              <span>Mostrador</span>
+            </button>
+
+            <button 
+              type="button"
+              className={`channel-btn ${channel === 'mesa' ? 'active' : ''}`}
+              onClick={() => setChannel('mesa')}
+            >
+              <Utensils size={16} />
+              <span>Mesa Local</span>
+            </button>
+          </div>
+
+          {/* Contextual Fields */}
+          {channel === 'whatsapp' && (
+            <div className="customer-fields-bar">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
+                <input 
+                  type="text" 
+                  className="custom-input-sm" 
+                  placeholder="Nombre del Cliente"
+                  value={customer.name}
+                  onChange={e => setCustomer({ ...customer, name: e.target.value })}
+                />
+                <input 
+                  type="text" 
+                  className="custom-input-sm" 
+                  placeholder="Teléfono / WhatsApp"
+                  value={customer.phone}
+                  onChange={e => setCustomer({ ...customer, phone: e.target.value })}
+                />
+              </div>
+              <input 
+                type="text" 
+                className="custom-input-sm" 
+                placeholder="Dirección de Entrega (Calle y Nº)"
+                value={customer.address}
+                onChange={e => setCustomer({ ...customer, address: e.target.value })}
+              />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: '0.4rem' }}>
+                <input 
+                  type="text" 
+                  className="custom-input-sm" 
+                  placeholder="Aclaración / Obs. envío"
+                  value={customer.notes}
+                  onChange={e => setCustomer({ ...customer, notes: e.target.value })}
+                />
+                <input 
+                  type="number" 
+                  className="custom-input-sm" 
+                  placeholder="Envío ($)"
+                  value={deliveryFee}
+                  onChange={e => setDeliveryFee(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          {channel === 'mostrador' && (
+            <div className="customer-fields-bar">
+              <input 
+                type="text" 
+                className="custom-input-sm" 
+                placeholder="Nombre o Nº de Llamador para retirar"
+                value={customer.name}
+                onChange={e => setCustomer({ ...customer, name: e.target.value })}
+              />
+            </div>
+          )}
+
+          {channel === 'mesa' && (
+            <div className="customer-fields-bar" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>Número de Mesa:</span>
+              <select 
+                className="custom-input-sm" 
+                style={{ width: '100px' }}
+                value={tableNumber}
+                onChange={e => setTableNumber(e.target.value)}
+              >
+                {[1,2,3,4,5,6,7,8,9,10,11,12,15,20].map(n => (
+                  <option key={n} value={n}>Mesa #{n}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* Cart Items List */}
+        <div className="cart-items-scroll">
+          {cartItems.length === 0 ? (
+            <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '3rem 1rem' }}>
+              <ShoppingBag size={48} style={{ opacity: 0.3, margin: '0 auto 0.75rem' }} />
+              <div style={{ fontWeight: 700 }}>El pedido está vacío</div>
+              <div style={{ fontSize: '0.8rem', marginTop: '4px' }}>Toca los productos de la izquierda para agregarlos.</div>
+            </div>
+          ) : (
+            cartItems.map((item, idx) => (
+              <div key={item.id || idx} className="cart-item-row">
+                <div className="cart-item-header">
+                  <span className="cart-item-title">{item.name}</span>
+                  <span className="cart-item-price">${(item.unitPrice * item.qty).toLocaleString('es-AR')}</span>
+                </div>
+
+                {item.modifiers && item.modifiers.length > 0 && (
+                  <div className="cart-item-modifiers">
+                    {item.modifiers.map(m => (
+                      <span key={m} className="modifier-chip">{m}</span>
+                    ))}
+                  </div>
+                )}
+
+                {item.notes && (
+                  <div style={{ fontSize: '0.75rem', fontStyle: 'italic', color: 'var(--accent-amber)' }}>
+                    Nota: {item.notes}
+                  </div>
+                )}
+
+                <div className="cart-item-controls">
+                  <div className="qty-stepper">
+                    <button className="qty-btn" onClick={() => updateItemQty(idx, -1)}>-</button>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 800 }}>{item.qty}</span>
+                    <button className="qty-btn" onClick={() => updateItemQty(idx, 1)}>+</button>
+                  </div>
+                  <button 
+                    style={{ background: 'transparent', border: 'none', color: 'var(--accent-rose)', cursor: 'pointer', padding: '4px' }}
+                    onClick={() => removeItem(idx)}
+                    title="Quitar item"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Cart Footer */}
+        <div className="cart-footer">
+          <div className="cart-totals-breakdown">
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Subtotal:</span>
+              <span style={{ fontWeight: 700 }}>${subtotal.toLocaleString('es-AR')}</span>
+            </div>
+            {channel === 'whatsapp' && effectiveDelivery > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#60a5fa' }}>
+                <span>Costo de Envío:</span>
+                <span style={{ fontWeight: 700 }}>+${effectiveDelivery.toLocaleString('es-AR')}</span>
+              </div>
+            )}
+            <div className="total-row-highlight">
+              <span>TOTAL:</span>
+              <span style={{ color: 'var(--accent-amber)' }}>${total.toLocaleString('es-AR')}</span>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 48px', gap: '0.5rem' }}>
+            <button 
+              className="btn-confirm-order"
+              disabled={cartItems.length === 0}
+              onClick={handleOpenPayment}
+            >
+              <Send size={20} />
+              <span>Confirmar Pedido & Cobrar</span>
+            </button>
+
+            <button 
+              type="button"
+              className="qty-btn"
+              style={{ width: '100%', height: 'auto', background: 'var(--bg-main)', border: '1px solid var(--border-active)' }}
+              title="Abrir Cajón de Dinero (ESC/POS)"
+              onClick={handleKickDrawer}
+            >
+              <DollarSign size={18} style={{ color: 'var(--accent-emerald)' }} />
+            </button>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* MODALS */}
+      {/* Modals */}
       {selectedProductForModal && (
         <ItemModifierModal 
           product={selectedProductForModal}
@@ -614,10 +453,12 @@ export default function FastOrderPad({
 
       {isPaymentModalOpen && (
         <PaymentModal 
+          cartTotal={total}
           total={total}
           customer={customer}
           channel={channel}
           settings={settings}
+          onConfirmOrder={handleCompleteOrder}
           onConfirm={handleCompleteOrder}
           onClose={() => setIsPaymentModalOpen(false)}
         />
@@ -626,6 +467,7 @@ export default function FastOrderPad({
       {isWhatsAppImportOpen && (
         <WhatsAppImportModal 
           products={products}
+          onApplyOrder={handleApplyWhatsAppImport}
           onApply={handleApplyWhatsAppImport}
           onClose={() => setIsWhatsAppImportOpen(false)}
         />
