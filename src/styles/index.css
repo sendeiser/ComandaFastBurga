@@ -687,8 +687,8 @@ h1, h2, h3, h4, .brand-title {
 
 .cart-item-title {
   font-weight: 700;
-  font-size: 0.9rem;
-  color: #fff;
+  font-size: 0.95rem;
+  color: var(--text-primary);
 }
 
 .cart-item-price {
@@ -767,7 +767,7 @@ h1, h2, h3, h4, .brand-title {
   align-items: center;
   font-size: 1.35rem;
   font-weight: 900;
-  color: #fff;
+  color: var(--text-primary);
   padding-top: 0.35rem;
   border-top: 1px dashed var(--border-subtle);
 }
@@ -894,7 +894,7 @@ h1, h2, h3, h4, .brand-title {
   font-family: var(--font-heading);
   font-size: 1.25rem;
   font-weight: 900;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .order-type-chip {
@@ -1035,7 +1035,7 @@ h1, h2, h3, h4, .brand-title {
 .modal-title {
   font-size: 1.3rem;
   font-weight: 800;
-  color: #fff;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -1276,6 +1276,32 @@ body.light-theme {
 [data-theme="light"] .pos-mobile-tab-btn.active {
   background: var(--accent-amber);
   color: #ffffff;
+}
+
+
+[data-theme="light"] .cart-item-title {
+  color: #0f172a;
+}
+
+[data-theme="light"] .total-row-highlight {
+  color: #0f172a;
+}
+
+[data-theme="light"] .modal-title {
+  color: #0f172a;
+}
+
+[data-theme="light"] .kds-item-line {
+  color: #0f172a;
+}
+
+[data-theme="light"] .order-num-badge {
+  color: #0f172a;
+}
+
+[data-theme="light"] .modifier-chip {
+  background: rgba(245, 158, 11, 0.2);
+  color: #b45309;
 }
 
 [data-theme="light"] .pos-mobile-cart-bar {
