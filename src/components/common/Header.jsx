@@ -91,6 +91,23 @@ export default function Header({
           <UtensilsCrossed size={18} />
           <span>Menú</span>
         </button>
+
+        {/* OWNER AUDIT PORTAL TAB */}
+        <button 
+          className={`nav-tab-btn ${currentTab === 'admin' ? 'active' : ''}`}
+          onClick={() => setCurrentTab('admin')}
+          style={{
+            background: currentTab === 'admin' ? 'var(--accent-amber)' : 'rgba(245, 158, 11, 0.12)',
+            color: currentTab === 'admin' ? '#000' : 'var(--accent-amber)',
+            border: '1px solid var(--accent-amber)',
+            fontWeight: 800,
+            gap: '6px'
+          }}
+          title="Portal de Auditoría & Control del Dueño"
+        >
+          <ShieldCheck size={18} />
+          <span>Auditoría Dueño</span>
+        </button>
       </nav>
 
       <div className="header-right-actions">

@@ -8,6 +8,9 @@ import TicketPreviewModal from './components/pos/TicketPreviewModal';
 import OrderHistory from './components/pos/OrderHistory';
 import MenuManagement from './components/pos/MenuManagement';
 import SettingsModal from './components/pos/SettingsModal';
+import OwnerAuditPortal from './components/admin/OwnerAuditPortal';
+import OwnerLogin from './components/admin/OwnerLogin';
+import { authService } from './services/authService';
 import { storageService } from './services/storageService';
 import { audioService } from './services/audioService';
 import { printerService } from './services/printerService';
@@ -19,6 +22,21 @@ export default function App() {
   const [orders, setOrders] = useState([]);
   const [cashShift, setCashShift] = useState(null);
   const [settings, setSettings] = useState(null);
+
+  // Owner authentication state
+  const [isOwnerAuthenticated, setIsOwnerAuthenticated] = useState(() => authService.isAuthenticated());
+
+  // Listen to hash changes (e.g. #admin)
+  useEffect(() => {
+    const handleHash = () => {
+      if (window.location.hash === '#admin' || window.location.hash === '#auditoria') {
+        setCurrentTab('admin');
+      }
+    };
+    handleHash();
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
 
   // Modals
   const [isCashModalOpen, setIsCashModalOpen] = useState(false);

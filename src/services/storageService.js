@@ -138,9 +138,47 @@ const KEYS = {
   PRODUCTS: 'comandafast_products',
   ORDERS: 'comandafast_orders',
   CASH_SHIFT: 'comandafast_cash_shift',
+  CASH_SHIFTS_HISTORY: 'comandafast_cash_shifts_history',
+  CANCELLED_ORDERS: 'comandafast_cancelled_orders',
   SETTINGS: 'comandafast_settings',
   ORDER_COUNTER: 'comandafast_order_counter'
 };
+
+
+const SAMPLE_MOCK_SHIFTS = [
+  {
+    id: 'shift-prev-1',
+    openedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+    closedAt: new Date(Date.now() - 86400000 * 2 + 1000 * 60 * 60 * 6).toISOString(),
+    initialCash: 15000,
+    cashierName: 'Sofía Gomez',
+    cashSales: 78500,
+    expenses: [
+      { id: 'exp-1', amount: 3500, reason: 'Compra de hielo y servilletas', timestamp: new Date(Date.now() - 86400000 * 2 + 3600000).toISOString() }
+    ],
+    countedCash: 90000,
+    expectedCash: 90000,
+    difference: 0,
+    notes: 'Turno sin novedades, arqueo exacto',
+    isClosed: true
+  },
+  {
+    id: 'shift-prev-2',
+    openedAt: new Date(Date.now() - 86400000).toISOString(),
+    closedAt: new Date(Date.now() - 86400000 + 1000 * 60 * 60 * 7).toISOString(),
+    initialCash: 20000,
+    cashierName: 'Lucas Martínez',
+    cashSales: 94200,
+    expenses: [
+      { id: 'exp-2', amount: 5000, reason: 'Adelanto cadete de delivery', timestamp: new Date(Date.now() - 86400000 + 7200000).toISOString() }
+    ],
+    countedCash: 108200,
+    expectedCash: 109200,
+    difference: -1000,
+    notes: 'Diferencia de $1.000 en cambio al cerrar',
+    isClosed: true
+  }
+];
 
 export const storageService = {
   init() {
@@ -255,15 +293,78 @@ export const storageService = {
     return shift;
   },
 
+  getCashShiftsHistory() {
+    const raw = localStorage.getItem(KEYS.CASH_SHIFTS_HISTORY);
+    if (!raw) {
+      localStorage.setItem(KEYS.CASH_SHIFTS_HISTORY, JSON.stringify(SAMPLE_MOCK_SHIFTS));
+      return SAMPLE_MOCK_SHIFTS;
+    }
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return SAMPLE_MOCK_SHIFTS;
+    }
+  },
+
   closeCashShift(countedCash, notes = '') {
     const shift = this.getCashShift();
     if (!shift) return null;
-    shift.closedAt = new Date().toISOString();
+    const now = new Date().toISOString();
+    shift.closedAt = now;
     shift.countedCash = Number(countedCash);
     shift.notes = notes;
     shift.isClosed = true;
+
+    // Calcular ventas en efectivo durante este turno
+    const orders = this.getOrders();
+    const shiftOrders = orders.filter(o => {
+      const t = new Date(o.createdAt);
+      return t >= new Date(shift.openedAt) && t <= new Date(now) && o.paymentMethod === 'efectivo';
+    });
+    const cashSales = shiftOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+    const totalExpenses = (shift.expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    const expected = (Number(shift.initialCash) || 0) + cashSales - totalExpenses;
+    const difference = Number(countedCash) - expected;
+
+    shift.cashSales = cashSales;
+    shift.expectedCash = expected;
+    shift.difference = difference;
+
     localStorage.setItem(KEYS.CASH_SHIFT, JSON.stringify(shift));
+
+    // Guardar en historial inmutable de turnos
+    const history = this.getCashShiftsHistory();
+    history.unshift({ ...shift });
+    localStorage.setItem(KEYS.CASH_SHIFTS_HISTORY, JSON.stringify(history));
+
     return shift;
+  },
+
+  // AUDITORÍA DE ANULACIONES / SEGURIDAD
+  getCancelledOrders() {
+    const raw = localStorage.getItem(KEYS.CANCELLED_ORDERS);
+    return raw ? JSON.parse(raw) : [];
+  },
+
+  cancelOrder(orderId, reason = 'Cancelado por solicitud de cliente', author = 'Cajero') {
+    const orders = this.getOrders();
+    const orderToCancel = orders.find(o => o.id === orderId);
+    if (!orderToCancel) return false;
+
+    // Registrar en cancelaciones
+    const cancelled = this.getCancelledOrders();
+    cancelled.unshift({
+      ...orderToCancel,
+      cancelledAt: new Date().toISOString(),
+      cancelReason: reason,
+      cancelAuthor: author
+    });
+    localStorage.setItem(KEYS.CANCELLED_ORDERS, JSON.stringify(cancelled));
+
+    // Remover de órdenes activas
+    const updated = orders.filter(o => o.id !== orderId);
+    localStorage.setItem(KEYS.ORDERS, JSON.stringify(updated));
+    return true;
   },
 
   // SETTINGS
