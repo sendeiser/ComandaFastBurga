@@ -125,7 +125,7 @@ h1, h2, h3, h4, .brand-title {
 .brand-name {
   font-size: 1.25rem;
   font-weight: 800;
-  color: #fff;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -503,7 +503,7 @@ h1, h2, h3, h4, .brand-title {
 .product-name {
   font-size: 1rem;
   font-weight: 700;
-  color: #fff;
+  color: var(--text-primary);
   line-height: 1.25;
   margin-bottom: 0.35rem;
 }
@@ -1051,4 +1051,195 @@ h1, h2, h3, h4, .brand-title {
     color: #000 !important;
     background: #fff !important;
   }
+}
+
+
+/* =========================================================
+   LIGHT MODE THEME
+   ========================================================= */
+[data-theme="light"],
+body.light-theme {
+  --bg-main: #f1f5f9;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8fafc;
+  --bg-input: #ffffff;
+  --border-subtle: #e2e8f0;
+  --border-active: #cbd5e1;
+  
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  
+  /* Brand Accents for Light Mode */
+  --accent-amber: #d97706;
+  --accent-amber-glow: rgba(217, 119, 6, 0.2);
+  --accent-orange: #ea580c;
+  --accent-emerald: #059669;
+  --accent-emerald-glow: rgba(5, 150, 105, 0.2);
+  --accent-rose: #dc2626;
+  --accent-blue: #2563eb;
+  --accent-purple: #7c3aed;
+  
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] body {
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .top-header {
+  background: #ffffff;
+  border-bottom-color: #e2e8f0;
+}
+
+[data-theme="light"] .search-filter-bar input,
+[data-theme="light"] .custom-input-sm,
+[data-theme="light"] select,
+[data-theme="light"] .form-input,
+[data-theme="light"] .form-textarea {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+[data-theme="light"] .cat-pill-btn {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+[data-theme="light"] .cat-pill-btn:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+[data-theme="light"] .cat-pill-btn.active {
+  background: var(--accent-amber);
+  color: #ffffff;
+  border-color: var(--accent-amber);
+}
+
+[data-theme="light"] .product-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .product-card:hover {
+  background: #ffffff;
+  border-color: var(--accent-amber);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .pos-cart-panel {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .channel-selector {
+  background: #f1f5f9;
+}
+
+[data-theme="light"] .channel-btn {
+  color: #64748b;
+}
+
+[data-theme="light"] .channel-btn.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .channel-btn.whatsapp.active {
+  background: #15803d;
+  color: #ffffff;
+}
+
+[data-theme="light"] .cart-item-row {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .qty-btn {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+[data-theme="light"] .cart-footer {
+  background: #f8fafc;
+  border-top-color: #e2e8f0;
+}
+
+[data-theme="light"] .total-row-highlight {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .nav-tabs {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .nav-tab-btn {
+  color: #64748b;
+}
+
+[data-theme="light"] .nav-tab-btn:hover {
+  color: #0f172a;
+}
+
+[data-theme="light"] .nav-tab-btn.active {
+  background: #ffffff;
+  color: var(--accent-amber);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .kds-column {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .kds-order-card {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .modal-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .modal-header {
+  border-bottom-color: #e2e8f0;
+}
+
+[data-theme="light"] .modal-footer {
+  border-top-color: #e2e8f0;
+}
+
+[data-theme="light"] .pos-mobile-tabs {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .pos-mobile-tab-btn {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #64748b;
+}
+
+[data-theme="light"] .pos-mobile-tab-btn.active {
+  background: var(--accent-amber);
+  color: #ffffff;
+}
+
+[data-theme="light"] .pos-mobile-cart-bar {
+  background: #ffffff;
+  border-color: var(--accent-amber);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
 }

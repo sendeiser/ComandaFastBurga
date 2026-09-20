@@ -1,5 +1,19 @@
 import React from 'react';
-import { Flame, ShoppingCart, ChefHat, DollarSign, History, UtensilsCrossed, Settings, Maximize2, CheckCircle2, AlertCircle, Database, Cloud } from 'lucide-react';
+import { 
+  Flame, 
+  ShoppingCart, 
+  ChefHat, 
+  DollarSign, 
+  History, 
+  UtensilsCrossed, 
+  Settings, 
+  Maximize2, 
+  CheckCircle2, 
+  AlertCircle, 
+  Cloud, 
+  Sun, 
+  Moon 
+} from 'lucide-react';
 import { printerService } from '../../services/printerService';
 import { supabaseSync } from '../../services/supabaseClient';
 
@@ -9,6 +23,8 @@ export default function Header({
   pendingKitchenCount, 
   cashShift, 
   settings,
+  theme,
+  onToggleTheme,
   onOpenCashModal, 
   onOpenSettings 
 }) {
@@ -116,6 +132,21 @@ export default function Header({
         >
           <Cloud size={18} />
         </div>
+
+        {/* Theme Toggle Button (Light / Dark) */}
+        <button 
+          type="button"
+          className="nav-tab-btn" 
+          onClick={onToggleTheme}
+          title={theme === 'light' ? 'Cambiar a Modo Oscuro' : 'Cambiar a Modo Claro'}
+          style={{ padding: '0.5rem 0.75rem' }}
+        >
+          {theme === 'light' ? (
+            <Moon size={18} style={{ color: 'var(--accent-indigo)' }} />
+          ) : (
+            <Sun size={18} style={{ color: 'var(--accent-amber)' }} />
+          )}
+        </button>
 
         <button 
           className="nav-tab-btn" 

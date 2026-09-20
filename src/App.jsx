@@ -25,6 +25,21 @@ export default function App() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [previewOrder, setPreviewOrder] = useState(null);
 
+  // Theme state ('dark' | 'light')
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('comandafast_theme') || 'dark';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    document.body.className = theme + '-theme';
+    localStorage.setItem('comandafast_theme', theme);
+  }, [theme]);
+
+  const handleToggleTheme = () => {
+    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
   // Load initial data (Local first, then try Cloud)
   useEffect(() => {
     const localProds = storageService.getProducts();
@@ -150,6 +165,8 @@ export default function App() {
         pendingKitchenCount={pendingKitchenCount}
         cashShift={cashShift}
         settings={settings}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
         onOpenCashModal={() => setIsCashModalOpen(true)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
       />
