@@ -1,5 +1,16 @@
-import React, { useState } from 'react';
-import { X, DollarSign, ArrowDownRight, CheckCircle2, AlertTriangle, Printer, Lock, Unlock } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { 
+  X, 
+  DollarSign, 
+  Lock, 
+  Unlock, 
+  TrendingDown, 
+  Calculator, 
+  AlertTriangle, 
+  CheckCircle2, 
+  FileText 
+} from 'lucide-react';
+import { toastService } from '../../services/toastService';
 
 export default function CashControlModal({ 
   cashShift, 
@@ -9,269 +20,306 @@ export default function CashControlModal({
   onCloseShift, 
   onClose 
 }) {
-  const [initialCashInput, setInitialCashInput] = useState('');
-  const [cashierNameInput, setCashierNameInput] = useState('Cajero 1');
-  
+  const [initialCashInput, setInitialCashInput] = useState('10000');
+  const [cashierName, setCashierName] = useState('Cajero Principal');
+
+  // Expense form
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseReason, setExpenseReason] = useState('');
 
-  const [countedCashInput, setCountedCashInput] = useState('');
-  const [closeNotes, setCloseNotes] = useState('');
-  const [isClosingConfirm, setIsClosingConfirm] = useState(false);
-
-  // Calculate totals for active shift
-  const shiftOrders = orders.filter(o => {
-    if (!cashShift || cashShift.isClosed) return false;
-    return new Date(o.createdAt) >= new Date(cashShift.openedAt);
+  // Bill counter state for cash counting
+  const [billCounts, setBillCounts] = useState({
+    20000: 0,
+    10000: 0,
+    2000: 0,
+    1000: 0,
+    500: 0,
+    200: 0,
+    100: 0
   });
 
-  const cashSales = shiftOrders
-    .filter(o => o.paymentMethod === 'efectivo' && o.status !== 'cancelado')
-    .reduce((acc, o) => acc + o.total, 0);
+  const [closeNotes, setCloseNotes] = useState('');
 
-  const transferSales = shiftOrders
-    .filter(o => o.paymentMethod === 'transferencia' && o.status !== 'cancelado')
-    .reduce((acc, o) => acc + o.total, 0);
+  // Calculate counted physical cash from bill counter
+  const totalCountedCash = useMemo(() => {
+    return Object.entries(billCounts).reduce((sum, [denom, count]) => {
+      return sum + (Number(denom) * (Number(count) || 0));
+    }, 0);
+  }, [billCounts]);
 
-  const cardSales = shiftOrders
-    .filter(o => o.paymentMethod === 'tarjeta' && o.status !== 'cancelado')
-    .reduce((acc, o) => acc + o.total, 0);
+  // Calculate sales from orders during shift
+  const shiftMetrics = useMemo(() => {
+    if (!cashShift || cashShift.isClosed) return { cashSales: 0, transferSales: 0, cardSales: 0, totalSales: 0 };
 
-  const totalExpenses = (cashShift?.expenses || []).reduce((acc, e) => acc + e.amount, 0);
+    const shiftOrders = orders.filter(o => {
+      const oTime = new Date(o.createdAt).getTime();
+      const sTime = new Date(cashShift.openedAt).getTime();
+      return oTime >= sTime;
+    });
 
-  const expectedCashInDrawer = (cashShift?.initialCash || 0) + cashSales - totalExpenses;
-  const totalShiftRevenue = cashSales + transferSales + cardSales;
+    let cashSales = 0;
+    let transferSales = 0;
+    let cardSales = 0;
 
-  const countedCashNum = parseFloat(countedCashInput) || 0;
-  const cashDifference = countedCashNum - expectedCashInDrawer;
+    shiftOrders.forEach(o => {
+      if (o.paymentMethod === 'efectivo') cashSales += o.total;
+      else if (o.paymentMethod === 'transferencia') transferSales += o.total;
+      else if (o.paymentMethod === 'tarjeta') cardSales += o.total;
+    });
+
+    const totalExpenses = (cashShift.expenses || []).reduce((acc, e) => acc + e.amount, 0);
+    const expectedCashInDrawer = cashShift.initialCash + cashSales - totalExpenses;
+
+    return {
+      cashSales,
+      transferSales,
+      cardSales,
+      totalSales: cashSales + transferSales + cardSales,
+      totalExpenses,
+      expectedCashInDrawer,
+      orderCount: shiftOrders.length
+    };
+  }, [cashShift, orders]);
+
+  const cashDifference = totalCountedCash - (shiftMetrics.expectedCashInDrawer || 0);
 
   const handleOpen = () => {
-    if (!initialCashInput && initialCashInput !== '0') {
-      alert('Ingresa el monto de fondo de caja inicial.');
-      return;
-    }
-    onOpenShift(initialCashInput, cashierNameInput);
+    const val = parseFloat(initialCashInput) || 0;
+    onOpenShift(val, cashierName);
+    toastService.success(`Turno de caja abierto con $${val.toLocaleString('es-AR')}`);
+    onClose();
   };
 
-  const handleAddExpense = (e) => {
-    e.preventDefault();
-    if (!expenseAmount || !expenseReason) {
-      alert('Completa el monto y motivo del retiro de caja.');
+  const handleAddExpenseSubmit = () => {
+    const amt = parseFloat(expenseAmount);
+    if (!amt || amt <= 0 || !expenseReason) {
+      toastService.warning('Ingresa un monto y motivo válido para el retiro de caja.');
       return;
     }
-    onAddExpense(expenseAmount, expenseReason.trim());
+    onAddExpense(amt, expenseReason);
     setExpenseAmount('');
     setExpenseReason('');
+    toastService.info(`Retiro de $${amt.toLocaleString('es-AR')} registrado`);
   };
 
-  const handleCloseShift = () => {
-    if (!countedCashInput && countedCashInput !== '0') {
-      alert('Ingresa el dinero físico contado en caja para hacer el arqueo.');
-      return;
+  const handleCloseShiftSubmit = () => {
+    if (totalCountedCash === 0) {
+      if (!window.confirm('El monto de billetes contados es $0. ¿Confirmar cierre igualmente?')) return;
     }
-    onCloseShift(countedCashNum, closeNotes);
+    onCloseShift(totalCountedCash, closeNotes);
+    toastService.success('Turno de caja cerrado con arqueo guardado 🔒');
     onClose();
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" style={{ maxWidth: '620px' }} onClick={e => e.stopPropagation()}>
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-card large" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <div className="modal-title">
-            <DollarSign size={24} style={{ color: 'var(--accent-amber)' }} />
-            <span>Control de Caja & Arqueo de Turno</span>
+            <DollarSign size={22} style={{ color: 'var(--accent-amber)' }} />
+            <span>Control de Caja & Arqueo Ciego</span>
           </div>
-          <button className="btn-close-modal" onClick={onClose}><X size={20} /></button>
+          <button className="modal-close-btn" onClick={onClose}>
+            <X size={16} />
+          </button>
         </div>
 
-        {/* IF SHIFT IS CLOSED -> OPEN FORM */}
-        {!cashShift || cashShift.isClosed ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem 0' }}>
-            <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid var(--accent-rose)', padding: '1rem', borderRadius: 'var(--radius-md)', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-              <Lock size={28} style={{ color: 'var(--accent-rose)' }} />
-              <div>
-                <div style={{ fontWeight: 800, color: 'var(--accent-rose)' }}>LA CAJA SE ENCUENTRA CERRADA</div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Abre un nuevo turno de caja para comenzar a facturar y registrar movimientos.</div>
-              </div>
-            </div>
-
-            <div>
-              <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Fondo Inicial de Caja ($ Efectivo):</label>
-              <input
-                type="number"
-                className="custom-input-sm"
-                style={{ fontSize: '1.2rem', fontWeight: 800, padding: '0.6rem', marginTop: '4px' }}
-                placeholder="Ej: 5000"
-                value={initialCashInput}
-                onChange={e => setInitialCashInput(e.target.value)}
-                autoFocus
-              />
-            </div>
-
-            <div>
-              <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Nombre de Cajero / Turno:</label>
-              <input
-                type="text"
-                className="custom-input-sm"
-                placeholder="Ej: Turno Noche - Martín"
-                value={cashierNameInput}
-                onChange={e => setCashierNameInput(e.target.value)}
-              />
-            </div>
-
-            <button 
-              className="btn-confirm-order"
-              style={{ background: 'var(--accent-emerald)', color: '#000' }}
-              onClick={handleOpen}
-            >
-              <Unlock size={20} />
-              <span>Abrir Turno de Caja</span>
-            </button>
-          </div>
-        ) : (
-          /* IF SHIFT IS OPEN -> LIVE DASHBOARD & CLOSE */
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            {/* Shift Info Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-main)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-              <div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>TURNO ACTIVO:</div>
-                <div style={{ fontWeight: 800, color: 'var(--accent-emerald)' }}>{cashShift.cashierName}</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>APERTURA:</div>
-                <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>
-                  {new Date(cashShift.openedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} ({new Date(cashShift.openedAt).toLocaleDateString('es-AR')})
-                </div>
-              </div>
-            </div>
-
-            {/* Metrics Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-              <div style={{ background: 'var(--bg-main)', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>FONDO INICIAL:</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#fff' }}>${cashShift.initialCash.toLocaleString('es-AR')}</div>
+        <div className="modal-body-scroll">
+          {/* CASE 1: NO OPEN SHIFT */}
+          {(!cashShift || cashShift.isClosed) ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1rem 0' }}>
+              <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                <Lock size={48} style={{ color: 'var(--accent-rose)' }} />
+                <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.35rem', fontWeight: 800 }}>
+                  La Caja se Encuentra Cerrada
+                </h3>
+                <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  Ingresa el fondo inicial de cambio en efectivo para comenzar a facturar.
+                </p>
               </div>
 
-              <div style={{ background: 'var(--bg-main)', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>VENTAS EN EFECTIVO:</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--accent-emerald)' }}>+${cashSales.toLocaleString('es-AR')}</div>
-              </div>
-
-              <div style={{ background: 'var(--bg-main)', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>TRANSFERENCIAS ACREDITADAS:</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#60a5fa' }}>${transferSales.toLocaleString('es-AR')}</div>
-              </div>
-
-              <div style={{ background: 'var(--bg-main)', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>VENTAS CON TARJETA:</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#c084fc' }}>${cardSales.toLocaleString('es-AR')}</div>
-              </div>
-            </div>
-
-            {/* Cash in Drawer Calculated */}
-            <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid var(--accent-amber)', padding: '1rem', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--accent-amber)', fontWeight: 800 }}>EFECTIVO TEÓRICO EN CAJÓN:</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>(Fondo Inicial + Efectivo Cobrado - Egresos)</div>
-              </div>
-              <div style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--accent-amber)', fontFamily: 'var(--font-heading)' }}>
-                ${expectedCashInDrawer.toLocaleString('es-AR')}
-              </div>
-            </div>
-
-            {/* Quick Expense Form */}
-            <form onSubmit={handleAddExpense} style={{ background: 'var(--bg-main)', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-rose)' }}>Registrar Retiro / Gasto de Caja:</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 100px', gap: '0.4rem' }}>
+              <div className="form-group">
+                <label className="form-label">Nombre del Responsable / Cajero:</label>
                 <input 
-                  type="number"
-                  className="custom-input-sm"
-                  placeholder="Monto ($)"
-                  value={expenseAmount}
-                  onChange={e => setExpenseAmount(e.target.value)}
+                  type="text" 
+                  className="form-input"
+                  value={cashierName}
+                  onChange={(e) => setCashierName(e.target.value)}
                 />
-                <input 
-                  type="text"
-                  className="custom-input-sm"
-                  placeholder="Motivo (ej: hielo, panadería...)"
-                  value={expenseReason}
-                  onChange={e => setExpenseReason(e.target.value)}
-                />
-                <button type="submit" className="qty-btn" style={{ width: '100%', height: 'auto', background: 'var(--accent-rose)', color: '#fff', border: 'none', fontSize: '0.8rem' }}>
-                  Retirar
-                </button>
               </div>
 
-              {cashShift.expenses && cashShift.expenses.length > 0 && (
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Egresos del turno: {cashShift.expenses.map(e => `-$${e.amount} (${e.reason})`).join(', ')} (Total: -${totalExpenses})
-                </div>
-              )}
-            </form>
+              <div className="form-group">
+                <label className="form-label">Fondo Inicial en Efectivo ($):</label>
+                <input 
+                  type="number" 
+                  className="form-input"
+                  style={{ fontFamily: 'var(--font-mono)', fontSize: '1.35rem', fontWeight: 800 }}
+                  value={initialCashInput}
+                  onChange={(e) => setInitialCashInput(e.target.value)}
+                />
+              </div>
 
-            {/* Close Shift Accordion / Form */}
-            {!isClosingConfirm ? (
               <button 
                 type="button"
-                className="btn-kds-action to-done"
-                style={{ background: 'var(--accent-rose)', color: '#fff' }}
-                onClick={() => setIsClosingConfirm(true)}
+                className="btn-primary"
+                style={{ padding: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                onClick={handleOpen}
               >
-                <Lock size={18} />
-                <span>Proceder al Cierre de Turno y Arqueo</span>
+                <Unlock size={18} />
+                <span>Abrir Turno de Caja</span>
               </button>
-            ) : (
-              <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--accent-rose)', padding: '1rem', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <div style={{ fontWeight: 800, color: 'var(--accent-rose)' }}>ARQUEO DE CAJA FINAL</div>
-                <div>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 700 }}>Dinero Físico Real Contado en Cajón ($):</label>
-                  <input
-                    type="number"
-                    className="custom-input-sm"
-                    style={{ fontSize: '1.2rem', fontWeight: 800, padding: '0.5rem', marginTop: '4px' }}
-                    placeholder={`Esperado: ${expectedCashInDrawer}`}
-                    value={countedCashInput}
-                    onChange={e => setCountedCashInput(e.target.value)}
-                    autoFocus
-                  />
+            </div>
+          ) : (
+            /* CASE 2: ACTIVE SHIFT */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {/* SHIFT SUMMARY CARDS */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
+                <div style={{ background: 'rgba(10, 15, 26, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.75rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Fondo Inicial:</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    ${cashShift.initialCash.toLocaleString('es-AR')}
+                  </div>
                 </div>
 
-                {countedCashInput !== '' && (
-                  <div style={{ fontSize: '0.9rem', fontWeight: 800, color: cashDifference === 0 ? 'var(--accent-emerald)' : cashDifference > 0 ? '#60a5fa' : 'var(--accent-rose)' }}>
-                    {cashDifference === 0 ? '✅ Cuadre Exacto (Sin diferencias)' :
-                     cashDifference > 0 ? `Sobran: +$${cashDifference.toLocaleString('es-AR')}` :
-                     `Faltan: -$${Math.abs(cashDifference).toLocaleString('es-AR')}`}
+                <div style={{ background: 'rgba(10, 15, 26, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.75rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--accent-emerald)' }}>Ventas Efectivo:</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '1.15rem', fontWeight: 800, color: 'var(--accent-emerald)' }}>
+                    ${shiftMetrics.cashSales.toLocaleString('es-AR')}
                   </div>
-                )}
+                </div>
 
-                <input
-                  type="text"
-                  className="custom-input-sm"
-                  placeholder="Notas de cierre (Opcional)"
-                  value={closeNotes}
-                  onChange={e => setCloseNotes(e.target.value)}
-                />
+                <div style={{ background: 'rgba(10, 15, 26, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.75rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--accent-blue)' }}>Transferencias:</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '1.15rem', fontWeight: 800, color: 'var(--accent-blue)' }}>
+                    ${shiftMetrics.transferSales.toLocaleString('es-AR')}
+                  </div>
+                </div>
 
+                <div style={{ background: 'rgba(10, 15, 26, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.75rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--accent-rose)' }}>Gastos / Retiros:</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '1.15rem', fontWeight: 800, color: 'var(--accent-rose)' }}>
+                    -${shiftMetrics.totalExpenses.toLocaleString('es-AR')}
+                  </div>
+                </div>
+              </div>
+
+              {/* EXPENSE LOGGER */}
+              <div style={{ background: 'rgba(15, 23, 42, 0.4)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <TrendingDown size={16} style={{ color: 'var(--accent-rose)' }} />
+                  <span>Registrar Retiro de Caja / Gasto Vario</span>
+                </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button 
-                    type="button" 
-                    className="btn-confirm-order"
-                    style={{ background: 'var(--accent-rose)', color: '#fff' }}
-                    onClick={handleCloseShift}
-                  >
-                    Confirmar Cierre de Turno
-                  </button>
-                  <button 
-                    type="button" 
-                    className="qty-btn"
-                    style={{ width: 'auto', padding: '0.5rem 1rem' }}
-                    onClick={() => setIsClosingConfirm(false)}
-                  >
-                    Cancelar
+                  <input 
+                    type="number"
+                    className="form-input"
+                    style={{ width: '130px', fontFamily: 'var(--font-mono)' }}
+                    placeholder="Monto ($)"
+                    value={expenseAmount}
+                    onChange={(e) => setExpenseAmount(e.target.value)}
+                  />
+                  <input 
+                    type="text"
+                    className="form-input"
+                    style={{ flex: 1 }}
+                    placeholder="Motivo (Ej: Compra de hielo, verdulería, flete)"
+                    value={expenseReason}
+                    onChange={(e) => setExpenseReason(e.target.value)}
+                  />
+                  <button type="button" className="btn-secondary" onClick={handleAddExpenseSubmit}>
+                    Registrar
                   </button>
                 </div>
               </div>
-            )}
+
+              {/* BILL COUNTER FOR BLIND AUDIT */}
+              <div style={{ background: 'rgba(10, 15, 26, 0.6)', border: '1px solid var(--border-card)', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-amber)' }}>
+                  <Calculator size={16} />
+                  <span>Conteo Rápido de Billetes Físicos (Para Arqueo)</span>
+                </div>
+
+                <div className="bill-counter-grid">
+                  {Object.keys(billCounts).reverse().map(denom => (
+                    <div key={denom} className="bill-counter-row">
+                      <span className="bill-label">${Number(denom).toLocaleString('es-AR')} x</span>
+                      <input 
+                        type="number"
+                        min="0"
+                        className="bill-input"
+                        value={billCounts[denom] || ''}
+                        placeholder="0"
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0;
+                          setBillCounts({ ...billCounts, [denom]: val });
+                        }}
+                      />
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--text-muted)', minWidth: '70px', textAlign: 'right' }}>
+                        = ${(Number(denom) * (billCounts[denom] || 0)).toLocaleString('es-AR')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* ARQUEO COMPARISON */}
+                <div 
+                  style={{ 
+                    marginTop: '1rem', 
+                    padding: '0.85rem', 
+                    background: 'rgba(15, 23, 42, 0.8)', 
+                    borderRadius: 'var(--radius-sm)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Efectivo Contado:</div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '1.35rem', fontWeight: 900, color: 'var(--accent-emerald)' }}>
+                      ${totalCountedCash.toLocaleString('es-AR')}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Efectivo Esperado:</div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '1.35rem', fontWeight: 800 }}>
+                      ${shiftMetrics.expectedCashInDrawer.toLocaleString('es-AR')}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Diferencia:</div>
+                    <div 
+                      style={{ 
+                        fontFamily: 'var(--font-mono)', 
+                        fontSize: '1.35rem', 
+                        fontWeight: 900, 
+                        color: cashDifference === 0 ? 'var(--accent-emerald)' : (cashDifference > 0 ? 'var(--accent-blue)' : 'var(--accent-rose)') 
+                      }}
+                    >
+                      {cashDifference > 0 ? `+$${cashDifference.toLocaleString('es-AR')} (Sobrante)` : 
+                       (cashDifference < 0 ? `-$${Math.abs(cashDifference).toLocaleString('es-AR')} (Faltante)` : '$0 (Exacto)')}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {cashShift && !cashShift.isClosed && (
+          <div className="modal-footer">
+            <button className="btn-secondary" onClick={onClose}>
+              Cerrar Ventana
+            </button>
+            <button 
+              className="btn-primary" 
+              onClick={handleCloseShiftSubmit}
+              style={{ background: 'var(--accent-rose)', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Lock size={16} />
+              <span>Finalizar y Cerrar Turno de Caja</span>
+            </button>
           </div>
         )}
       </div>

@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import confetti from 'canvas-confetti';
 import Header from './components/common/Header';
+import ToastContainer from './components/common/ToastContainer';
+import ShortcutsHelpModal from './components/common/ShortcutsHelpModal';
 import FastOrderPad from './components/pos/FastOrderPad';
 import KitchenDisplay from './components/pos/KitchenDisplay';
-import CashControlModal from './components/pos/CashControlModal';
-import TicketPreviewModal from './components/pos/TicketPreviewModal';
 import OrderHistory from './components/pos/OrderHistory';
 import MenuManagement from './components/pos/MenuManagement';
+import CashControlModal from './components/pos/CashControlModal';
 import SettingsModal from './components/pos/SettingsModal';
+import TicketPreviewModal from './components/pos/TicketPreviewModal';
+
 import { storageService } from './services/storageService';
-import { audioService } from './services/audioService';
 import { printerService } from './services/printerService';
 import { supabaseSync } from './services/supabaseClient';
+import { audioService } from './services/audioService';
+import { toastService } from './services/toastService';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState('pos'); // 'pos' | 'kds' | 'history' | 'menu'
@@ -20,73 +23,91 @@ export default function App() {
   const [cashShift, setCashShift] = useState(null);
   const [settings, setSettings] = useState(null);
 
-  // Modals
+  // Modals state
   const [isCashModalOpen, setIsCashModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [previewOrder, setPreviewOrder] = useState(null);
 
-  // Load initial data (Local first, then try Cloud)
+  // Initialize data
   useEffect(() => {
-    const localProds = storageService.getProducts();
-    setProducts(localProds);
+    storageService.init();
+    setProducts(storageService.getProducts());
     setOrders(storageService.getOrders());
-    setCashShift(storageService.getCashShift());
+    setCashShift(storageService.getCurrentCashShift());
     setSettings(storageService.getSettings());
 
-    // Try fetching from Supabase if configured
-    (async () => {
-      if (supabaseSync.isConfigured()) {
-        const cloudProds = await supabaseSync.fetchProducts();
-        if (cloudProds && cloudProds.length > 0) {
-          setProducts(cloudProds);
-          storageService.saveProducts(cloudProds);
-        }
+    // Initialize Supabase realtime sync
+    supabaseSync.init(
+      (newOrder) => {
+        setOrders(prev => [newOrder, ...prev.filter(o => o.id !== newOrder.id)]);
+        audioService.playOrderChime();
+        toastService.info(`Nueva orden #${newOrder.orderNumber} recibida`);
+      },
+      (orderId, status) => {
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
       }
-    })();
+    );
   }, []);
 
-  // Keyboard shortcuts
+  // Global Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'F1') { e.preventDefault(); setCurrentTab('pos'); }
-      if (e.key === 'F2') { e.preventDefault(); setCurrentTab('kds'); }
-      if (e.key === 'F3') { e.preventDefault(); setCurrentTab('history'); }
-      if (e.key === 'F4') { e.preventDefault(); setCurrentTab('menu'); }
-      if (e.key === 'F5') { e.preventDefault(); setIsCashModalOpen(true); }
+      // Escape closes modals
+      if (e.key === 'Escape') {
+        setIsCashModalOpen(false);
+        setIsSettingsModalOpen(false);
+        setIsShortcutsModalOpen(false);
+        setPreviewOrder(null);
+        return;
+      }
+
+      // F1 - F4 Navigation
+      if (e.key === 'F1' || (e.altKey && e.key === '1')) { e.preventDefault(); setCurrentTab('pos'); }
+      if (e.key === 'F2' || (e.altKey && e.key === '2')) { e.preventDefault(); setCurrentTab('kds'); }
+      if (e.key === 'F3' || (e.altKey && e.key === '3')) { e.preventDefault(); setCurrentTab('history'); }
+      if (e.key === 'F4' || (e.altKey && e.key === '4')) { e.preventDefault(); setCurrentTab('menu'); }
+
+      // Alt+C for Cash Modal
+      if (e.altKey && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        setIsCashModalOpen(prev => !prev);
+      }
+
+      // Alt+A for Drawer Kick
+      if (e.altKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        if (settings) printerService.kickCashDrawer(settings);
+        toastService.success('Cajón de dinero abierto');
+      }
+
+      // Question mark or F10 for shortcuts
+      if (e.key === 'F10' || (e.key === '?' && document.activeElement.tagName !== 'INPUT')) {
+        e.preventDefault();
+        setIsShortcutsModalOpen(prev => !prev);
+      }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [settings]);
 
-  const pendingKitchenCount = orders.filter(o => o.status === 'pendiente' || o.status === 'cocina').length;
+  // Pending orders in kitchen
+  const pendingKitchenCount = orders.filter(o => o.status === 'pendiente' || o.status === 'en_cocina').length;
 
-  // Handlers
+  // Order Handlers
   const handleSaveOrder = (orderData) => {
     const savedOrder = storageService.saveOrder(orderData);
     setOrders(storageService.getOrders());
-    
-    // Sync to Supabase in background
-    supabaseSync.pushOrder(savedOrder);
 
-    // Audio feedback
+    // Sound chime
     audioService.playOrderChime();
 
-    // Celebration confetti
-    try {
-      confetti({
-        particleCount: 50,
-        spread: 60,
-        origin: { y: 0.8 }
-      });
-    } catch (e) {}
+    // Push to Supabase
+    supabaseSync.pushOrder(savedOrder);
 
-    // Auto open cash drawer if cash sale
-    if (orderData.paymentMethod === 'efectivo') {
-      printerService.kickCashDrawer(settings);
-    }
-
-    // Auto print or show preview
-    if (orderData.autoPrint) {
+    // Auto print thermal ticket if enabled
+    if (settings?.autoPrintOrders) {
       const kitchenHtml = printerService.getKitchenTicketHtml(savedOrder, settings);
       const customerHtml = printerService.getCustomerTicketHtml(savedOrder, settings);
       printerService.printHtml(`
@@ -110,18 +131,20 @@ export default function App() {
   const handleDeleteOrder = (orderId) => {
     storageService.deleteOrder(orderId);
     setOrders(storageService.getOrders());
+    toastService.info('Orden eliminada');
   };
 
   const handleSaveProducts = (newProducts) => {
     storageService.saveProducts(newProducts);
     setProducts(newProducts);
-    // Sync to Supabase
     supabaseSync.pushProducts(newProducts);
+    toastService.success('Menú actualizado correctamente');
   };
 
   const handleSaveSettings = (newSettings) => {
     storageService.saveSettings(newSettings);
     setSettings(newSettings);
+    toastService.success('Ajustes guardados');
   };
 
   // Cash Handlers
@@ -152,6 +175,7 @@ export default function App() {
         settings={settings}
         onOpenCashModal={() => setIsCashModalOpen(true)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
+        onOpenShortcuts={() => setIsShortcutsModalOpen(true)}
       />
 
       <main className="main-content">
@@ -214,6 +238,15 @@ export default function App() {
           onClose={() => setPreviewOrder(null)}
         />
       )}
+
+      {isShortcutsModalOpen && (
+        <ShortcutsHelpModal 
+          onClose={() => setIsShortcutsModalOpen(false)}
+        />
+      )}
+
+      {/* FLOATING TOAST NOTIFICATIONS */}
+      <ToastContainer />
     </div>
   );
 }
