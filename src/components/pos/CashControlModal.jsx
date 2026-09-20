@@ -149,7 +149,7 @@ export default function CashControlModal({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <div style={{ background: 'var(--bg-main)', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>FONDO INICIAL:</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#fff' }}>${cashShift.initialCash.toLocaleString('es-AR')}</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)' }}>${cashShift.initialCash.toLocaleString('es-AR')}</div>
               </div>
 
               <div style={{ background: 'var(--bg-main)', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>

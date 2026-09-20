@@ -84,7 +84,7 @@ export default function MenuManagement({ products, onSaveProducts }) {
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
               <span style={{ fontSize: '2rem' }}>{prod.emoji}</span>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 800, color: '#fff' }}>{prod.name}</div>
+                <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{prod.name}</div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--accent-amber)', fontWeight: 700 }}>{prod.category}</div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>{prod.description}</div>
               </div>

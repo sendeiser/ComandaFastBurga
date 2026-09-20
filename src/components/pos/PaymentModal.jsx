@@ -214,7 +214,7 @@ export default function PaymentModal({
         {method === 'tarjeta' && (
           <div style={{ background: 'var(--bg-main)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', textAlign: 'center', color: 'var(--text-secondary)' }}>
             <CreditCard size={32} style={{ color: 'var(--accent-blue)', margin: '0 auto 0.5rem' }} />
-            <div style={{ fontWeight: 700, color: '#fff' }}>Cobro con Posnet / Lector de Tarjetas</div>
+            <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Cobro con Posnet / Lector de Tarjetas</div>
             <div style={{ fontSize: '0.8rem', marginTop: '4px' }}>Pase la tarjeta por la terminal de cobro y confirme.</div>
           </div>
         )}

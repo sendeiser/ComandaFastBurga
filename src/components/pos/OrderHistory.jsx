@@ -73,7 +73,7 @@ export default function OrderHistory({
             ) : (
               filteredOrders.map(order => (
                 <tr key={order.id} style={{ borderBottom: '1px solid var(--border-subtle)', transition: 'background 0.15s' }}>
-                  <td style={{ padding: '0.85rem 1rem', fontWeight: 900, color: '#fff', fontSize: '1rem' }}>
+                  <td style={{ padding: '0.85rem 1rem', fontWeight: 900, color: 'var(--text-primary)', fontSize: '1rem' }}>
                     #{order.orderNumber}
                   </td>
                   <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)' }}>
@@ -85,7 +85,7 @@ export default function OrderHistory({
                     </span>
                   </td>
                   <td style={{ padding: '0.85rem 1rem' }}>
-                    <div style={{ fontWeight: 700, color: '#fff' }}>{order.customer?.name || 'Consumidor Final'}</div>
+                    <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{order.customer?.name || 'Consumidor Final'}</div>
                     {order.customer?.address && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{order.customer.address}</div>}
                   </td>
                   <td style={{ padding: '0.85rem 1rem', fontSize: '0.8rem', maxWidth: '240px' }}>

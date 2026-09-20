@@ -93,7 +93,7 @@ export default function WhatsAppImportModal({
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px' }}>
                   {parsedResult.items.map((it, idx) => (
-                    <div key={idx} style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff' }}>
+                    <div key={idx} style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                       • {it.qty}x {it.name} {it.modifiers.length > 0 && <span style={{ color: 'var(--accent-amber)', fontSize: '0.75rem' }}>({it.modifiers.join(', ')})</span>}
                     </div>
                   ))}
@@ -105,7 +105,7 @@ export default function WhatsAppImportModal({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem' }}>
               <div>
                 <span style={{ color: 'var(--text-muted)' }}>Dirección: </span>
-                <strong style={{ color: '#fff' }}>{parsedResult.customer?.address || 'No detectada'}</strong>
+                <strong style={{ color: 'var(--text-primary)' }}>{parsedResult.customer?.address || 'No detectada'}</strong>
               </div>
               <div>
                 <span style={{ color: 'var(--text-muted)' }}>Pago: </span>
