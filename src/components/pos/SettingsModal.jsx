@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings, Download, Upload, Printer, DollarSign, Database, Bluetooth, Usb, CheckCircle } from 'lucide-react';
+import { X, Settings, Download, Upload, Printer, DollarSign, Database, Bluetooth, Usb, CheckCircle, Palette, FileText, Check } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 import { printerService } from '../../services/printerService';
 import { supabaseSync } from '../../services/supabaseClient';
@@ -107,6 +107,161 @@ export default function SettingsModal({ settings, onSaveSettings, onClose }) {
             <div>
               <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Alias MP / Banco para Transferencias:</label>
               <input type="text" className="custom-input-sm" value={form.alias} onChange={e => setForm({ ...form, alias: e.target.value })} />
+            </div>
+          </div>
+
+          {/* DISEÑO & PLANTILLAS DE TICKET TÉRMICO */}
+          <div style={{ background: 'var(--bg-main)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--accent-amber)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Palette size={18} />
+                <span>Diseño & Plantilla del Ticket Térmico</span>
+              </div>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+                Personalización 58mm / 80mm
+              </span>
+            </div>
+
+            {/* Theme Selector Grid */}
+            <div>
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
+                Selecciona la plantilla de diseño para cocina y cliente:
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
+                {[
+                  { id: 'classic', label: '🏛️ Clásico', title: 'Tradicional 32 col', desc: 'Separadores de guiones y formato POS estándar' },
+                  { id: 'modern', label: '✨ Moderno', title: 'Gourmet / Invertido', desc: 'Total en bloque negro invertido y marco doble' },
+                  { id: 'minimal', label: '⚡ Minimal Eco', title: 'Ahorro de Papel', desc: 'Ultra-compacto, reduce hasta 40% de papel' },
+                  { id: 'street', label: '🍔 Street Food', title: 'Audaz & Modificadores', desc: 'Letras grandes, emojis y mod resaltadas' }
+                ].map(th => (
+                  <div
+                    key={th.id}
+                    onClick={() => setForm({ ...form, ticketTheme: th.id })}
+                    style={{
+                      border: form.ticketTheme === th.id ? '2px solid var(--accent-amber)' : '1px solid var(--border-subtle)',
+                      background: form.ticketTheme === th.id ? 'rgba(245, 158, 11, 0.12)' : 'var(--bg-card)',
+                      borderRadius: 'var(--radius-sm)',
+                      padding: '0.65rem 0.75rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '2px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.85rem', color: form.ticketTheme === th.id ? 'var(--accent-amber)' : 'var(--text-primary)' }}>
+                        {th.label}
+                      </span>
+                      {form.ticketTheme === th.id && <Check size={14} style={{ color: 'var(--accent-amber)' }} />}
+                    </div>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>{th.title}</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.2 }}>{th.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom Footer Input & Presets */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Mensaje de Pie del Ticket:</label>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button 
+                    type="button" 
+                    className="cat-pill-btn" 
+                    style={{ fontSize: '0.7rem', height: '22px', padding: '0 6px' }}
+                    onClick={() => setForm({ ...form, ticketCustomFooter: '¡Gracias por su compra!\nComandaFast Gastronomía' })}
+                  >
+                    + Estándar
+                  </button>
+                  <button 
+                    type="button" 
+                    className="cat-pill-btn" 
+                    style={{ fontSize: '0.7rem', height: '22px', padding: '0 6px' }}
+                    onClick={() => setForm({ ...form, ticketCustomFooter: '🍔 ¡Seguinos en Instagram!\n@tu_comercio_ok' })}
+                  >
+                    + Instagram
+                  </button>
+                  <button 
+                    type="button" 
+                    className="cat-pill-btn" 
+                    style={{ fontSize: '0.7rem', height: '22px', padding: '0 6px' }}
+                    onClick={() => setForm({ ...form, ticketCustomFooter: '📶 Wi-Fi Clientes: ClaveBurger\n¡Vuelve pronto!' })}
+                  >
+                    + Wi-Fi
+                  </button>
+                </div>
+              </div>
+              <textarea 
+                className="form-textarea" 
+                rows="2"
+                style={{ fontSize: '0.85rem', width: '100%', resize: 'none' }}
+                value={form.ticketCustomFooter || ''} 
+                onChange={e => setForm({ ...form, ticketCustomFooter: e.target.value })}
+                placeholder="Texto de agradecimiento o redes sociales..."
+              />
+            </div>
+
+            {/* Toggles de Contenido Visible */}
+            <div>
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
+                Elementos a imprimir en el ticket:
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.4rem', fontSize: '0.75rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={form.ticketShowSlogan !== false} 
+                    onChange={e => setForm({ ...form, ticketShowSlogan: e.target.checked })} 
+                  />
+                  <span>Eslogan</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={form.ticketShowAddress !== false} 
+                    onChange={e => setForm({ ...form, ticketShowAddress: e.target.checked })} 
+                  />
+                  <span>Dirección</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={form.ticketShowPhone !== false} 
+                    onChange={e => setForm({ ...form, ticketShowPhone: e.target.checked })} 
+                  />
+                  <span>Teléfono</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={form.ticketShowAlias !== false} 
+                    onChange={e => setForm({ ...form, ticketShowAlias: e.target.checked })} 
+                  />
+                  <span>Alias MP / CBU</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={form.ticketShowCustomer !== false} 
+                    onChange={e => setForm({ ...form, ticketShowCustomer: e.target.checked })} 
+                  />
+                  <span>Datos de Entrega</span>
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span>Ancho:</span>
+                  <select 
+                    className="custom-input-sm" 
+                    style={{ padding: '2px 4px', height: '26px', fontSize: '0.75rem', width: 'auto' }}
+                    value={form.ticketWidth || '58mm'} 
+                    onChange={e => setForm({ ...form, ticketWidth: e.target.value })}
+                  >
+                    <option value="58mm">58mm (XP-58)</option>
+                    <option value="80mm">80mm (Grande)</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
 

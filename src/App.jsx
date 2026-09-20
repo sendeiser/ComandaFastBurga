@@ -228,6 +228,7 @@ export default function App() {
         <TicketPreviewModal 
           order={previewOrder}
           settings={settings}
+          onUpdateSettings={setSettings}
           onClose={() => setPreviewOrder(null)}
         />
       )}

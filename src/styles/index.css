@@ -1304,6 +1304,13 @@ body.light-theme {
   color: #b45309;
 }
 
+[data-theme="light"] .receipt-paper {
+  background: #ffffff;
+  color: #000000;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+}
+
 [data-theme="light"] .pos-mobile-cart-bar {
   background: #ffffff;
   border-color: var(--accent-amber);

@@ -121,6 +121,13 @@ const DEFAULT_SETTINGS = {
   alias: 'BURGER.CHAMICAL.MP',
   cbu: '0000003100045678901234',
   ticketWidth: '58mm', // '58mm' | '80mm'
+  ticketTheme: 'classic', // 'classic' | 'modern' | 'minimal' | 'street'
+  ticketCustomFooter: '¡Gracias por su compra!\nComandaFast Gastronomía',
+  ticketShowSlogan: true,
+  ticketShowAddress: true,
+  ticketShowPhone: true,
+  ticketShowAlias: true,
+  ticketShowCustomer: true,
   autoPrintOnConfirm: true,
   soundAlerts: true,
   deliveryDefaultFee: 1000,
