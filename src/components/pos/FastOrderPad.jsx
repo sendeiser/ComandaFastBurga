@@ -161,40 +161,44 @@ export default function FastOrderPad({
 
       {/* LEFT: PRODUCTS CATALOG */}
       <div className={`pos-catalog-panel ${mobileTab === 'catalog' ? 'mobile-active' : ''}`}>
-        <div className="search-filter-bar">
-          <div className="search-input-wrapper">
-            <Search size={18} className="search-icon-inside" />
-            <input 
-              type="text" 
-              placeholder="Buscar hamburguesa, bebida, combo..." 
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
+        {/* STICKY SEARCH & CATEGORIES HEADER */}
+        <div className="catalog-sticky-header">
+          <div className="search-filter-bar">
+            <div className="search-input-wrapper">
+              <Search size={18} className="search-icon-inside" />
+              <input 
+                type="text" 
+                placeholder="Buscar hamburguesa, bebida, combo..." 
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            <button 
+              type="button" 
+              className="cat-pill-btn"
+              style={{ background: 'linear-gradient(135deg, #15803d, #16a34a)', color: '#fff', border: 'none', gap: '6px' }}
+              onClick={() => setIsWhatsAppImportOpen(true)}
+              title="Pegar y parsear texto de WhatsApp"
+            >
+              <Sparkles size={16} />
+              <span>Pegar WhatsApp</span>
+            </button>
           </div>
 
-          <button 
-            type="button" 
-            className="cat-pill-btn"
-            style={{ background: 'linear-gradient(135deg, #15803d, #16a34a)', color: '#fff', border: 'none', gap: '6px' }}
-            onClick={() => setIsWhatsAppImportOpen(true)}
-            title="Pegar y parsear texto de WhatsApp"
-          >
-            <Sparkles size={16} />
-            <span>Pegar WhatsApp</span>
-          </button>
-        </div>
-
-        {/* Category Filter Pills */}
-        <div className="category-scroll-pills">
-          {categories.map(cat => (
-            <button
-              key={cat}
-              className={`cat-pill-btn ${selectedCategory === cat ? 'active' : ''}`}
-              onClick={() => setSelectedCategory(cat)}
-            >
-              <span>{cat}</span>
-            </button>
-          ))}
+          {/* Category Filter Pills */}
+          <div className="category-scroll-pills">
+            {categories.map(cat => (
+              <button
+                key={cat}
+                type="button"
+                className={`cat-pill-btn ${selectedCategory === cat ? 'active' : ''}`}
+                onClick={() => setSelectedCategory(cat)}
+              >
+                <span>{cat}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Products Grid */}
