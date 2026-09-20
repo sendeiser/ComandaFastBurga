@@ -12,7 +12,8 @@ import {
   AlertCircle, 
   Cloud, 
   Sun, 
-  Moon 
+  Moon,
+  ShieldCheck
 } from 'lucide-react';
 import { printerService } from '../../services/printerService';
 import { supabaseSync } from '../../services/supabaseClient';
