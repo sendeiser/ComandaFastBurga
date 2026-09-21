@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Bot, FlaskConical, Settings, ShieldCheck, QrCode, 
+  Bot, Download, Terminal, FlaskConical, Settings, ShieldCheck, QrCode, 
   Smartphone, CheckCircle2, Save, RotateCcw, Plus, 
   Trash2, Copy, Check, Info, Zap, AlertCircle, RefreshCw,
   Power, Wifi, WifiOff, ExternalLink
@@ -131,6 +131,189 @@ export default function AdminWhatsAppBot() {
   };
 
   // Acciones en vivo con el servidor Baileys
+    // Descarga directa del script local para Windows (.bat)
+  const handleDownloadBotScript = () => {
+    const batContent = `@echo off
+chcp 65001 > nul
+title ComandaFast - Servidor WhatsApp Bot (Baileys)
+color 0B
+cls
+
+echo =====================================================================
+echo    [COMANDAFAST BURGERS] - SERVIDOR LOCAL WHATSAPP BOT (BAILEYS)
+echo =====================================================================
+echo.
+
+cd /d "%~dp0"
+
+:: 1. Verificar si Node.js esta instalado
+where node >nul 2>nul
+if %errorlevel% neq 0 (
+    color 0C
+    echo [ERROR] Node.js no esta instalado o no se encuentra en el PATH.
+    echo Por favor descarga e instala Node.js desde: https://nodejs.org/
+    echo.
+    pause
+    exit /b 1
+)
+
+:: 2. Verificar dependencias de Baileys y qrcode-terminal
+if not exist "node_modules\\@whiskeysockets\\baileys" (
+    echo [INFO] Instalando dependencias necesarias de Baileys y WhatsApp...
+    call npm install
+    if %errorlevel% neq 0 (
+        color 0C
+        echo [ERROR] Hubo un error al instalar las dependencias con npm.
+        pause
+        exit /b 1
+    )
+)
+
+:: 3. Verificar si el puerto 3002 ya esta ocupado
+set OCCUPIED_PID=
+for /f "tokens=5" %%p in ('netstat -aon ^| findstr :3002 ^| findstr LISTENING 2^>nul') do (
+    set OCCUPIED_PID=%%p
+)
+
+if defined OCCUPIED_PID (
+    echo [AVISO] El puerto 3002 ya esta siendo usado por el proceso PID %OCCUPIED_PID%.
+    echo Es probable que una instancia previa del bot ya este en ejecucion.
+    echo.
+    set /p RESTART_CONFIRM="Deseas detener el proceso anterior para ver el bot/QR? (S/N): "
+    if /i "%RESTART_CONFIRM%"=="S" (
+        echo Deteniendo proceso %OCCUPIED_PID%...
+        taskkill /F /PID %OCCUPIED_PID% >nul 2>nul
+        timeout /t 2 /nobreak >nul
+    ) else (
+        echo.
+        echo Manteniendo el bot actual activo en http://localhost:3002/status
+        echo Podes gestionar el bot desde el panel de Dueno: http://localhost:5174/#dueno
+        echo.
+        pause
+        exit /b 0
+    )
+)
+
+:: 4. Opcion por parametro directo (--reset o --qr)
+if "%1"=="--reset" goto :DO_RESET
+if "%1"=="--qr" goto :DO_RESET
+if "%1"=="-r" goto :DO_RESET
+
+:ASK_MODE
+cls
+echo =====================================================================
+echo    [COMANDAFAST BURGERS] - SERVIDOR LOCAL WHATSAPP BOT (BAILEYS)
+echo =====================================================================
+echo.
+echo ¿Como deseas iniciar el bot de WhatsApp?
+echo.
+echo   [1] Conectar normalmente (Usa la sesion guardada si ya estas vinculado)
+echo   [2] Vincular NUEVO celular (Muestra el CODIGO QR en pantalla para escanear)
+echo.
+set BOT_CHOICE=1
+set /p BOT_CHOICE="Elige una opcion [1 o 2] (Por defecto 1): "
+
+if "%BOT_CHOICE%"=="2" goto :DO_RESET
+goto :RUN_NORMAL
+
+:DO_RESET
+cls
+echo =====================================================================
+echo    [VINCULAR NUEVO WHATSAPP - CODIGO QR EN PANTALLA]
+echo =====================================================================
+echo.
+echo Generando nuevo codigo QR en terminal...
+echo Cuando aparezca el codigo, escanealo con WhatsApp desde tu celular:
+echo -> WhatsApp > Menu (o Ajustes) > Dispositivos vinculados > Vincular
+echo.
+echo =====================================================================
+echo.
+node server/whatsappBotServer.js --reset
+goto :AFTER_BOT
+
+:RUN_NORMAL
+cls
+echo =====================================================================
+echo    [CONECTANDO WHATSAPP BOT COMANDAFAST]
+echo =====================================================================
+echo.
+echo Iniciando microservicio...
+echo Si no hay sesion guardada, aparecera el codigo QR aqui abajo:
+echo.
+node server/whatsappBotServer.js
+goto :AFTER_BOT
+
+:AFTER_BOT
+echo.
+echo ---------------------------------------------------------------------
+echo El servidor del bot se ha detenido.
+echo.
+set /p RESTART_BOT="Deseas reiniciar el bot ahora? (S/N): "
+if /i "%RESTART_BOT%"=="S" goto :ASK_MODE
+
+echo Saliendo...
+`;
+    const blob = new Blob([batContent], { type: 'application/x-bat;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'INICIAR_BOT_WHATSAPP.bat';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadAllScript = () => {
+    const batContent = `@echo off
+chcp 65001 > nul
+title ComandaFast - Lanzador Completo (Sistema + Bot)
+color 0E
+cls
+
+echo =====================================================================
+echo    [COMANDAFAST BURGERS] - LANZADOR COMPLETO (SISTEMA + BOT)
+echo =====================================================================
+echo.
+echo Este script iniciara:
+echo   1. Servidor del Bot de WhatsApp (Puerto 3002)
+echo   2. Servidor Web POS / Cocina / Auditoria de Dueno (Vite)
+echo   3. Apertura automatica del navegador en el panel administrativo
+echo.
+echo =====================================================================
+echo.
+pause
+
+cd /d "%~dp0"
+
+echo.
+echo [1/3] Lanzando Servidor WhatsApp Bot en ventana separada...
+start "ComandaFast - WhatsApp Bot" cmd /c "INICIAR_BOT_WHATSAPP.bat"
+
+timeout /t 2 /nobreak >nul
+
+echo [2/3] Abriendo navegador en el Portal del Dueno & Chatbot...
+start http://localhost:5174/#dueno
+
+echo [3/3] Iniciando Servidor Web (Vite)...
+echo.
+echo (Para cerrar todo cuando termines, simplemente cerra estas consolas)
+echo =====================================================================
+echo.
+
+call npm run dev
+`;
+    const blob = new Blob([batContent], { type: 'application/x-bat;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'INICIAR_SISTEMA_COMPLETO.bat';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const handleStartBot = async () => {
     setLoadingAction(true);
     try {
@@ -696,6 +879,29 @@ export default function AdminWhatsAppBot() {
               </div>
             )}
 
+                        {/* BOTÓN RÁPIDO PARA DESCARGAR SCRIPT */}
+            <button
+              type="button"
+              onClick={handleDownloadBotScript}
+              className="cat-pill-btn"
+              style={{
+                width: '100%',
+                height: '36px',
+                padding: '0 0.85rem',
+                fontSize: '0.78rem',
+                background: 'rgba(37, 211, 102, 0.12)',
+                color: '#25D366',
+                border: '1px solid rgba(37, 211, 102, 0.3)',
+                gap: '6px',
+                justifyContent: 'center',
+                fontWeight: 700
+              }}
+              title="Descargar script para ejecutar el bot localmente"
+            >
+              <Download size={14} />
+              <span>Descargar Script Local (.bat)</span>
+            </button>
+
             {/* CONTROLS */}
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center', width: '100%' }}>
               {connectionStatus !== 'connected' ? (
@@ -758,18 +964,139 @@ export default function AdminWhatsAppBot() {
                   </ul>
                 </div>
                 <div style={{ marginTop: '4px' }}>
-                  <button
-                    type="button"
-                    className="cat-pill-btn active"
-                    style={{ height: '32px', padding: '0 0.85rem', fontSize: '0.78rem', gap: '6px' }}
-                    onClick={fetchServerStatus}
-                  >
-                    <RefreshCw size={13} />
-                    <span>Comprobar Estado del Servidor</span>
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="cat-pill-btn active"
+                      style={{ height: '32px', padding: '0 0.85rem', fontSize: '0.78rem', gap: '6px' }}
+                      onClick={fetchServerStatus}
+                    >
+                      <RefreshCw size={13} />
+                      <span>Comprobar Estado del Servidor</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="cat-pill-btn"
+                      style={{
+                        height: '32px',
+                        padding: '0 0.85rem',
+                        fontSize: '0.78rem',
+                        gap: '6px',
+                        background: 'var(--accent-amber)',
+                        color: '#000',
+                        fontWeight: 800
+                      }}
+                      onClick={handleDownloadBotScript}
+                    >
+                      <Download size={13} />
+                      <span>Descargar INICIAR_BOT_WHATSAPP.bat</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
+
+                        {/* TARJETA DE DESCARGA DE SCRIPTS */}
+            <div style={{
+              background: 'var(--bg-main)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-md)',
+              padding: '1.15rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.75rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Terminal size={17} style={{ color: 'var(--accent-emerald)' }} />
+                  <span>Descargar Scripts de Ejecución Local para Windows</span>
+                </div>
+                <span style={{ fontSize: '0.7rem', background: 'rgba(37, 211, 102, 0.15)', color: '#25D366', padding: '2px 8px', borderRadius: '4px', fontWeight: 800 }}>
+                  Listo para Usar
+                </span>
+              </div>
+              
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+                Podés descargar los archivos ejecutables <strong>.bat</strong> directamente en tu PC. Incluyen detección de Node.js, auto-instalación de dependencias, control de puertos y visualización de Código QR en consola.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', marginTop: '4px' }}>
+                {/* BOT ONLY SCRIPT */}
+                <div style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '0.85rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px'
+                }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Smartphone size={15} style={{ color: '#25D366' }} />
+                    <span>Bot de WhatsApp</span>
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    Inicia el microservicio Baileys en puerto 3002 con menú de QR en consola.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDownloadBotScript}
+                    className="cat-pill-btn active"
+                    style={{
+                      marginTop: '6px',
+                      height: '32px',
+                      fontSize: '0.75rem',
+                      gap: '6px',
+                      justifyContent: 'center',
+                      background: '#25D366',
+                      color: '#052e16',
+                      fontWeight: 800
+                    }}
+                  >
+                    <Download size={13} />
+                    <span>Descargar INICIAR_BOT_WHATSAPP.bat</span>
+                  </button>
+                </div>
+
+                {/* FULL SYSTEM SCRIPT */}
+                <div style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '0.85rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px'
+                }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Zap size={15} style={{ color: 'var(--accent-amber)' }} />
+                    <span>Sistema Completo + Bot</span>
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    Lanza el Bot en consola, el servidor web Vite y abre el navegador automáticamente.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDownloadAllScript}
+                    className="cat-pill-btn"
+                    style={{
+                      marginTop: '6px',
+                      height: '32px',
+                      fontSize: '0.75rem',
+                      gap: '6px',
+                      justifyContent: 'center',
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      color: 'var(--accent-amber)',
+                      border: '1px solid var(--accent-amber)',
+                      fontWeight: 800
+                    }}
+                  >
+                    <Download size={13} />
+                    <span>Descargar INICIAR_SISTEMA_COMPLETO.bat</span>
+                  </button>
+                </div>
+              </div>
+            </div>
 
             {/* STEPS TO CONNECT */}
             <div style={{

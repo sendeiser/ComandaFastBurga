@@ -647,6 +647,23 @@ app.post('/api/orders/ack', (req, res) => {
 });
 
 // Endpoint para consultar histórico de pedidos de WhatsApp
+// Endpoints para descarga directa de scripts (.bat)
+app.get('/download/INICIAR_BOT_WHATSAPP.bat', (req, res) => {
+  const filePath = path.join(process.cwd(), 'INICIAR_BOT_WHATSAPP.bat');
+  if (fs.existsSync(filePath)) {
+    return res.download(filePath, 'INICIAR_BOT_WHATSAPP.bat');
+  }
+  res.status(404).send('Archivo no encontrado');
+});
+
+app.get('/download/INICIAR_SISTEMA_COMPLETO.bat', (req, res) => {
+  const filePath = path.join(process.cwd(), 'INICIAR_SISTEMA_COMPLETO.bat');
+  if (fs.existsSync(filePath)) {
+    return res.download(filePath, 'INICIAR_SISTEMA_COMPLETO.bat');
+  }
+  res.status(404).send('Archivo no encontrado');
+});
+
 app.get('/api/orders', (req, res) => {
   res.json({ success: true, orders: getStoredOrders() });
 });
