@@ -148,14 +148,21 @@ export default function App() {
     };
     window.addEventListener('storage', handleStorageChange);
 
-    // 2. Polling activo contra el microservicio WhatsApp (puerto 3002)
+    // 2. Polling activo con backoff inteligente contra el microservicio WhatsApp (puerto 3002)
     let isPolling = false;
-    const botOrderInterval = setInterval(async () => {
+    let pollTimer = null;
+    let consecutiveOfflineErrors = 0;
+
+    const pollOrders = async () => {
       if (isPolling) return;
       isPolling = true;
+      let nextDelay = 2500;
+
       try {
         const res = await fetch('http://localhost:3002/api/orders/pending');
         if (res.ok) {
+          consecutiveOfflineErrors = 0;
+          nextDelay = 2500;
           const data = await res.json();
           if (data && Array.isArray(data.orders) && data.orders.length > 0) {
             const ackIds = [];
@@ -189,18 +196,26 @@ export default function App() {
               body: JSON.stringify({ ids: ackIds })
             });
           }
+        } else {
+          consecutiveOfflineErrors++;
+          if (consecutiveOfflineErrors >= 2) nextDelay = 10000;
         }
       } catch (_) {
-        // Microservicio no disponible o inactivo temporalmente
+        // Microservicio no disponible o inactivo temporalmente: espaciar reintentos a 10s
+        consecutiveOfflineErrors++;
+        if (consecutiveOfflineErrors >= 2) nextDelay = 10000;
       } finally {
         isPolling = false;
+        pollTimer = setTimeout(pollOrders, nextDelay);
       }
-    }, 2000);
+    };
+
+    pollTimer = setTimeout(pollOrders, 1500);
 
     return () => {
       window.removeEventListener('comandafast:new-order', handleInternalOrder);
       window.removeEventListener('storage', handleStorageChange);
-      clearInterval(botOrderInterval);
+      if (pollTimer) clearTimeout(pollTimer);
     };
   }, []);
 

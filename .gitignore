@@ -34,3 +34,4 @@ pnpm-debug.log*
 # WhatsApp Bot Baileys Auth session
 data/baileys_auth/
 
+data/ai_config.json

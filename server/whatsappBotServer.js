@@ -207,11 +207,26 @@ class WhatsAppBotServer {
         const prods = getStoredProducts();
 
         for (const msg of chatUpdate.messages) {
-          if (msg.key?.fromMe || !msg.key?.remoteJid || msg.key.remoteJid.endsWith('@g.us')) continue;
+          const remoteJid = msg.key?.remoteJid;
+          if (!remoteJid) continue;
+          if (msg.key?.fromMe) continue;
+
+          // Ignorar estados / historias de WhatsApp y broadcasts
+          if (remoteJid === 'status@broadcast' || remoteJid.endsWith('@broadcast')) continue;
+          // Ignorar grupos
+          if (remoteJid.endsWith('@g.us')) continue;
+          // Ignorar canales informativos de WhatsApp
+          if (remoteJid.includes('@newsletter')) continue;
+
+          // Ignorar mensajes con más de 90 segundos de antigüedad (historial masivo al conectar)
+          const msgTimestamp = Number(msg.messageTimestamp || 0);
+          const nowSec = Math.floor(Date.now() / 1000);
+          if (msgTimestamp > 0 && (nowSec - msgTimestamp) > 90) {
+            continue;
+          }
 
           const text = (msg.message?.conversation || msg.message?.extendedTextMessage?.text || '').trim();
           const isImageMsg = !!msg.message?.imageMessage;
-          const remoteJid = msg.key.remoteJid;
           const lower = text.toLowerCase();
 
           // Si envió una imagen (ej: comprobante de pago)
