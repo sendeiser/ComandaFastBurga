@@ -9,6 +9,7 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import QRCode from 'qrcode';
+import qrcodeTerminal from 'qrcode-terminal';
 import pino from 'pino';
 import makeWASocket, { 
   useMultiFileAuthState, 
@@ -107,9 +108,19 @@ class WhatsAppBotServer {
             this.qrCode = await QRCode.toDataURL(qr, { scale: 8, margin: 2 });
             this.status = 'qr_ready';
             this.isStarting = false;
-            console.log('📲 [WHATSAPP BOT] Código QR emitido y listo para escanear.');
+            
+            console.log('\n=====================================================================');
+            console.log('📲  [WHATSAPP BOT] ESCANEÁ ESTE CÓDIGO QR PARA VINCULAR TU WHATSAPP:');
+            console.log('=====================================================================\n');
+            qrcodeTerminal.generate(qr, { small: true });
+            console.log('\n=====================================================================');
+            console.log('👉 1. Abrí WhatsApp en tu celular.');
+            console.log('👉 2. Andá a Menú (tres puntitos) o Ajustes > Dispositivos vinculados.');
+            console.log('👉 3. Tocá "Vincular un dispositivo" y apuntá la cámara al código de arriba.');
+            console.log('👉 (También disponible en el panel web: http://localhost:5174/#dueno)');
+            console.log('=====================================================================\n');
           } catch (err) {
-            console.error('[WHATSAPP BOT] Error al generar DataURL de QR:', err);
+            console.error('[WHATSAPP BOT] Error al generar código QR:', err);
           }
         }
 
@@ -250,6 +261,13 @@ class WhatsAppBotServer {
 const botServer = new WhatsAppBotServer();
 
 // Iniciar automáticamente
+// Verificar si se solicita reiniciar sesión o generar nuevo código QR
+if (process.argv.includes('--reset') || process.argv.includes('--new-qr')) {
+  console.log('\n🔄 [WHATSAPP BOT] Solicitud de nuevo código QR detectada.');
+  console.log('🧹 Limpiando sesión previa para vincular un nuevo número...\n');
+  botServer.clearAuth();
+}
+
 botServer.start().catch(() => {});
 
 // ENDPOINTS HTTP

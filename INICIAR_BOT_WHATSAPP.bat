@@ -22,7 +22,7 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: 2. Verificar dependencias de Baileys
+:: 2. Verificar dependencias de Baileys y qrcode-terminal
 if not exist "node_modules\@whiskeysockets\baileys" (
     echo [INFO] Instalando dependencias necesarias de Baileys y WhatsApp...
     call npm install
@@ -44,7 +44,7 @@ if defined OCCUPIED_PID (
     echo [AVISO] El puerto 3002 ya esta siendo usado por el proceso PID %OCCUPIED_PID%.
     echo Es probable que una instancia previa del bot ya este en ejecucion.
     echo.
-    set /p RESTART_CONFIRM="Deseas detener el proceso anterior y reiniciar el bot? (S/N): "
+    set /p RESTART_CONFIRM="Deseas detener el proceso anterior para ver el bot/QR? (S/N): "
     if /i "%RESTART_CONFIRM%"=="S" (
         echo Deteniendo proceso %OCCUPIED_PID%...
         taskkill /F /PID %OCCUPIED_PID% >nul 2>nul
@@ -59,29 +59,61 @@ if defined OCCUPIED_PID (
     )
 )
 
-:RUN_BOT
+:: 4. Opcion por parametro directo (--reset o --qr)
+if "%1"=="--reset" goto :DO_RESET
+if "%1"=="--qr" goto :DO_RESET
+if "%1"=="-r" goto :DO_RESET
+
+:ASK_MODE
 cls
 echo =====================================================================
 echo    [COMANDAFAST BURGERS] - SERVIDOR LOCAL WHATSAPP BOT (BAILEYS)
 echo =====================================================================
 echo.
-echo [OK] Microservicio de WhatsApp iniciado en el puerto 3002.
-echo [OK] Estado de sesion y codigos QR sincronizados con el panel web.
+echo ¿Como deseas iniciar el bot de WhatsApp?
 echo.
-echo Para gestionar el bot, ver el simulador o escanear el QR:
-echo -> Ingresa a: http://localhost:5174/#dueno (Pestana Bot WhatsApp)
+echo   [1] Conectar normalmente (Usa la sesion guardada si ya estas vinculado)
+echo   [2] Vincular NUEVO celular (Muestra el CODIGO QR en pantalla para escanear)
 echo.
-echo Presiona Ctrl + C para detener el bot en cualquier momento.
+set BOT_CHOICE=1
+set /p BOT_CHOICE="Elige una opcion [1 o 2] (Por defecto 1): "
+
+if "%BOT_CHOICE%"=="2" goto :DO_RESET
+goto :RUN_NORMAL
+
+:DO_RESET
+cls
+echo =====================================================================
+echo    [VINCULAR NUEVO WHATSAPP - CODIGO QR EN PANTALLA]
 echo =====================================================================
 echo.
+echo Generando nuevo codigo QR en terminal...
+echo Cuando aparezca el codigo, escanealo con WhatsApp desde tu celular:
+echo -> WhatsApp > Menu (o Ajustes) > Dispositivos vinculados > Vincular
+echo.
+echo =====================================================================
+echo.
+node server/whatsappBotServer.js --reset
+goto :AFTER_BOT
 
+:RUN_NORMAL
+cls
+echo =====================================================================
+echo    [CONECTANDO WHATSAPP BOT COMANDAFAST]
+echo =====================================================================
+echo.
+echo Iniciando microservicio...
+echo Si no hay sesion guardada, aparecera el codigo QR aqui abajo:
+echo.
 node server/whatsappBotServer.js
+goto :AFTER_BOT
 
+:AFTER_BOT
 echo.
 echo ---------------------------------------------------------------------
 echo El servidor del bot se ha detenido.
 echo.
 set /p RESTART_BOT="Deseas reiniciar el bot ahora? (S/N): "
-if /i "%RESTART_BOT%"=="S" goto :RUN_BOT
+if /i "%RESTART_BOT%"=="S" goto :ASK_MODE
 
 echo Saliendo...
