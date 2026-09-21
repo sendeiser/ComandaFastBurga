@@ -132,6 +132,78 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Sincronización en tiempo real de pedidos (WhatsApp Bot + Chatbot Lab directo a Cocina)
+  useEffect(() => {
+    // 1. Escuchar pedidos inyectados internamente desde el Chatbot Lab
+    const handleInternalOrder = () => {
+      setOrders(storageService.getOrders());
+      audioService.playOrderChime();
+    };
+    window.addEventListener('comandafast:new-order', handleInternalOrder);
+
+    const handleStorageChange = (e) => {
+      if (e.key === 'comandafast_orders') {
+        setOrders(storageService.getOrders());
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    // 2. Polling activo contra el microservicio WhatsApp (puerto 3002)
+    let isPolling = false;
+    const botOrderInterval = setInterval(async () => {
+      if (isPolling) return;
+      isPolling = true;
+      try {
+        const res = await fetch('http://localhost:3002/api/orders/pending');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.orders) && data.orders.length > 0) {
+            const ackIds = [];
+            for (const ord of data.orders) {
+              const saved = storageService.saveOrder(ord);
+              ackIds.push(ord.id);
+              if (supabaseSync.isConfigured()) {
+                supabaseSync.pushOrder(saved);
+              }
+            }
+
+            // Actualizar estado de pedidos en el POS
+            setOrders(storageService.getOrders());
+
+            // Alerta sonora en cocina y caja
+            audioService.playOrderChime();
+
+            // Animación de celebración
+            try {
+              confetti({
+                particleCount: 60,
+                spread: 70,
+                origin: { y: 0.7 }
+              });
+            } catch (_) {}
+
+            // Confirmar al servidor que los pedidos ya fueron incorporados
+            await fetch('http://localhost:3002/api/orders/ack', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ids: ackIds })
+            });
+          }
+        }
+      } catch (_) {
+        // Microservicio no disponible o inactivo temporalmente
+      } finally {
+        isPolling = false;
+      }
+    }, 2000);
+
+    return () => {
+      window.removeEventListener('comandafast:new-order', handleInternalOrder);
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(botOrderInterval);
+    };
+  }, []);
+
   const pendingKitchenCount = orders.filter(o => o.status === 'pendiente' || o.status === 'cocina').length;
 
   // Handlers

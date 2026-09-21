@@ -50,8 +50,9 @@ export default function KitchenDisplay({
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
             <span className={`order-type-chip ${order.channel}`}>
-              {order.channel === 'whatsapp' ? '🛵 DELIVERY' :
+              {order.channel === 'whatsapp' ? (order.deliveryType === 'local' ? '🛍️ WA RETIRO' : '🛵 WA DELIVERY') :
                order.channel === 'mesa' ? `🍽️ MESA #${order.tableNumber || 'S/N'}` :
+               order.channel === 'delivery' ? '🛵 DELIVERY' :
                '🛍️ MOSTRADOR'}
             </span>
 
@@ -62,9 +63,16 @@ export default function KitchenDisplay({
           </div>
         </div>
 
-        {order.customer?.name && (
+        {(order.customer?.name || typeof order.customer === 'string') && (
           <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
-            Cliente: {order.customer.name}
+            👤 Cliente: {typeof order.customer === 'object' ? order.customer.name : order.customer}
+            {typeof order.customer === 'object' && order.customer.phone ? ` (${order.customer.phone})` : ''}
+          </div>
+        )}
+
+        {typeof order.customer === 'object' && order.customer.address && order.deliveryType === 'delivery' && (
+          <div style={{ fontSize: '0.75rem', color: 'var(--accent-amber)', marginTop: '2px', fontWeight: 600 }}>
+            📍 Envío: {order.customer.address}
           </div>
         )}
 
@@ -79,7 +87,7 @@ export default function KitchenDisplay({
           {order.items.map((item, idx) => (
             <div key={idx} style={{ marginBottom: '4px' }}>
               <div className="kds-item-line">
-                <span className="kds-item-qty">{item.qty}x</span>
+                <span className="kds-item-qty">{item.qty || item.quantity || 1}x</span>
                 <span>{item.name.toUpperCase()}</span>
               </div>
               {item.modifiers && item.modifiers.length > 0 && (

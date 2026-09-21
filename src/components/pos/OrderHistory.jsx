@@ -81,15 +81,15 @@ export default function OrderHistory({
                   </td>
                   <td style={{ padding: '0.85rem 1rem' }}>
                     <span className={`order-type-chip ${order.channel}`}>
-                      {order.channel === 'whatsapp' ? '🛵 Delivery' : order.channel === 'mesa' ? `🍽️ Mesa #${order.tableNumber}` : '🛍️ Mostrador'}
+                      {order.channel === 'whatsapp' ? (order.deliveryType === 'local' ? '🛍️ WA Retiro' : '🛵 WA Delivery') : order.channel === 'mesa' ? `🍽️ Mesa #${order.tableNumber}` : '🛍️ Mostrador'}
                     </span>
                   </td>
                   <td style={{ padding: '0.85rem 1rem' }}>
-                    <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{order.customer?.name || 'Consumidor Final'}</div>
-                    {order.customer?.address && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{order.customer.address}</div>}
+                    <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{typeof order.customer === 'object' ? (order.customer?.name || 'Consumidor Final') : (order.customer || 'Consumidor Final')}</div>
+                    {typeof order.customer === 'object' && order.customer?.address && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{order.customer.address}</div>}
                   </td>
                   <td style={{ padding: '0.85rem 1rem', fontSize: '0.8rem', maxWidth: '240px' }}>
-                    {order.items.map(i => `${i.qty}x ${i.name}`).join(', ')}
+                    {order.items.map(i => `${i.qty || i.quantity || 1}x ${i.name}`).join(', ')}
                   </td>
                   <td style={{ padding: '0.85rem 1rem', fontWeight: 900, color: 'var(--accent-amber)' }}>
                     ${order.total.toLocaleString('es-AR')}

@@ -109,46 +109,57 @@ export const chatbotService = {
     };
   },
 
-  // 6. Inyección directa de pedido a ComandaFast (POS y Cocina KDS)
+    // 6. Inyección directa de pedido a ComandaFast (POS y Cocina KDS)
   injectOrderToPos({ items = [], customer = {}, paymentMethod = 'efectivo', shippingMethod = 'local' }) {
     if (!items || items.length === 0) return null;
 
-    const subtotal = items.reduce((acc, it) => acc + (it.price * it.quantity), 0);
+    const subtotal = items.reduce((acc, it) => acc + (it.price * (it.qty || it.quantity || 1)), 0);
     const orderCode = 'CMD-' + Math.floor(1000 + Math.random() * 9000);
+    const custName = typeof customer === 'object' ? (customer.name || 'Cliente WhatsApp') : customer;
+    const custPhone = typeof customer === 'object' ? (customer.phone || '') : '';
+    const custAddress = typeof customer === 'object' ? (customer.address || (shippingMethod === 'delivery' ? 'Domicilio' : 'Retiro en Local')) : (shippingMethod === 'delivery' ? 'Domicilio' : 'Retiro en Local');
 
     const newOrder = {
       id: orderCode,
       code: orderCode,
-      customer: customer.name || 'Cliente WhatsApp',
-      phone: customer.phone || '',
-      address: customer.address || (shippingMethod === 'delivery' ? 'Domicilio' : 'Retiro en Local'),
+      orderNumber: orderCode.replace('CMD-', ''),
+      customer: {
+        name: custName,
+        phone: custPhone,
+        address: custAddress
+      },
+      channel: 'whatsapp',
       deliveryType: shippingMethod === 'delivery' ? 'delivery' : 'local',
       paymentMethod: paymentMethod || 'efectivo',
       items: items.map(it => ({
-        id: it.id || it.productId,
+        id: it.id || it.productId || ('item-' + Math.random()),
         name: it.name,
         price: it.price,
-        quantity: it.quantity || 1,
+        qty: it.qty || it.quantity || 1,
+        quantity: it.qty || it.quantity || 1,
         modifiers: it.modifiers || [],
         notes: it.notes || ''
       })),
       total: subtotal,
-      status: 'pending',
+      status: 'pendiente',
       createdAt: new Date().toISOString(),
       source: 'whatsapp_bot'
     };
 
     try {
-      storageService.saveOrder(newOrder);
-      try { audioService.playNewOrder(); } catch (_) {}
-      return newOrder;
+      const saved = storageService.saveOrder(newOrder);
+      try { audioService.playOrderChime(); } catch (_) {}
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('comandafast:new-order', { detail: saved || newOrder }));
+      }
+      return saved || newOrder;
     } catch (e) {
       console.error('[chatbotService] Error al inyectar pedido:', e);
       return null;
     }
   },
 
-  // 7. MOTOR DE CÓMPUTO CONVERSACIONAL (CON SOPORTE DE FOTOS REALES Y BASE DE DATOS)
+  // 7. MOTOR DE CÓMPUTO CONVERSACIONAL// 7. MOTOR DE CÓMPUTO CONVERSACIONAL (CON SOPORTE DE FOTOS REALES Y BASE DE DATOS)
   computeBotResponse(userInput, prevState, persona, { availableProducts = [], sandboxMode = true } = {}) {
     const text = (userInput || '').trim();
     const lower = text.toLowerCase();
