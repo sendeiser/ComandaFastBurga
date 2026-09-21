@@ -174,6 +174,57 @@ function interpolateTemplate(template, vars = {}) {
   return res;
 }
 
+function formatItemNumber(n) {
+  const numEmojis = {
+    1: '1️⃣', 2: '2️⃣', 3: '3️⃣', 4: '4️⃣', 5: '5️⃣',
+    6: '6️⃣', 7: '7️⃣', 8: '8️⃣', 9: '9️⃣', 10: '🔟'
+  };
+  if (numEmojis[n]) return numEmojis[n];
+  return `*[${n}]*`;
+}
+
+function buildCatalogMessage(prods, page = 1, pageSize = 8, isAll = false) {
+  const total = prods.length;
+  if (total === 0) {
+    return '🍔 *La carta se encuentra en actualización.* Por favor consultá en unos minutos.';
+  }
+
+  if (isAll) {
+    const list = prods.map((p, i) => {
+      const numBadge = formatItemNumber(i + 1);
+      const photoBadge = p.image ? '📸' : '';
+      return `${numBadge} *${p.name}* — $${Number(p.price).toLocaleString('es-AR')} ${photoBadge}`;
+    }).join('\n');
+
+    return `🍔 *CARTA COMPLETA DE COMANDAFAST (${total} opciones)* 🔥\n\n${list}\n\n👉 *Para pedir:* Respondé con el número (ej: *1*, *12*, *18*) o *COMPRAR*.\n👉 *Para ver foto:* Escribí *FOTO [número]* (ej: *FOTO 12*).`;
+  }
+
+  const totalPages = Math.ceil(total / pageSize) || 1;
+  const currentPage = Math.max(1, Math.min(page, totalPages));
+  const startIdx = (currentPage - 1) * pageSize;
+  const pageProds = prods.slice(startIdx, startIdx + pageSize);
+
+  const list = pageProds.map((p, i) => {
+    const globalIdx = startIdx + i + 1;
+    const numBadge = formatItemNumber(globalIdx);
+    const photoBadge = p.image ? '📸' : '';
+    return `${numBadge} *${p.name}* — $${Number(p.price).toLocaleString('es-AR')} ${photoBadge}`;
+  }).join('\n');
+
+  let navInstructions = '';
+  if (totalPages > 1) {
+    if (currentPage < totalPages && currentPage > 1) {
+      navInstructions = `⏩ Escribí *SIGUIENTE* (o *PAG ${currentPage + 1}*) | ⏪ *ANTERIOR*\n`;
+    } else if (currentPage === 1) {
+      navInstructions = `⏩ Escribí *SIGUIENTE* (o *PAG 2*) para ver más hamburguesas.\n`;
+    } else {
+      navInstructions = `⏪ Escribí *ANTERIOR* para volver a la página ${currentPage - 1}.\n`;
+    }
+  }
+
+  return `🍔 *MENÚ COMANDAFAST BURGERS* 🔥\n📄 *Página ${currentPage} de ${totalPages}* (Opciones ${startIdx + 1} al ${startIdx + pageProds.length} de ${total})\n\n${list}\n\n───────────────────\n👉 *Para pedir:* Respondé con el NÚMERO (1 al ${total}).\n👉 *Para ver foto:* Escribí *FOTO [número]* (ej: *FOTO ${startIdx + 1}*).\n${navInstructions}👉 Escribí *VER TODO* para ver la lista completa.`;
+}
+
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
@@ -693,44 +744,42 @@ class WhatsAppBotServer {
           }
 
           // -------------------------------------------------------------
-          // ESTADO IDLE / MENÚ PRINCIPAL
+          // COMANDOS DE NAVEGACIÓN Y PAGINACIÓN DEL CATÁLOGO
           // -------------------------------------------------------------
-          // Verificación de si el mensaje es para hacer un pedido o seleccionar una hamburguesa
-          const initialNum = parseInt(lower.replace(/\D/g, ''), 10);
-          let matchedProd = null;
-          if (!isNaN(initialNum) && initialNum >= 1 && initialNum <= prods.length && lower.length < 5) {
-            matchedProd = prods[initialNum - 1];
-          } else {
-            matchedProd = prods.find(p => lower.includes(p.name.toLowerCase()));
-          }
-
-          if (matchedProd && (lower.startsWith('comprar') || lower.startsWith('pedir') || lower.startsWith('quiero') || lower.length < 15 || session.step === 'SELECTING')) {
-            session.step = 'SELECTING';
-            session.items = [{
-              id: matchedProd.id,
-              name: matchedProd.name,
-              price: Number(matchedProd.price),
-              qty: 1,
-              quantity: 1,
-              modifiers: []
-            }];
-            session.subtotal = Number(matchedProd.price);
-            session.total = session.subtotal;
-
-            const reply = `✅ *¡Excelente elección! Agregaste ${matchedProd.name}* 🍔\n\n💵 *Precio:* $${Number(matchedProd.price).toLocaleString('es-AR')}\n\n👉 ¿Querés sumar otra burger o bebida? *(Escribí su número)*\n👉 ¿Algún cambio? *(Ej: Sin cebolla, Extra cheddar)*\n👉 O respondé *LISTO* para elegir forma de entrega.`;
+          if (lower === 'siguiente' || lower === 'sig' || lower === 'mas' || lower === 'ver mas' || lower === 'next' || lower === 'otra pagina') {
+            const totalPages = Math.ceil(prods.length / 8) || 1;
+            session.catalogPage = ((session.catalogPage || 1) % totalPages) + 1;
+            const reply = buildCatalogMessage(prods, session.catalogPage, 8, false);
             await this.sock.sendMessage(remoteJid, { text: reply });
             continue;
           }
 
-          if (lower === '5' || lower === 'pedir' || lower === 'hacer pedido' || lower === 'comprar') {
-            session.step = 'SELECTING';
-            const list = prods.slice(0, 10).map((p, i) => `${i + 1}️⃣ *${p.name}* — $${Number(p.price).toLocaleString('es-AR')}`).join('\n');
-            const reply = `🍔 *¿Qué burger te gustaría pedir hoy?* 🔥\n\n${list}\n\n👉 *Respondé con el número de la hamburguesa* que querés sumar a tu comanda:`;
+          if (lower === 'anterior' || lower === 'atras' || lower === 'volver' || lower === 'prev') {
+            const totalPages = Math.ceil(prods.length / 8) || 1;
+            session.catalogPage = Math.max(1, (session.catalogPage || 1) - 1);
+            const reply = buildCatalogMessage(prods, session.catalogPage, 8, false);
             await this.sock.sendMessage(remoteJid, { text: reply });
             continue;
           }
 
-          // OPCIONES INFORMATIVAS
+          if (/^(pag|pagina|página)\s*(\d+)$/i.test(lower)) {
+            const pageMatch = lower.match(/\d+/);
+            const pNum = parseInt(pageMatch[0], 10);
+            session.catalogPage = pNum;
+            const reply = buildCatalogMessage(prods, pNum, 8, false);
+            await this.sock.sendMessage(remoteJid, { text: reply });
+            continue;
+          }
+
+          if (lower === 'ver todo' || lower === 'todo' || lower === 'todas' || lower === 'completa' || lower === 'completo') {
+            const reply = buildCatalogMessage(prods, 1, 8, true);
+            await this.sock.sendMessage(remoteJid, { text: reply });
+            continue;
+          }
+
+          // -------------------------------------------------------------
+          // OPCIONES DEL MENÚ PRINCIPAL (1, 2, 3, 4, 5)
+          // -------------------------------------------------------------
           if (lower === '1') {
             await this.sock.sendMessage(remoteJid, {
               text: '📋 *Estado de Pedido:*\n\nIngresá tu número de orden (ej: *CMD-1234*) o aguardá un instante que un encargado verifique el estado en la plancha. 🔥'
@@ -752,9 +801,58 @@ class WhatsAppBotServer {
             continue;
           }
 
-          if (lower === '4' || lower === 'carta' || lower === 'catalogo') {
-            const list = prods.slice(0, 10).map((p, i) => `${i + 1}️⃣ *${p.name}* — $${Number(p.price).toLocaleString('es-AR')} ${p.image ? '📸' : ''}`).join('\n');
-            const reply = `🍔 *CARTA DE COMANDAFAST (${prods.length} productos):* 🔥\n\n${list}\n\n👉 Escribí *FOTO [número]* para ver la foto real (ej: *FOTO 1*).\n👉 O escribí el número para comenzar a ordenar.`;
+          if (lower === '4' || lower === 'carta' || lower === 'catalogo' || lower === 'menu') {
+            session.step = 'SELECTING';
+            session.catalogPage = 1;
+            const reply = buildCatalogMessage(prods, 1, 8, false);
+            await this.sock.sendMessage(remoteJid, { text: reply });
+            continue;
+          }
+
+          if (lower === '5' || lower === 'pedir' || lower === 'hacer pedido' || lower === 'comprar') {
+            session.step = 'SELECTING';
+            session.catalogPage = 1;
+            const reply = buildCatalogMessage(prods, 1, 8, false);
+            await this.sock.sendMessage(remoteJid, { text: reply });
+            continue;
+          }
+
+          // -------------------------------------------------------------
+          // SELECCIÓN DIRECTA DE HAMBURGUESAS (POR NÚMERO 1-23 O NOMBRE)
+          // -------------------------------------------------------------
+          const initialNum = parseInt(lower.replace(/\D/g, ''), 10);
+          let matchedProd = null;
+          if (!isNaN(initialNum) && initialNum >= 1 && initialNum <= prods.length) {
+            matchedProd = prods[initialNum - 1];
+          } else {
+            matchedProd = prods.find(p => lower.includes(p.name.toLowerCase()));
+          }
+
+          if (matchedProd && (lower.startsWith('comprar') || lower.startsWith('pedir') || lower.startsWith('quiero') || !isNaN(initialNum) || session.step === 'SELECTING')) {
+            session.step = 'SELECTING';
+            if (!session.items) session.items = [];
+            
+            const existingIdx = session.items.findIndex(it => it.id === matchedProd.id);
+            if (existingIdx !== -1) {
+              session.items[existingIdx].qty = (session.items[existingIdx].qty || 1) + 1;
+              session.items[existingIdx].quantity = session.items[existingIdx].qty;
+            } else {
+              session.items.push({
+                id: matchedProd.id,
+                name: matchedProd.name,
+                price: Number(matchedProd.price),
+                qty: 1,
+                quantity: 1,
+                modifiers: []
+              });
+            }
+
+            session.subtotal = session.items.reduce((acc, it) => acc + (it.price * (it.qty || 1)), 0);
+            session.total = session.subtotal;
+
+            const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
+
+            const reply = `✅ *¡Excelente elección! Sumaste ${matchedProd.name}* 🍔 (+$$${Number(matchedProd.price).toLocaleString('es-AR')})\n\n🛒 *Tu comanda actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n👉 ¿Querés sumar otra burger o bebida? *(Escribí su número)*\n👉 ¿Algún cambio? *(Ej: Sin cebolla, Extra cheddar)*\n👉 O respondé *LISTO* para elegir forma de entrega.`;
             await this.sock.sendMessage(remoteJid, { text: reply });
             continue;
           }

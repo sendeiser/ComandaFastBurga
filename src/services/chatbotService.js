@@ -3,7 +3,7 @@
 // Motor de atención automática, toma de pedidos y lab de simulación
 // =========================================================
 
-import { DEFAULT_CHATBOT_KEYWORDS, DEFAULT_TEMPLATES, DEFAULT_CUSTOM_FLOWS } from './whatsappBotConstants';
+import { DEFAULT_CHATBOT_KEYWORDS, DEFAULT_TEMPLATES, DEFAULT_CUSTOM_FLOWS, formatItemNumber } from './whatsappBotConstants.js';
 import { storageService } from './storageService';
 import { audioService } from './audioService';
 import { supabaseSync } from './supabaseClient';
@@ -139,6 +139,49 @@ export const chatbotService = {
     } catch (_) {
       // Servidor local puede no estar escuchando todavía
     }
+  },
+
+  // Generador de catálogo paginado y formateado limpio (sin iconos rotos en números de 2 dígitos)
+  buildCatalogMessage(prods, page = 1, pageSize = 8, isAll = false) {
+    const total = prods.length;
+    if (total === 0) {
+      return '🍔 *La carta se encuentra en actualización.* Por favor consultá en unos minutos.';
+    }
+
+    if (isAll) {
+      const list = prods.map((p, i) => {
+        const numBadge = formatItemNumber(i + 1);
+        const photoBadge = p.image ? '📸' : '';
+        return `${numBadge} *${p.name}* — $${Number(p.price).toLocaleString('es-AR')} ${photoBadge}`;
+      }).join('\n');
+
+      return `🍔 *CARTA COMPLETA DE COMANDAFAST (${total} opciones)* 🔥\n\n${list}\n\n👉 *Para pedir:* Respondé con el número (ej: *1*, *12*, *18*) o *COMPRAR*.\n👉 *Para ver foto:* Escribí *FOTO [número]* (ej: *FOTO 12*).`;
+    }
+
+    const totalPages = Math.ceil(total / pageSize) || 1;
+    const currentPage = Math.max(1, Math.min(page, totalPages));
+    const startIdx = (currentPage - 1) * pageSize;
+    const pageProds = prods.slice(startIdx, startIdx + pageSize);
+
+    const list = pageProds.map((p, i) => {
+      const globalIdx = startIdx + i + 1;
+      const numBadge = formatItemNumber(globalIdx);
+      const photoBadge = p.image ? '📸' : '';
+      return `${numBadge} *${p.name}* — $${Number(p.price).toLocaleString('es-AR')} ${photoBadge}`;
+    }).join('\n');
+
+    let navInstructions = '';
+    if (totalPages > 1) {
+      if (currentPage < totalPages && currentPage > 1) {
+        navInstructions = `⏩ Escribí *SIGUIENTE* (o *PAG ${currentPage + 1}*) | ⏪ *ANTERIOR*\n`;
+      } else if (currentPage === 1) {
+        navInstructions = `⏩ Escribí *SIGUIENTE* (o *PAG 2*) para ver más hamburguesas.\n`;
+      } else {
+        navInstructions = `⏪ Escribí *ANTERIOR* para volver a la página ${currentPage - 1}.\n`;
+      }
+    }
+
+    return `🍔 *MENÚ COMANDAFAST BURGERS* 🔥\n📄 *Página ${currentPage} de ${totalPages}* (Opciones ${startIdx + 1} al ${startIdx + pageProds.length} de ${total})\n\n${list}\n\n───────────────────\n👉 *Para pedir:* Respondé con el NÚMERO (1 al ${total}).\n👉 *Para ver foto:* Escribí *FOTO [número]* (ej: *FOTO ${startIdx + 1}*).\n${navInstructions}👉 Escribí *VER TODO* para ver la lista completa.`;
   },
 
   // 4. Interpolación de variables en plantillas
@@ -306,9 +349,9 @@ export const chatbotService = {
         reply = `🍔 *${target.name}* 🔥\n\n💵 *Precio:* $${Number(target.price).toLocaleString('es-AR')}\n📖 *Detalle:* ${target.description || 'Elaborada en nuestra cocina con ingredientes frescos del día.'}\n${target.modifiers?.length ? '✨ *Modificadores:* ' + target.modifiers.join(', ') + '\n' : ''}\n👉 *Para agregarla a tu comanda respondé con su número (*${prods.indexOf(target) + 1}*) o escribí COMPRAR.*\n👉 Escribí *FOTO [número]* para ver otra hamburguesa.`;
         return { reply, image, newState };
       } else {
-        const listText = prods.slice(0, 10).map((p, i) => {
-          const hasCustomPhoto = p.image ? '📸 Foto disponible' : '';
-          return `${i + 1}️⃣ *${p.name}* — $${Number(p.price).toLocaleString('es-AR')} ${hasCustomPhoto} _(Escribí FOTO ${i + 1})_`;
+        const listText = prods.map((p, i) => {
+          const hasCustomPhoto = p.image ? '📸' : '';
+          return `${formatItemNumber(i + 1)} *${p.name}* — $${Number(p.price).toLocaleString('es-AR')} ${hasCustomPhoto}`;
         }).join('\n');
         
         image = prods[0]?.image || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80';
@@ -400,7 +443,7 @@ export const chatbotService = {
       if (newState.items.length === 0) {
         reply = '🛒 Tu comanda está vacía. Escribí *COMPRAR* para ver nuestras hamburguesas disponibles.';
       } else {
-        const list = newState.items.map((it, i) => `${i + 1}️⃣ ${it.name} (x${it.quantity}) - $${(it.price * it.quantity).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
+        const list = newState.items.map((it, i) => `${formatItemNumber(i + 1)} ${it.name} (x${it.quantity}) - $${(it.price * it.quantity).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
         reply = `🛒 *TU COMANDA ACTUAL:* 🍔\n\n${list}\n\n💵 *Subtotal:* $${newState.subtotal.toLocaleString('es-AR')}\n\n👉 Para sumar más, escribí su número.\n👉 Para quitar, escribí *QUITAR [nro]* (ej: QUITAR 1).\n👉 O escribí *LISTO* para avanzar con la entrega.`;
       }
       return { reply, newState };
@@ -412,7 +455,7 @@ export const chatbotService = {
         const removed = newState.items.splice(num - 1, 1)[0];
         newState.subtotal = newState.items.reduce((s, it) => s + (it.price * it.quantity), 0);
         newState.total = newState.subtotal;
-        const list = newState.items.map((it, i) => `${i + 1}️⃣ ${it.name} - $${(it.price * it.quantity).toLocaleString('es-AR')}`).join('\n');
+        const list = newState.items.map((it, i) => `${formatItemNumber(i + 1)} ${it.name} - $${(it.price * it.quantity).toLocaleString('es-AR')}`).join('\n');
         reply = `🗑️ Quitaste *${removed.name}* de la comanda.\n\n🛒 *Comanda restante:*\n${list || 'Vacía'}\n\n💵 *Total:* $${newState.total.toLocaleString('es-AR')}\n\n👉 Escribí otro número o escribí *LISTO* para finalizar.`;
       } else {
         reply = '⚠️ Para quitar un producto escribí *QUITAR 1* o el número correspondiente.';
@@ -478,6 +521,36 @@ export const chatbotService = {
     }
 
     // -------------------------------------------------------------
+    // COMANDOS DE NAVEGACIÓN Y PAGINACIÓN DEL MENÚ
+    // -------------------------------------------------------------
+    if (lower === 'siguiente' || lower === 'sig' || lower === 'mas' || lower === 'ver mas' || lower === 'next' || lower === 'otra pagina') {
+      const totalPages = Math.ceil(prods.length / 8) || 1;
+      newState.catalogPage = ((newState.catalogPage || 1) % totalPages) + 1;
+      reply = this.buildCatalogMessage(prods, newState.catalogPage, 8, false);
+      return { reply, newState };
+    }
+
+    if (lower === 'anterior' || lower === 'atras' || lower === 'volver' || lower === 'prev') {
+      const totalPages = Math.ceil(prods.length / 8) || 1;
+      newState.catalogPage = Math.max(1, (newState.catalogPage || 1) - 1);
+      reply = this.buildCatalogMessage(prods, newState.catalogPage, 8, false);
+      return { reply, newState };
+    }
+
+    if (/^(pag|pagina|página)\s*(\d+)$/i.test(lower)) {
+      const pageMatch = lower.match(/\d+/);
+      const pNum = parseInt(pageMatch[0], 10);
+      newState.catalogPage = pNum;
+      reply = this.buildCatalogMessage(prods, pNum, 8, false);
+      return { reply, newState };
+    }
+
+    if (lower === 'ver todo' || lower === 'todo' || lower === 'todas' || lower === 'completa' || lower === 'completo') {
+      reply = this.buildCatalogMessage(prods, 1, 8, true);
+      return { reply, newState };
+    }
+
+    // -------------------------------------------------------------
     // 11. INICIAR COMPRA / MENÚ (OPCIÓN 4 O 'COMPRAR')
     // -------------------------------------------------------------
     if (lower === 'comprar' || lower === 'pedir' || lower === 'quiero pedir' || ((lower === '4' || lower.includes('catalogo') || lower.includes('menu')) && newState.step === 'IDLE')) {
@@ -485,12 +558,9 @@ export const chatbotService = {
       newState.items = [];
       newState.subtotal = 0;
       newState.total = 0;
+      newState.catalogPage = 1;
 
-      const prodsListText = prods.slice(0, 10).map((p, idx) => {
-        return `${idx + 1}️⃣ *${p.name}* — $${Number(p.price).toLocaleString('es-AR')}`;
-      }).join('\n');
-
-      reply = `🍔 *¡Menú & Burgers de ComandaFast (${prods.length} productos en Base de Datos)!* 🔥\n\n${prodsListText}\n\n👉 *Respondé con el NÚMERO (1, 2, 3...) de lo que quieras pedir.*\n📸 _Podés escribir *FOTO [número]* para ver la foto real del producto._`;
+      reply = this.buildCatalogMessage(prods, 1, 8, false);
       image = prods[0]?.image || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80';
       return { reply, image, newState };
     }
