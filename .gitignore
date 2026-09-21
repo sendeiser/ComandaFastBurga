@@ -30,3 +30,7 @@ pnpm-debug.log*
 *.njsproj
 *.sln
 *.sw?
+ 
+# WhatsApp Bot Baileys Auth session
+data/baileys_auth/
+

@@ -6,6 +6,7 @@
 import { DEFAULT_CHATBOT_KEYWORDS, DEFAULT_TEMPLATES } from './whatsappBotConstants';
 import { storageService } from './storageService';
 import { audioService } from './audioService';
+import { supabaseSync } from './supabaseClient';
 
 const BOT_SETTINGS_KEY = 'comandafast_bot_settings';
 
@@ -49,7 +50,42 @@ export const chatbotService = {
     }
   },
 
-  // 3. Interpolación de variables en plantillas
+  // 3. Obtener productos frescos directamente de la base de datos (Supabase + Local)
+  async getDatabaseProducts() {
+    try {
+      // 1. Si Supabase está configurado, intentar traer de la nube primero
+      if (supabaseSync.isConfigured()) {
+        const cloudProds = await supabaseSync.fetchProducts();
+        if (Array.isArray(cloudProds) && cloudProds.length > 0) {
+          storageService.saveProducts(cloudProds);
+          this.syncWithBotServer(cloudProds);
+          return cloudProds;
+        }
+      }
+    } catch (err) {
+      console.warn('[chatbotService] Error al sincronizar con Supabase, usando local:', err);
+    }
+
+    // 2. Traer productos de almacenamiento local persistente
+    const localProds = storageService.getProducts();
+    this.syncWithBotServer(localProds);
+    return localProds;
+  },
+
+  // Sincronizar catálogo con el servidor Baileys de WhatsApp en puerto 3002
+  async syncWithBotServer(products) {
+    try {
+      await fetch('http://localhost:3002/sync-products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ products })
+      });
+    } catch (_) {
+      // Servidor local puede no estar escuchando todavía
+    }
+  },
+
+  // 4. Interpolación de variables en plantillas
   interpolateTemplate(template, vars = {}) {
     let res = template || '';
     for (const [k, v] of Object.entries(vars)) {
@@ -58,7 +94,7 @@ export const chatbotService = {
     return res;
   },
 
-  // 4. Variables resueltas dinámicamente
+  // 5. Variables resueltas dinámicamente
   getResolvedVariables(persona = {}, settings = null) {
     const s = settings || this.getSettings();
     return {
@@ -73,7 +109,7 @@ export const chatbotService = {
     };
   },
 
-  // 5. Inyección directa de pedido a ComandaFast (POS y Cocina KDS)
+  // 6. Inyección directa de pedido a ComandaFast (POS y Cocina KDS)
   injectOrderToPos({ items = [], customer = {}, paymentMethod = 'efectivo', shippingMethod = 'local' }) {
     if (!items || items.length === 0) return null;
 
@@ -97,7 +133,7 @@ export const chatbotService = {
         notes: it.notes || ''
       })),
       total: subtotal,
-      status: 'pending', // Entra a cocina de inmediato
+      status: 'pending',
       createdAt: new Date().toISOString(),
       source: 'whatsapp_bot'
     };
@@ -112,7 +148,7 @@ export const chatbotService = {
     }
   },
 
-  // 6. MOTOR DE CÓMPUTO CONVERSACIONAL (STATE MACHINE & NLP)
+  // 7. MOTOR DE CÓMPUTO CONVERSACIONAL (CON SOPORTE DE FOTOS REALES Y BASE DE DATOS)
   computeBotResponse(userInput, prevState, persona, { availableProducts = [], sandboxMode = true } = {}) {
     const text = (userInput || '').trim();
     const lower = text.toLowerCase();
@@ -136,7 +172,7 @@ export const chatbotService = {
     let systemNote = false;
     let generatedOrder = null;
 
-    // Productos activos para el menú
+    // Productos activos para el menú desde la base de datos
     const prods = (availableProducts && availableProducts.length > 0)
       ? availableProducts
       : storageService.getProducts();
@@ -166,7 +202,7 @@ export const chatbotService = {
     }
 
     // -------------------------------------------------------------
-    // 3. FOTOS DE HAMBURGUESAS Y COMBOS
+    // 3. FOTOS DE HAMBURGUESAS Y COMBOS (SUBIDAS DESDE BD)
     // -------------------------------------------------------------
     if (lower.startsWith('foto') || lower.startsWith('ver foto') || lower === 'fotos') {
       const numIdx = parseInt(lower.replace(/\D/g, ''), 10);
@@ -178,13 +214,18 @@ export const chatbotService = {
       }
 
       if (target) {
-        image = target.image || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80';
-        reply = `🍔 *${target.name}* 🔥\n\n💵 *Precio:* $${Number(target.price).toLocaleString('es-AR')}\n📖 *Detalle:* ${target.description || 'Carne 100% vacuna smashada con pan artesanal de papa tostado en manteca.'}\n\n👉 *Para agregarla a tu comanda respondé con su número (*${prods.indexOf(target) + 1}*) o escribí COMPRAR.*\n👉 Escribí *FOTO [número]* para ver otra hamburguesa.`;
+        // PRIORIZAR FOTO SUBIDA POR EL USUARIO O DESDE BASE DE DATOS
+        image = target.image || target.image_url || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80';
+        reply = `🍔 *${target.name}* 🔥\n\n💵 *Precio:* $${Number(target.price).toLocaleString('es-AR')}\n📖 *Detalle:* ${target.description || 'Elaborada en nuestra cocina con ingredientes frescos del día.'}\n${target.modifiers?.length ? '✨ *Modificadores:* ' + target.modifiers.join(', ') + '\n' : ''}\n👉 *Para agregarla a tu comanda respondé con su número (*${prods.indexOf(target) + 1}*) o escribí COMPRAR.*\n👉 Escribí *FOTO [número]* para ver otra hamburguesa.`;
         return { reply, image, newState };
       } else {
-        const listText = prods.slice(0, 8).map((p, i) => `${i + 1}️⃣ *${p.name}* — $${Number(p.price).toLocaleString('es-AR')} 📸 _(Escribí FOTO ${i + 1})_`).join('\n');
+        const listText = prods.slice(0, 10).map((p, i) => {
+          const hasCustomPhoto = p.image ? '📸 Foto disponible' : '';
+          return `${i + 1}️⃣ *${p.name}* — $${Number(p.price).toLocaleString('es-AR')} ${hasCustomPhoto} _(Escribí FOTO ${i + 1})_`;
+        }).join('\n');
+        
         image = prods[0]?.image || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80';
-        reply = `📸 *GALERÍA DE BURGERS COMANDAFAST* 🍔🔥\n\n${listText}\n\n👉 *Escribí FOTO [número] (ej: FOTO 1, FOTO 2) para ver la foto de cada una.*`;
+        reply = `📸 *GALERÍA COMPLETA DE COMANDAFAST (${prods.length} productos en BD)* 🍔🔥\n\n${listText}\n\n👉 *Escribí FOTO [número] (ej: FOTO 1, FOTO 2) para ver la foto real de cada una.*`;
         return { reply, image, newState };
       }
     }
@@ -218,8 +259,8 @@ export const chatbotService = {
       let modText = '';
       if (/sin\s*cebolla/i.test(lower)) { modText = 'Sin cebolla'; }
       else if (/sin\s*tomate/i.test(lower)) { modText = 'Sin tomate'; }
-      else if (/extra\s*cheddar/i.test(lower)) { modText = 'Extra Cheddar (+$500)'; lastItem.price += 500; }
-      else if (/extra\s*bacon/i.test(lower)) { modText = 'Extra Bacon (+$700)'; lastItem.price += 700; }
+      else if (/extra\s*cheddar/i.test(lower)) { modText = 'Extra Cheddar (+$800)'; lastItem.price += 800; }
+      else if (/extra\s*bacon/i.test(lower)) { modText = 'Extra Bacon (+$900)'; lastItem.price += 900; }
       else if (/bien\s*cocida/i.test(lower)) { modText = 'Bien cocida'; }
 
       if (modText && !lastItem.modifiers.includes(modText)) {
@@ -329,7 +370,7 @@ export const chatbotService = {
         return `${idx + 1}️⃣ *${p.name}* — $${Number(p.price).toLocaleString('es-AR')}`;
       }).join('\n');
 
-      reply = `🍔 *¡Menú & Burgers de ComandaFast!* 🔥\n\n${prodsListText}\n\n👉 *Respondé con el NÚMERO (1, 2, 3...) de lo que quieras pedir.*\n📸 _Podés escribir *FOTO [número]* para ver cómo sale emplatada._`;
+      reply = `🍔 *¡Menú & Burgers de ComandaFast (${prods.length} productos en Base de Datos)!* 🔥\n\n${prodsListText}\n\n👉 *Respondé con el NÚMERO (1, 2, 3...) de lo que quieras pedir.*\n📸 _Podés escribir *FOTO [número]* para ver la foto real del producto._`;
       image = prods[0]?.image || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80';
       return { reply, image, newState };
     }
@@ -462,7 +503,6 @@ export const chatbotService = {
           confirmMsg += `\n💳 *Pago con Mercado Pago:* Podés transferir al Alias \`${commonVars.alias_banco}\`. ¡Muchas gracias!`;
         }
 
-        // Si NO estamos en modo sandbox, persistir en ComandaFast
         if (!sandboxMode) {
           generatedOrder = this.injectOrderToPos({
             items: newState.items,

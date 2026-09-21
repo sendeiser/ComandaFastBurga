@@ -9,6 +9,7 @@ const DEFAULT_PRODUCTS = [
     category: 'Hamburguesas',
     price: 6500,
     emoji: '🍔',
+    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format&fit=crop&q=80',
     description: 'Medallón 150g, lechuga, tomate, queso y mayonesa casera',
     modifiers: ['Sin cebolla', 'Sin tomate', 'Extra Cheddar (+$800)', 'Extra Bacon (+$900)', 'Papas Rústicas']
   },
@@ -18,6 +19,7 @@ const DEFAULT_PRODUCTS = [
     category: 'Hamburguesas',
     price: 8200,
     emoji: '🧀',
+    image: 'https://images.unsplash.com/photo-1586190848861-99aa4a171e90?w=800&auto=format&fit=crop&q=80',
     description: 'Doble medallón 300g, 4 fetas de cheddar, cebolla picada y ketchup',
     modifiers: ['Sin cebolla', 'Extra Cheddar (+$800)', 'Doble Bacon (+$1200)', 'Medallón Extra (+$2000)']
   },
@@ -27,6 +29,7 @@ const DEFAULT_PRODUCTS = [
     category: 'Hamburguesas',
     price: 9800,
     emoji: '🥓',
+    image: 'https://images.unsplash.com/photo-1553979459-d2229ba7433b?w=800&auto=format&fit=crop&q=80',
     description: 'Triple medallón 450g, 6 fetas de cheddar, abundante bacon crocante y salsa BBQ',
     modifiers: ['Sin salsa BBQ', 'Extra Bacon (+$900)', 'Salsa Picante', 'Papas Grandes']
   },
@@ -36,6 +39,7 @@ const DEFAULT_PRODUCTS = [
     category: 'Hamburguesas',
     price: 7400,
     emoji: '🍗',
+    image: 'https://images.unsplash.com/photo-1625813506062-0aeb1d7a094b?w=800&auto=format&fit=crop&q=80',
     description: 'Pechuga rebozada super crocante, coleslaw, pepinillos y salsa tártara',
     modifiers: ['Sin pepinillos', 'Sin coleslaw', 'Extra Queso (+$800)']
   },
@@ -44,7 +48,8 @@ const DEFAULT_PRODUCTS = [
     name: 'Burger Veggie Deluxe',
     category: 'Hamburguesas',
     price: 6900,
-    emoji: '🌱',
+    emoji: '🥑',
+    image: 'https://images.unsplash.com/photo-1520072959219-c595dc870360?w=800&auto=format&fit=crop&q=80',
     description: 'Medallón de lentejas y champignones, rúcula, tomate seco y queso provoleta',
     modifiers: ['Vegano sin queso', 'Sin rúcula']
   },
@@ -54,6 +59,7 @@ const DEFAULT_PRODUCTS = [
     category: 'Agregados',
     price: 3500,
     emoji: '🍟',
+    image: 'https://images.unsplash.com/photo-1576107232684-1279f3908594?w=800&auto=format&fit=crop&q=80',
     description: 'Porción grande de papas bastón crocantes',
     modifiers: ['Sin sal', 'Con provenzal']
   },
@@ -63,6 +69,7 @@ const DEFAULT_PRODUCTS = [
     category: 'Agregados',
     price: 4900,
     emoji: '🧀',
+    image: 'https://images.unsplash.com/photo-1585109649139-366815a0d713?w=800&auto=format&fit=crop&q=80',
     description: 'Papas fritas bañadas en salsa cheddar y lluvia de bacon crocante con verdeo',
     modifiers: ['Sin verdeo', 'Cheddar aparte', 'Doble Bacon (+$900)']
   },
@@ -72,6 +79,7 @@ const DEFAULT_PRODUCTS = [
     category: 'Agregados',
     price: 4200,
     emoji: '🧅',
+    image: 'https://images.unsplash.com/photo-1639024471284-0af5676d738d?w=800&auto=format&fit=crop&q=80',
     description: 'Aros de cebolla rebozados con salsa barbacoa',
     modifiers: ['Con salsa picante', 'Con alioli']
   },
@@ -81,6 +89,7 @@ const DEFAULT_PRODUCTS = [
     category: 'Bebidas',
     price: 2000,
     emoji: '🥤',
+    image: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=800&auto=format&fit=crop&q=80',
     description: 'Botella 500ml bien fría',
     modifiers: ['Fría', 'Natural']
   },
@@ -89,7 +98,8 @@ const DEFAULT_PRODUCTS = [
     name: 'Sprite 500ml',
     category: 'Bebidas',
     price: 2000,
-    emoji: '🍋',
+    emoji: '🥤',
+    image: 'https://images.unsplash.com/photo-1625772299848-391b6a87d7b3?w=800&auto=format&fit=crop&q=80',
     description: 'Botella 500ml bien fría',
     modifiers: ['Fría', 'Natural']
   },
@@ -99,6 +109,7 @@ const DEFAULT_PRODUCTS = [
     category: 'Bebidas',
     price: 3200,
     emoji: '🍺',
+    image: 'https://images.unsplash.com/photo-1608270191763-71860d5b7808?w=800&auto=format&fit=crop&q=80',
     description: 'Lata de cerveza artesanal rubia o IPA',
     modifiers: ['Muy fría']
   },
@@ -107,7 +118,8 @@ const DEFAULT_PRODUCTS = [
     name: 'Mega Combo Doble + Papas + Bebida',
     category: 'Combos',
     price: 11200,
-    emoji: '⭐',
+    emoji: '🔥',
+    image: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=800&auto=format&fit=crop&q=80',
     description: 'Doble Cuarto Cheddar + Papas Fritas + Gaseosa 500ml',
     modifiers: ['Con Coca Cola', 'Con Sprite', 'Con Cerveza (+$1000)', 'Papas con Cheddar (+$1200)']
   }
@@ -196,7 +208,27 @@ export const storageService = {
       localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(DEFAULT_PRODUCTS));
       return DEFAULT_PRODUCTS;
     }
-    return JSON.parse(raw);
+    try {
+      const prods = JSON.parse(raw);
+      let updated = false;
+      const enriched = prods.map(p => {
+        if (!p.image) {
+          const match = DEFAULT_PRODUCTS.find(dp => dp.id === p.id || dp.name.toLowerCase() === p.name.toLowerCase());
+          if (match && match.image) {
+            updated = true;
+            return { ...p, image: match.image };
+          }
+        }
+        return p;
+      });
+      if (updated) {
+        localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(enriched));
+        return enriched;
+      }
+      return prods;
+    } catch (_) {
+      return DEFAULT_PRODUCTS;
+    }
   },
 
   saveProducts(products) {

@@ -52,11 +52,19 @@ export default function AdminChatbotLab() {
   // Notificación de inyección
   const [injectedAlert, setInjectedAlert] = useState(null);
 
-  // Cargar productos de ComandaFast
-  useEffect(() => {
-    const loaded = storageService.getProducts();
-    setProducts(loaded);
+  // Cargar productos de ComandaFast desde la Base de Datos
+  const loadDatabaseCatalog = useCallback(async () => {
+    try {
+      const loaded = await chatbotService.getDatabaseProducts();
+      setProducts(loaded);
+    } catch (_) {
+      setProducts(storageService.getProducts());
+    }
   }, []);
+
+  useEffect(() => {
+    loadDatabaseCatalog();
+  }, [loadDatabaseCatalog]);
 
   // Scroll automático
   useEffect(() => {
@@ -277,6 +285,22 @@ export default function AdminChatbotLab() {
           >
             <Cpu size={14} />
             <span>{sandboxMode ? 'Sandbox: Activo' : 'POS Real: ACTIVO'}</span>
+          </button>
+
+          {/* Sync DB Button */}
+          <button
+            type="button"
+            className="qty-btn"
+            style={{ width: 'auto', padding: '0.35rem 0.75rem', fontSize: '0.78rem', gap: '4px' }}
+            onClick={async () => {
+              await loadDatabaseCatalog();
+              setInjectedAlert('¡Catálogo y fotos sincronizados desde la Base de Datos!');
+              setTimeout(() => setInjectedAlert(null), 3500);
+            }}
+            title="Sincronizar productos y fotos desde la Base de Datos"
+          >
+            <RefreshCw size={14} />
+            <span>Sincronizar BD</span>
           </button>
 
           {/* Reset Button */}
@@ -878,8 +902,22 @@ export default function AdminChatbotLab() {
 
           {/* TAB CONTENT: CATALOG */}
           {activeTab === 'catalog' && (
-            <div style={{ padding: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: 1, overflowY: 'auto' }}>
-              {products.map(p => (
+            <div style={{ padding: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, overflowY: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.25rem 0.35rem' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 800 }}>
+                  Fotos de la Base de Datos ({products.length}):
+                </span>
+                <button
+                  type="button"
+                  onClick={loadDatabaseCatalog}
+                  style={{ background: 'none', border: 'none', color: 'var(--accent-amber)', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                >
+                  <RefreshCw size={11} />
+                  <span>Refrescar</span>
+                </button>
+              </div>
+
+              {products.map((p, idx) => (
                 <div
                   key={p.id}
                   style={{
@@ -888,15 +926,22 @@ export default function AdminChatbotLab() {
                     gap: '0.5rem',
                     background: 'var(--bg-main)',
                     border: '1px solid var(--border-subtle)',
-                    padding: '0.4rem',
+                    padding: '0.45rem',
                     borderRadius: 'var(--radius-md)'
                   }}
                 >
-                  <img
-                    src={p.image || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80'}
-                    alt={p.name}
-                    style={{ width: '38px', height: '38px', borderRadius: '6px', objectFit: 'cover' }}
-                  />
+                  {p.image ? (
+                    <img
+                      src={p.image}
+                      alt={p.name}
+                      style={{ width: '42px', height: '42px', borderRadius: '8px', objectFit: 'cover', border: '1px solid var(--border-subtle)' }}
+                    />
+                  ) : (
+                    <div style={{ width: '42px', height: '42px', borderRadius: '8px', background: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
+                      {p.emoji || '🍔'}
+                    </div>
+                  )}
+
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {p.name}
@@ -905,13 +950,15 @@ export default function AdminChatbotLab() {
                       ${Number(p.price).toLocaleString('es-AR')}
                     </div>
                   </div>
+
                   <button
                     type="button"
                     className="qty-btn"
-                    style={{ width: 'auto', height: '26px', padding: '0 8px', fontSize: '0.7rem' }}
-                    onClick={() => handleSendMessage(`foto ${p.name}`)}
+                    style={{ width: 'auto', height: '26px', padding: '0 8px', fontSize: '0.7rem', gap: '3px', background: 'var(--bg-card)' }}
+                    onClick={() => handleSendMessage(`foto ${idx + 1}`)}
+                    title="Probar comando 'FOTO' en el chat del bot"
                   >
-                    Foto
+                    <span>📸 Probar</span>
                   </button>
                 </div>
               ))}
