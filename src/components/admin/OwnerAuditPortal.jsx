@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { ShieldCheck, Bot, BarChart3, DollarSign, ShieldAlert, Sparkles, LogOut, ArrowLeft, Download, Calendar, Printer } from 'lucide-react';
 import AuditKpisTab from './AuditKpisTab';
 import AuditCashShiftsTab from './AuditCashShiftsTab';
@@ -11,8 +11,16 @@ import { storageService } from '../../services/storageService';
 import { authService } from '../../services/authService';
 
 export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout }) {
+  const portalRef = useRef(null);
   const [activeTab, setActiveTab] = useState('kpis'); // 'kpis' | 'shifts' | 'security' | 'menu' | 'settings'
-  const [rangeType, setRangeType] = useState('today'); // 'today' | 'yesterday' | 'week' | 'month' | 'all'
+
+  // Al cambiar de pestaña, asegurar que la vista comience siempre arriba sin saltos
+  useEffect(() => {
+    if (portalRef.current) {
+      portalRef.current.scrollTop = 0;
+    }
+    window.scrollTo(0, 0);
+  }, [activeTab]);  const [rangeType, setRangeType] = useState('today'); // 'today' | 'yesterday' | 'week' | 'month' | 'all'
 
   // Turnos históricos
   const shifts = useMemo(() => storageService.getCashShiftsHistory(), []);
@@ -45,7 +53,7 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout })
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%', overflowY: 'auto', paddingRight: '4px' }}>
+    <div ref={portalRef} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%', overflowY: 'auto', paddingRight: '4px' }}>
       {/* EXECUTIVE HEADER */}
       <div style={{
         background: 'var(--bg-card)',

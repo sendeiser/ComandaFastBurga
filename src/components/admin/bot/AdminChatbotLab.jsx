@@ -23,7 +23,7 @@ export default function AdminChatbotLab() {
   // Chatbot State
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [inputText, setInputText] = useState('');
-  const chatBottomRef = useRef(null);
+  const chatContainerRef = useRef(null);
 
   // Historial de mensajes
   const [chatHistory, setChatHistory] = useState([
@@ -66,9 +66,11 @@ export default function AdminChatbotLab() {
     loadDatabaseCatalog();
   }, [loadDatabaseCatalog]);
 
-  // Scroll automático
+    // Scroll automático (exclusivamente dentro del contenedor interno del chat, sin mover la pantalla)
   useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
   }, [chatHistory, isBotTyping]);
 
   // Cambiar persona de prueba
@@ -545,7 +547,9 @@ export default function AdminChatbotLab() {
           </div>
 
           {/* CHAT MESSAGES CONTAINER */}
-          <div style={{
+          <div 
+            ref={chatContainerRef}
+            style={{
             flex: 1,
             padding: '1rem',
             overflowY: 'auto',
@@ -640,7 +644,7 @@ export default function AdminChatbotLab() {
               </div>
             )}
 
-            <div ref={chatBottomRef} />
+            
           </div>
 
           {/* QUICK ACTION CHIPS */}
