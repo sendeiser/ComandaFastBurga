@@ -176,3 +176,147 @@ export const DEFAULT_TEST_SUITES = [
     steps: ['Hola che, a qué hora nos juntamos hoy a jugar al fútbol?']
   }
 ];
+
+
+// =========================================================
+// GESTOR DE FLUJOS PERSONALIZADOS Y CONDICIONES (BUILDER)
+// =========================================================
+
+export const FLOW_CATEGORIES = [
+  { id: 'all', label: 'Todas las categorías', icon: 'Layers' },
+  { id: 'promociones', label: 'Promos & Ofertas', icon: 'Sparkles', color: '#f59e0b' },
+  { id: 'dietas', label: 'Dietas & Nutrición', icon: 'Utensils', color: '#10b981' },
+  { id: 'eventos', label: 'Eventos & Grupos', icon: 'PartyPopper', color: '#a855f7' },
+  { id: 'envios', label: 'Envíos & Logística', icon: 'Truck', color: '#3b82f6' },
+  { id: 'atencion', label: 'Atención & Soporte', icon: 'UserCheck', color: '#ec4899' },
+  { id: 'general', label: 'General / Otros', icon: 'MessageSquare', color: '#64748b' }
+];
+
+export const FLOW_MATCH_TYPES = [
+  { id: 'contains_any', label: 'Contiene alguna de las palabras clave', description: 'Se activa si el cliente escribe cualquier palabra de la lista en su mensaje' },
+  { id: 'exact', label: 'Coincidencia exacta de frase', description: 'El mensaje debe ser idéntico a una de las frases configuradas' },
+  { id: 'starts_with', label: 'Empieza con la palabra clave', description: 'El mensaje debe comenzar obligatoriamente con alguna de las palabras clave' }
+];
+
+export const FLOW_SCOPES = [
+  { id: 'always', label: '🌐 Siempre activo (Global)', description: 'Responde en cualquier momento de la charla' },
+  { id: 'idle_only', label: '⏳ Solo fuera de pedidos (Sin comanda activa)', description: 'No interrumpe si el cliente está armando un pedido o cargando su dirección' },
+  { id: 'active_order', label: '🛒 Solo durante la comanda', description: 'Únicamente cuando el cliente está seleccionando productos' }
+];
+
+export const DEFAULT_CUSTOM_FLOWS = [
+  {
+    id: 'flow-promos',
+    name: 'Promociones y 2x1',
+    category: 'promociones',
+    enabled: true,
+    priority: 10,
+    condition: {
+      type: 'contains_any',
+      keywords: ['promo', 'promos', 'promocion', 'promoción', '2x1', 'descuento', 'oferta', 'combos'],
+      scope: 'always'
+    },
+    action: {
+      type: 'reply_text',
+      response: `🎉 *¡PROMOS ACTIVAS EN COMANDAFAST!* 🔥🍔\n\n• 🍔 *2x1 Smash Clásica:* Todos los miércoles y jueves con papas incluidas.\n• 👨‍👩‍👧‍👦 *Combo Cuadrilla:* 4 Dobles Cheeseburgers + 2 Papas Grandes por solo *$18.500*.\n• 🍻 *Happy Hour Cerveza:* 2x1 de 19:30 a 21:00 hs en el local.\n\n👉 *¿Querés pedir una promo?* Respondé con la palabra *COMPRAR* o consultá la carta con *MENU*.`,
+      imageUrl: '',
+      suggestedChips: ['Ver Menú', 'Comprar', 'Horarios']
+    },
+    stats: { triggerCount: 0, lastTriggered: null }
+  },
+  {
+    id: 'flow-sintacc',
+    name: 'Opciones Celíacos / Sin TACC',
+    category: 'dietas',
+    enabled: true,
+    priority: 9,
+    condition: {
+      type: 'contains_any',
+      keywords: ['tacc', 'sin tacc', 'celiaco', 'celiaca', 'celíaco', 'celíaca', 'gluten', 'libre de gluten'],
+      scope: 'always'
+    },
+    action: {
+      type: 'reply_text',
+      response: `🌾 *OPCIONES SIN TACC / APTAS CELÍACOS* 🍔✨\n\nContamos con:\n• 🍞 *Pan artesanal libre de gluten* certificado para cualquier burger de nuestra carta (+$800).\n• 🍟 *Papas fritas clásicas* cocinadas en freidora exclusiva sin contaminación cruzada.\n• 🧀 Medallones de carne 100% vacuna condimentados únicamente con sal y pimienta.\n\n⚠️ _Por favor indicale al cocinero en las notas si tenés celiaquía severa para extremar los cuidados de sanitización de plancha._`,
+      imageUrl: '',
+      suggestedChips: ['Ver Carta', 'Comprar', 'Hablar con Encargado']
+    },
+    stats: { triggerCount: 0, lastTriggered: null }
+  },
+  {
+    id: 'flow-veggie',
+    name: 'Opciones Vegetarianas & Veggie',
+    category: 'dietas',
+    enabled: true,
+    priority: 8,
+    condition: {
+      type: 'contains_any',
+      keywords: ['vegano', 'vegana', 'vegetariano', 'vegetariana', 'veggie', 'vegan', 'sin carne', 'medallon vegetal'],
+      scope: 'always'
+    },
+    action: {
+      type: 'reply_text',
+      response: `🌱 *OPCIONES VEGETARIANAS Y VEGGIES* 🥑🍔\n\n• 🍔 *Veggie Smash Burger:* Medallón a base de legumbres y hongos portobello, cebolla caramelizada, rúcula fresca y queso provoleta.\n• 🧀 Podés reemplazar el medallón de carne de cualquiera de nuestras burgers por nuestra opción veggie artesanal.\n• 🍟 Papas clásicas, aros de cebolla y aderezos especiales sin derivados cárnicos.\n\n👉 Respondé con *MENU* para ver todos los precios o *COMPRAR* para pedirla.`,
+      imageUrl: '',
+      suggestedChips: ['Ver Menú', 'Comprar', 'Consultar']
+    },
+    stats: { triggerCount: 0, lastTriggered: null }
+  },
+  {
+    id: 'flow-cumples',
+    name: 'Cumpleaños y Eventos',
+    category: 'eventos',
+    enabled: true,
+    priority: 7,
+    condition: {
+      type: 'contains_any',
+      keywords: ['cumple', 'cumpleaños', 'evento', 'fiesta', 'festejo', 'reserva', 'mesas', 'grupo', 'agasajo'],
+      scope: 'always'
+    },
+    action: {
+      type: 'reply_text',
+      response: `🎉🎂 *¡FESTEJÁ TU CUMPLEAÑOS EN COMANDAFAST!* 🍔🍻\n\nBeneficios exclusivos para grupos:\n• 🎁 *El cumpleañero come GRATIS* viniendo con 4 o más amigos (burger simple + bebida).\n• 🍰 Podés traer tu propia torta y nosotros te facilitamos platos y cubiertos sin costo.\n• 🎈 Armamos sector reservado para grupos de 10 personas o más.\n\n👉 Para coordinar tu reserva o evento especial, respondé *RESERVA* y te contactará nuestro encargado de salón.`,
+      imageUrl: '',
+      suggestedChips: ['Reservar Mesa', 'Ver Menú', 'Horarios']
+    },
+    stats: { triggerCount: 0, lastTriggered: null }
+  },
+  {
+    id: 'flow-delivery-info',
+    name: 'Zonas de Envío y Tiempos de Cadete',
+    category: 'envios',
+    enabled: true,
+    priority: 6,
+    condition: {
+      type: 'contains_any',
+      keywords: ['zona', 'zonas', 'envio', 'envío', 'costo envio', 'cadete', 'demora', 'cuanto tarda', 'cobertura', 'llega'],
+      scope: 'always'
+    },
+    action: {
+      type: 'reply_text',
+      response: `🛵 *INFORMACIÓN DE DELIVERY & ENVÍOS* 📍\n\n• 📍 *Zona de cobertura:* Radio de hasta 6 km desde nuestro local en {direccion}.\n• ⏱️ *Tiempo promedio de despacho:* 30 a 45 minutos según demanda de cocina.\n• 💵 *Costo de envío:* Tarifa plana accesible para todo el casco urbano.\n• 🛍️ *Take Away:* También podés retirar por mostrador sin ningún costo extra.\n\n👉 ¿Querés pedir ahora? Escribí *COMPRAR* o *MENU* para empezar.`,
+      imageUrl: '',
+      suggestedChips: ['Hacer Pedido', 'Ver Carta', 'Ubicación']
+    },
+    stats: { triggerCount: 0, lastTriggered: null }
+  },
+  {
+    id: 'flow-humano',
+    name: 'Atención con Encargado Humano',
+    category: 'atencion',
+    enabled: true,
+    priority: 5,
+    condition: {
+      type: 'contains_any',
+      keywords: ['humano', 'persona', 'encargado', 'dueño', 'queja', 'reclamo', 'problema', 'hablar con alguien', 'operador'],
+      scope: 'always'
+    },
+    action: {
+      type: 'reply_text',
+      response: `👤 *DERIVACIÓN A ATENCIÓN HUMANA* 🔔\n\n¡Entendido! Ya notificamos a nuestro encargado de turno en caja para que tome el control de este chat y responda a tu consulta personalmente.\n\n⏰ *Tiempo estimado de respuesta:* 2 a 5 minutos.\n\n_Mientras tanto, podés detallarnos tu consulta o reclamo por este mensaje._`,
+      imageUrl: '',
+      suggestedChips: ['Volver al Menú', 'Estado de Pedido']
+    },
+    stats: { triggerCount: 0, lastTriggered: null }
+  }
+];

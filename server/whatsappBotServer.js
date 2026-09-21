@@ -32,6 +32,147 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const AUTH_DIR = path.join(DATA_DIR, 'baileys_auth');
 const PRODUCTS_FILE = path.join(DATA_DIR, 'products.json');
 const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
+const FLOWS_FILE = path.join(DATA_DIR, 'custom_flows.json');
+
+const DEFAULT_SERVER_FLOWS = [
+  {
+    id: 'flow-promos',
+    name: 'Promociones y 2x1',
+    category: 'promociones',
+    enabled: true,
+    priority: 10,
+    condition: {
+      type: 'contains_any',
+      keywords: ['promo', 'promos', 'promocion', 'promoción', '2x1', 'descuento', 'oferta', 'combos'],
+      scope: 'always'
+    },
+    action: {
+      type: 'reply_text',
+      response: `🎉 *¡PROMOS ACTIVAS EN COMANDAFAST!* 🔥🍔\n\n• 🍔 *2x1 Smash Clásica:* Todos los miércoles y jueves con papas incluidas.\n• 👨‍👩‍👧‍👦 *Combo Cuadrilla:* 4 Dobles Cheeseburgers + 2 Papas Grandes por solo *$18.500*.\n• 🍻 *Happy Hour Cerveza:* 2x1 de 19:30 a 21:00 hs en el local.\n\n👉 *¿Querés pedir una promo?* Respondé con la palabra *COMPRAR* o consultá la carta con *MENU*.`,
+      imageUrl: '',
+      suggestedChips: ['Ver Menú', 'Comprar', 'Horarios']
+    }
+  },
+  {
+    id: 'flow-sintacc',
+    name: 'Opciones Celíacos / Sin TACC',
+    category: 'dietas',
+    enabled: true,
+    priority: 9,
+    condition: {
+      type: 'contains_any',
+      keywords: ['tacc', 'sin tacc', 'celiaco', 'celiaca', 'celíaco', 'celíaca', 'gluten', 'libre de gluten'],
+      scope: 'always'
+    },
+    action: {
+      type: 'reply_text',
+      response: `🌾 *OPCIONES SIN TACC / APTAS CELÍACOS* 🍔✨\n\nContamos con:\n• 🍞 *Pan artesanal libre de gluten* certificado para cualquier burger de nuestra carta (+$800).\n• 🍟 *Papas fritas clásicas* cocinadas en freidora exclusiva sin contaminación cruzada.\n• 🧀 Medallones de carne 100% vacuna condimentados únicamente con sal y pimienta.\n\n⚠️ _Por favor indicale al cocinero en las notas si tenés celiaquía severa para extremar los cuidados de sanitización de plancha._`,
+      imageUrl: '',
+      suggestedChips: ['Ver Carta', 'Comprar', 'Hablar con Encargado']
+    }
+  },
+  {
+    id: 'flow-veggie',
+    name: 'Opciones Vegetarianas & Veggie',
+    category: 'dietas',
+    enabled: true,
+    priority: 8,
+    condition: {
+      type: 'contains_any',
+      keywords: ['vegano', 'vegana', 'vegetariano', 'vegetariana', 'veggie', 'vegan', 'sin carne', 'medallon vegetal'],
+      scope: 'always'
+    },
+    action: {
+      type: 'reply_text',
+      response: `🌱 *OPCIONES VEGETARIANAS Y VEGGIES* 🥑🍔\n\n• 🍔 *Veggie Smash Burger:* Medallón a base de legumbres y hongos portobello, cebolla caramelizada, rúcula fresca y queso provoleta.\n• 🧀 Podés reemplazar el medallón de carne de cualquiera de nuestras burgers por nuestra opción veggie artesanal.\n• 🍟 Papas clásicas, aros de cebolla y aderezos especiales sin derivados cárnicos.\n\n👉 Respondé con *MENU* para ver todos los precios o *COMPRAR* para pedirla.`,
+      imageUrl: '',
+      suggestedChips: ['Ver Menú', 'Comprar', 'Consultar']
+    }
+  },
+  {
+    id: 'flow-cumples',
+    name: 'Cumpleaños y Eventos',
+    category: 'eventos',
+    enabled: true,
+    priority: 7,
+    condition: {
+      type: 'contains_any',
+      keywords: ['cumple', 'cumpleaños', 'evento', 'fiesta', 'festejo', 'reserva', 'mesas', 'grupo', 'agasajo'],
+      scope: 'always'
+    },
+    action: {
+      type: 'reply_text',
+      response: `🎉🎂 *¡FESTEJÁ TU CUMPLEAÑOS EN COMANDAFAST!* 🍔🍻\n\nBeneficios exclusivos para grupos:\n• 🎁 *El cumpleañero come GRATIS* viniendo con 4 o más amigos (burger simple + bebida).\n• 🍰 Podés traer tu propia torta y nosotros te facilitamos platos y cubiertos sin costo.\n• 🎈 Armamos sector reservado para grupos de 10 personas o más.\n\n👉 Para coordinar tu reserva o evento especial, respondé *RESERVA* y te contactará nuestro encargado de salón.`,
+      imageUrl: '',
+      suggestedChips: ['Reservar Mesa', 'Ver Menú', 'Horarios']
+    }
+  },
+  {
+    id: 'flow-delivery-info',
+    name: 'Zonas de Envío y Tiempos de Cadete',
+    category: 'envios',
+    enabled: true,
+    priority: 6,
+    condition: {
+      type: 'contains_any',
+      keywords: ['zona', 'zonas', 'envio', 'envío', 'costo envio', 'cadete', 'demora', 'cuanto tarda', 'cobertura', 'llega'],
+      scope: 'always'
+    },
+    action: {
+      type: 'reply_text',
+      response: `🛵 *INFORMACIÓN DE DELIVERY & ENVÍOS* 📍\n\n• 📍 *Zona de cobertura:* Radio de hasta 6 km desde nuestro local en Av. Belgrano 1234, Centro.\n• ⏱️ *Tiempo promedio de despacho:* 30 a 45 minutos según demanda de cocina.\n• 💵 *Costo de envío:* Tarifa plana accesible para todo el casco urbano.\n• 🛍️ *Take Away:* También podés retirar por mostrador sin ningún costo extra.\n\n👉 ¿Querés pedir ahora? Escribí *COMPRAR* o *MENU* para empezar.`,
+      imageUrl: '',
+      suggestedChips: ['Hacer Pedido', 'Ver Carta', 'Ubicación']
+    }
+  },
+  {
+    id: 'flow-humano',
+    name: 'Atención con Encargado Humano',
+    category: 'atencion',
+    enabled: true,
+    priority: 5,
+    condition: {
+      type: 'contains_any',
+      keywords: ['humano', 'persona', 'encargado', 'dueño', 'queja', 'reclamo', 'problema', 'hablar con alguien', 'operador'],
+      scope: 'always'
+    },
+    action: {
+      type: 'reply_text',
+      response: `👤 *DERIVACIÓN A ATENCIÓN HUMANA* 🔔\n\n¡Entendido! Ya notificamos a nuestro encargado de turno en caja para que tome el control de este chat y responda a tu consulta personalmente.\n\n⏰ *Tiempo estimado de respuesta:* 2 a 5 minutos.\n\n_Mientras tanto, podés detallarnos tu consulta o reclamo por este mensaje._`,
+      imageUrl: '',
+      suggestedChips: ['Volver al Menú', 'Estado de Pedido']
+    }
+  }
+];
+
+function getCustomFlows() {
+  try {
+    if (fs.existsSync(FLOWS_FILE)) {
+      const raw = fs.readFileSync(FLOWS_FILE, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.error('[WHATSAPP BOT] Error al leer custom_flows.json:', e);
+  }
+  return DEFAULT_SERVER_FLOWS;
+}
+
+function saveStoredFlows(flows) {
+  try {
+    fs.writeFileSync(FLOWS_FILE, JSON.stringify(flows, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('[WHATSAPP BOT] Error al guardar en custom_flows.json:', e);
+  }
+}
+
+function interpolateTemplate(template, vars = {}) {
+  let res = String(template || '');
+  for (const [k, v] of Object.entries(vars)) {
+    res = res.replace(new RegExp(`\\{${k}\\}`, 'gi'), String(v ?? ''));
+  }
+  return res;
+}
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -251,6 +392,70 @@ class WhatsAppBotServer {
             await this.sock.sendMessage(remoteJid, {
               text: '❌ *Pedido cancelado.*\n\nEscribí *MENU* en cualquier momento para volver a ver las opciones o hacer un nuevo pedido.'
             });
+            continue;
+          }
+
+          // -------------------------------------------------------------
+          // EVALUACIÓN DE FLUJOS PERSONALIZADOS CON CONDICIONES
+          // -------------------------------------------------------------
+          const activeFlows = getCustomFlows().filter(f => f.enabled);
+          let matchedFlow = null;
+
+          for (const flow of activeFlows) {
+            const cond = flow.condition || {};
+            const keywords = (cond.keywords || []).map(k => k.trim().toLowerCase()).filter(Boolean);
+            const matchType = cond.type || 'contains_any';
+            const scope = cond.scope || 'always';
+
+            if (scope === 'idle_only' && session.step !== 'IDLE') continue;
+            if (scope === 'active_order' && session.step === 'IDLE') continue;
+
+            let isMatch = false;
+            if (matchType === 'exact') {
+              isMatch = keywords.some(k => lower === k);
+            } else if (matchType === 'starts_with') {
+              isMatch = keywords.some(k => lower.startsWith(k));
+            } else {
+              isMatch = keywords.some(k => lower.includes(k));
+            }
+
+            if (isMatch) {
+              matchedFlow = flow;
+              break;
+            }
+          }
+
+          if (matchedFlow) {
+            console.log(`🎯 [WHATSAPP BOT FLUJO]: Activado flujo "${matchedFlow.name}" por mensaje de ${remoteJid}`);
+            const action = matchedFlow.action || {};
+            let flowReply = action.response || '';
+            flowReply = interpolateTemplate(flowReply, {
+              cliente: msg.pushName || 'Cliente',
+              direccion: 'Av. Belgrano 1234, Centro',
+              horarios: 'Miércoles a Domingos de 19:30 a 00:30 hs',
+              alias_banco: 'comandafast.mp',
+              banco: 'Mercado Pago',
+              titular: 'ComandaFast Burgers S.R.L.',
+              cbu: '0000003100092138928374'
+            });
+
+            if (action.imageUrl) {
+              try {
+                if (action.imageUrl.startsWith('data:image')) {
+                  const base64Data = action.imageUrl.split(';base64,').pop();
+                  const imageBuffer = Buffer.from(base64Data, 'base64');
+                  await this.sock.sendMessage(remoteJid, { image: imageBuffer, caption: flowReply });
+                  continue;
+                } else if (action.imageUrl.startsWith('http')) {
+                  await this.sock.sendMessage(remoteJid, { image: { url: action.imageUrl }, caption: flowReply });
+                  continue;
+                }
+              } catch (imgErr) {
+                console.warn('[WHATSAPP BOT] Error enviando imagen del flujo:', imgErr);
+              }
+            }
+
+            await this.sock.sendMessage(remoteJid, { text: flowReply });
             continue;
           }
 
@@ -683,6 +888,20 @@ app.post('/api/orders/ack', (req, res) => {
 // =========================================================
 // ENDPOINTS DE INTELIGENCIA ARTIFICIAL (GOOGLE GEMINI)
 // =========================================================
+app.get('/api/flows', (req, res) => {
+  res.json({ success: true, flows: getCustomFlows() });
+});
+
+app.post('/api/flows', (req, res) => {
+  const { flows } = req.body;
+  if (Array.isArray(flows)) {
+    saveStoredFlows(flows);
+    console.log(`🔀 [WHATSAPP BOT] Sincronizados ${flows.length} flujos conversacionales.`);
+    return res.json({ success: true, count: flows.length });
+  }
+  res.status(400).json({ error: 'Array de flujos requerido' });
+});
+
 app.get('/api/ai/config', (req, res) => {
   res.json({ success: true, config: geminiBotService.getConfigSafe() });
 });

@@ -3,7 +3,7 @@
 // Motor de atención automática, toma de pedidos y lab de simulación
 // =========================================================
 
-import { DEFAULT_CHATBOT_KEYWORDS, DEFAULT_TEMPLATES } from './whatsappBotConstants';
+import { DEFAULT_CHATBOT_KEYWORDS, DEFAULT_TEMPLATES, DEFAULT_CUSTOM_FLOWS } from './whatsappBotConstants';
 import { storageService } from './storageService';
 import { audioService } from './audioService';
 import { supabaseSync } from './supabaseClient';
@@ -11,6 +11,62 @@ import { supabaseSync } from './supabaseClient';
 const BOT_SETTINGS_KEY = 'comandafast_bot_settings';
 
 export const chatbotService = {
+  // --- GESTIÓN DE FLUJOS PERSONALIZADOS Y CONDICIONES ---
+  getCustomFlows() {
+    try {
+      const saved = localStorage.getItem('comandafast_custom_flows');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error('[chatbotService] Error al leer custom_flows:', e);
+    }
+    return DEFAULT_CUSTOM_FLOWS;
+  },
+
+  saveCustomFlows(flows) {
+    try {
+      localStorage.setItem('comandafast_custom_flows', JSON.stringify(flows));
+      this.syncFlowsWithBotServer(flows);
+      return true;
+    } catch (e) {
+      console.error('[chatbotService] Error al guardar custom_flows:', e);
+      return false;
+    }
+  },
+
+  resetCustomFlows() {
+    this.saveCustomFlows(DEFAULT_CUSTOM_FLOWS);
+    return DEFAULT_CUSTOM_FLOWS;
+  },
+
+  async syncFlowsWithBotServer(flows) {
+    try {
+      await fetch('http://localhost:3002/api/flows', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ flows })
+      });
+    } catch (_) {}
+  },
+
+  async fetchServerFlows() {
+    try {
+      const res = await fetch('http://localhost:3002/api/flows');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.flows)) {
+          localStorage.setItem('comandafast_custom_flows', JSON.stringify(data.flows));
+          return data.flows;
+        }
+      }
+    } catch (_) {}
+    return this.getCustomFlows();
+  },
+
   // 1. Obtener ajustes del bot
   getSettings() {
     try {
@@ -278,6 +334,39 @@ export const chatbotService = {
       };
       reply = `❌ *Comanda cancelada.* ¿En qué más podemos ayudarte hoy?\n\n` + this.interpolateTemplate(settings.template_menu || DEFAULT_TEMPLATES.template_menu, commonVars);
       return { reply, newState };
+    }
+
+    // -------------------------------------------------------------
+    // 4.5. EVALUACIÓN DE FLUJOS PERSONALIZADOS CON CONDICIONES
+    // -------------------------------------------------------------
+    const activeFlows = this.getCustomFlows().filter(f => f.enabled);
+    for (const flow of activeFlows) {
+      const cond = flow.condition || {};
+      const keywords = (cond.keywords || []).map(k => k.trim().toLowerCase()).filter(Boolean);
+      const matchType = cond.type || 'contains_any';
+      const scope = cond.scope || 'always';
+
+      if (scope === 'idle_only' && newState.step !== 'IDLE') continue;
+      if (scope === 'active_order' && newState.step === 'IDLE') continue;
+
+      let isMatch = false;
+      if (matchType === 'exact') {
+        isMatch = keywords.some(k => lower === k);
+      } else if (matchType === 'starts_with') {
+        isMatch = keywords.some(k => lower.startsWith(k));
+      } else {
+        // contains_any
+        isMatch = keywords.some(k => lower.includes(k));
+      }
+
+      if (isMatch) {
+        const action = flow.action || {};
+        reply = this.interpolateTemplate(action.response || '', commonVars);
+        if (action.imageUrl) {
+          image = action.imageUrl;
+        }
+        return { reply, image, newState, triggeredFlow: flow };
+      }
     }
 
     // -------------------------------------------------------------

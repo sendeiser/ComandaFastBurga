@@ -6,6 +6,8 @@ import {
   Power, Wifi, WifiOff, ExternalLink
 } from 'lucide-react';
 import AdminChatbotLab from './AdminChatbotLab';
+import AdminBotFlowsTab from './AdminBotFlowsTab';
+import { GitBranch } from 'lucide-react';
 import { ALL_TEMPLATE_NODES, DEFAULT_TEMPLATES, DEFAULT_CHATBOT_KEYWORDS } from '../../../services/whatsappBotConstants';
 import { chatbotService } from '../../../services/chatbotService';
 
@@ -14,6 +16,15 @@ const BOT_SERVER_URL = 'http://localhost:3002';
 export default function AdminWhatsAppBot() {
   const [activeTab, setActiveTab] = useState('test_lab'); // 'test_lab' | 'templates' | 'security' | 'connection'
   const [settings, setSettings] = useState(chatbotService.getSettings());
+  const [flows, setFlows] = useState(() => chatbotService.getCustomFlows());
+
+  useEffect(() => {
+    chatbotService.fetchServerFlows().then(serverFlows => {
+      if (Array.isArray(serverFlows) && serverFlows.length > 0) {
+        setFlows(serverFlows);
+      }
+    });
+  }, []);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Template editor
@@ -466,6 +477,32 @@ call npm run dev
             <span>🧪 Laboratorio de Pruebas (Lab)</span>
           </button>
 
+          {/* TAB: GESTOR DE FLUJOS Y CONDICIONES (BUILDER) */}
+          <button
+            type="button"
+            className={`cat-pill-btn ${activeTab === 'flows' ? 'active' : ''}`}
+            style={{
+              height: '34px',
+              padding: '0.4rem 0.85rem',
+              gap: '6px',
+              borderColor: activeTab === 'flows' ? 'var(--accent-amber)' : undefined
+            }}
+            onClick={() => setActiveTab('flows')}
+          >
+            <GitBranch size={15} style={{ color: 'var(--accent-amber)' }} />
+            <span>🔀 Flujos & Condiciones</span>
+            <span style={{
+              fontSize: '0.65rem',
+              background: 'rgba(245, 158, 11, 0.2)',
+              color: 'var(--accent-amber)',
+              padding: '1px 6px',
+              borderRadius: 'var(--radius-full)',
+              fontWeight: 800
+            }}>
+              {flows.filter(f => f.enabled).length} Activos
+            </span>
+          </button>
+
                     {/* TAB 2: IA GEMINI */}
           <button
             type="button"
@@ -546,6 +583,22 @@ call npm run dev
         <div style={{ flex: 1 }}>
           <AdminChatbotLab />
         </div>
+      )}
+
+      {/* TAB CONTENT: FLUJOS & CONDICIONES (BUILDER) */}
+      {activeTab === 'flows' && (
+        <AdminBotFlowsTab
+          flows={flows}
+          onSaveFlows={(updatedFlows) => {
+            setFlows(updatedFlows);
+            chatbotService.saveCustomFlows(updatedFlows);
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 3000);
+          }}
+          onTestInLab={(flow) => {
+            setActiveTab('test_lab');
+          }}
+        />
       )}
 
       {/* TAB CONTENT: TEMPLATES STUDIO */}
