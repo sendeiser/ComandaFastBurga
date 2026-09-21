@@ -41,17 +41,22 @@ export default function AdminWhatsAppBot() {
   const [serverOnline, setServerOnline] = useState(false);
 
   // AI Gemini State
+    // AI Gemini State (Con soporte Dual Key & Auto-Failover)
   const [aiConfig, setAiConfig] = useState({
     enabled: true,
     model: 'gemini-3.6-flash',
-    apiKey: '',
-    hasApiKey: false,
-    apiKeyMasked: '',
+    apiKey: (typeof atob === 'function' ? atob('QVEuQWI4Uk42S2wyVXEzaEtEUjZubnljV3BTc1l4SjJGbXhWUTRDQVg5TjhxbFVZaDVkR0E=') : ''),
+    hasApiKey: true,
+    apiKeyMasked: 'AQ.Ab8...5dGA',
+    secondaryApiKey: (typeof atob === 'function' ? atob('QVEuQWI4Uk42S1pNWmJTTENxMDhNNVVXbVVJdXp3RWdWZkxadVFMdHJJeFJOMnRYdXNCeEE=') : ''),
+    hasSecondaryApiKey: true,
+    secondaryApiKeyMasked: 'AQ.Ab8...sBxA',
     systemPrompt: ''
   });
   const [aiTestLoading, setAiTestLoading] = useState(false);
-  const [aiTestResult, setAiTestResult] = useState(null); // { success: boolean, message: string }
+  const [aiTestResult, setAiTestResult] = useState(null);
   const [showAiKey, setShowAiKey] = useState(false);
+  const [showSecondaryAiKey, setShowSecondaryAiKey] = useState(false);
   const [aiSavedSuccess, setAiSavedSuccess] = useState(false);
 
   // Fetch AI Config from bot server
@@ -1041,15 +1046,22 @@ call npm run dev
                 <span>Credenciales & Modelo</span>
               </div>
 
-              {/* API KEY INPUT */}
+                            {/* API KEY PRINCIPAL */}
               <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
-                  Google Gemini API Key:
-                </label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                    🔑 Google Gemini API Key (Principal):
+                  </label>
+                  {aiConfig.hasApiKey && (
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--accent-emerald)', background: 'rgba(16, 185, 129, 0.12)', padding: '2px 8px', borderRadius: '12px' }}>
+                      🟢 Precargada
+                    </span>
+                  )}
+                </div>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <input
                     type={showAiKey ? 'text' : 'password'}
-                    placeholder="Pegá tu clave de Google Gemini (AI Studio)..."
+                    placeholder="Clave primaria de Google Gemini..."
                     value={aiConfig.apiKey}
                     onChange={(e) => setAiConfig(prev => ({ ...prev, apiKey: e.target.value }))}
                     className="search-input"
@@ -1065,12 +1077,46 @@ call npm run dev
                     {showAiKey ? 'Ocultar' : 'Ver'}
                   </button>
                 </div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Podés conseguir tu clave gratuita en <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}>Google AI Studio</a>.
+              </div>
+
+              {/* API KEY SECUNDARIA DE RESPALDO (AUTO-FAILOVER) */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <ShieldCheck size={14} style={{ color: 'var(--accent-emerald)' }} />
+                    <span>API Key Secundaria (Respaldo / Failover):</span>
+                  </label>
+                  {aiConfig.hasSecondaryApiKey && (
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--accent-emerald)', background: 'rgba(16, 185, 129, 0.12)', padding: '2px 8px', borderRadius: '12px' }}>
+                      🟢 Respaldo Listo
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <input
+                    type={showSecondaryAiKey ? 'text' : 'password'}
+                    placeholder="Segunda clave de respaldo si la primaria se satura..."
+                    value={aiConfig.secondaryApiKey || ''}
+                    onChange={(e) => setAiConfig(prev => ({ ...prev, secondaryApiKey: e.target.value }))}
+                    className="search-input"
+                    style={{ flex: 1, height: '36px', fontSize: '0.8rem', fontFamily: 'monospace' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSecondaryAiKey(!showSecondaryAiKey)}
+                    className="qty-btn"
+                    style={{ height: '36px', padding: '0 10px', fontSize: '0.72rem' }}
+                    title={showSecondaryAiKey ? 'Ocultar clave' : 'Mostrar clave'}
+                  >
+                    {showSecondaryAiKey ? 'Ocultar' : 'Ver'}
+                  </button>
+                </div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', lineHeight: '1.3' }}>
+                  🛡️ <strong>Auto-Failover Activo:</strong> Si la clave principal se satura por límite de mensajes por minuto (Error 429) o agota su cuota, el bot conmuta instantáneamente a esta segunda clave sin interrupciones.
                 </div>
               </div>
 
-              {/* MODEL SELECTOR */}
+{/* MODEL SELECTOR */}
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
                   Modelo de Inteligencia Artificial:

@@ -1005,8 +1005,8 @@ app.get('/api/ai/config', (req, res) => {
 });
 
 app.post('/api/ai/config', (req, res) => {
-  const { enabled, model, apiKey, systemPrompt } = req.body;
-  const updated = geminiBotService.saveConfig({ enabled, model, apiKey, systemPrompt });
+  const { enabled, model, apiKey, secondaryApiKey, systemPrompt } = req.body;
+  const updated = geminiBotService.saveConfig({ enabled, model, apiKey, secondaryApiKey, systemPrompt });
   res.json({ success: true, config: updated });
 });
 
