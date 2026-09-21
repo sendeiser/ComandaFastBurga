@@ -109,7 +109,27 @@ export const chatbotService = {
     };
   },
 
-    // 6. Inyección directa de pedido a ComandaFast (POS y Cocina KDS)
+    // Consulta a Google Gemini AI mediante el microservicio local
+  async queryGeminiAI(userMessage, persona = {}, availableProducts = []) {
+    try {
+      const res = await fetch('http://localhost:3002/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userMessage,
+          customerName: persona?.name || '',
+          availableProducts: availableProducts.length > 0 ? availableProducts : this.getDatabaseProducts()
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data.reply || null;
+      }
+    } catch (_) {}
+    return null;
+  },
+
+  // 6. Inyección directa de pedido a ComandaFast (POS y Cocina KDS)
   injectOrderToPos({ items = [], customer = {}, paymentMethod = 'efectivo', shippingMethod = 'local' }) {
     if (!items || items.length === 0) return null;
 

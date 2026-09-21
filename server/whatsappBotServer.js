@@ -12,6 +12,7 @@ import path from 'path';
 import QRCode from 'qrcode';
 import qrcodeTerminal from 'qrcode-terminal';
 import pino from 'pino';
+import { geminiBotService } from './geminiBotService.js';
 import makeWASocket, { 
   useMultiFileAuthState, 
   fetchLatestBaileysVersion, 
@@ -538,6 +539,23 @@ class WhatsAppBotServer {
             continue;
           }
 
+          // CONSULTA INTELIGENTE CON GOOGLE GEMINI AI (Patrón Candy Shop)
+          try {
+            const aiReply = await geminiBotService.generateReply(text, {
+              customerName: msg.pushName || '',
+              customerPhone: remoteJid,
+              availableProducts: prods
+            });
+
+            if (aiReply) {
+              console.log(`✨ [WHATSAPP IA GEMINI]: Respondiendo a ${remoteJid}`);
+              await this.sock.sendMessage(remoteJid, { text: aiReply });
+              continue;
+            }
+          } catch (aiErr) {
+            console.warn('[WHATSAPP BOT GEMINI AI ERROR]:', aiErr);
+          }
+
           // SALUDO POR DEFECTO
           const reply = `🍔 *¡Hola! Bienvenido a ComandaFast Burgers* 🔥\n\n¿En qué podemos ayudarte hoy?\n\n1️⃣ *Consultar estado de pedido*\n2️⃣ *Datos de transferencia / Alias*\n3️⃣ *Horarios y ubicación*\n4️⃣ *Ver carta completa y fotos (${prods.length} burgers)*\n5️⃣ *Hacer un pedido ahora* 🍔\n\n_Respondé con el número de opción o escribí tu pedido directo._`;
           await this.sock.sendMessage(remoteJid, { text: reply });
@@ -647,6 +665,32 @@ app.post('/api/orders/ack', (req, res) => {
 });
 
 // Endpoint para consultar histórico de pedidos de WhatsApp
+// =========================================================
+// ENDPOINTS DE INTELIGENCIA ARTIFICIAL (GOOGLE GEMINI)
+// =========================================================
+app.get('/api/ai/config', (req, res) => {
+  res.json({ success: true, config: geminiBotService.getConfigSafe() });
+});
+
+app.post('/api/ai/config', (req, res) => {
+  const { enabled, model, apiKey, systemPrompt } = req.body;
+  const updated = geminiBotService.saveConfig({ enabled, model, apiKey, systemPrompt });
+  res.json({ success: true, config: updated });
+});
+
+app.post('/api/ai/test', async (req, res) => {
+  const { apiKey } = req.body;
+  const result = await geminiBotService.testConnection(apiKey);
+  res.json(result);
+});
+
+app.post('/api/ai/chat', async (req, res) => {
+  const { message, customerName, availableProducts } = req.body;
+  const prods = availableProducts || getStoredProducts();
+  const reply = await geminiBotService.generateReply(message, { customerName, availableProducts: prods });
+  res.json({ success: true, reply });
+});
+
 // Endpoints para descarga directa de scripts (.bat)
 app.get('/download/INICIAR_BOT_WHATSAPP.bat', (req, res) => {
   const filePath = path.join(process.cwd(), 'INICIAR_BOT_WHATSAPP.bat');

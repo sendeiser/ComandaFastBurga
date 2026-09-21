@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Bot, Download, Terminal, FlaskConical, Settings, ShieldCheck, QrCode, 
+  Bot, Sparkles, Key, Download, Terminal, FlaskConical, Settings, ShieldCheck, QrCode, 
   Smartphone, CheckCircle2, Save, RotateCcw, Plus, 
   Trash2, Copy, Check, Info, Zap, AlertCircle, RefreshCw,
   Power, Wifi, WifiOff, ExternalLink
@@ -28,6 +28,94 @@ export default function AdminWhatsAppBot() {
 
   // Live Baileys Server Connection State
   const [serverOnline, setServerOnline] = useState(false);
+
+  // AI Gemini State
+  const [aiConfig, setAiConfig] = useState({
+    enabled: true,
+    model: 'gemini-3.6-flash',
+    apiKey: '',
+    hasApiKey: false,
+    apiKeyMasked: '',
+    systemPrompt: ''
+  });
+  const [aiTestLoading, setAiTestLoading] = useState(false);
+  const [aiTestResult, setAiTestResult] = useState(null); // { success: boolean, message: string }
+  const [showAiKey, setShowAiKey] = useState(false);
+  const [aiSavedSuccess, setAiSavedSuccess] = useState(false);
+
+  // Fetch AI Config from bot server
+  const fetchAiConfig = useCallback(async () => {
+    try {
+      const res = await fetch(`${BOT_SERVER_URL}/api/ai/config`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.config) {
+          setAiConfig(prev => ({
+            ...prev,
+            ...data.config,
+            apiKey: data.config.apiKeyMasked || prev.apiKey
+          }));
+        }
+      }
+    } catch (_) {}
+  }, []);
+
+  useEffect(() => {
+    fetchAiConfig();
+  }, [fetchAiConfig]);
+
+  const handleSaveAiConfig = async () => {
+    try {
+      const payload = {
+        enabled: aiConfig.enabled,
+        model: aiConfig.model,
+        systemPrompt: aiConfig.systemPrompt
+      };
+      // Solo enviar apiKey si el usuario escribió una nueva
+      if (aiConfig.apiKey && !aiConfig.apiKey.includes('...')) {
+        payload.apiKey = aiConfig.apiKey;
+      }
+      const res = await fetch(`${BOT_SERVER_URL}/api/ai/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        setAiSavedSuccess(true);
+        setTimeout(() => setAiSavedSuccess(false), 3000);
+        fetchAiConfig();
+      }
+    } catch (err) {
+      console.error('Error al guardar configuración de IA:', err);
+    }
+  };
+
+  const handleTestAiConnection = async () => {
+    setAiTestLoading(true);
+    setAiTestResult(null);
+    try {
+      const payload = {};
+      if (aiConfig.apiKey && !aiConfig.apiKey.includes('...')) {
+        payload.apiKey = aiConfig.apiKey;
+      }
+      const res = await fetch(`${BOT_SERVER_URL}/api/ai/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAiTestResult({ success: true, message: `✅ ¡Conexión exitosa con ${data.modelUsed || 'Gemini'}! Respuesta de prueba recibida.` });
+      } else {
+        setAiTestResult({ success: false, message: `❌ ${data.error || 'No se pudo conectar con Gemini.'}` });
+      }
+    } catch (err) {
+      setAiTestResult({ success: false, message: '❌ Servidor desconectado o error de red.' });
+    } finally {
+      setAiTestLoading(false);
+    }
+  };
+
   const [connectionStatus, setConnectionStatus] = useState('disconnected'); // 'disconnected' | 'connecting' | 'qr_ready' | 'connected'
   const [qrCodeData, setQrCodeData] = useState(null);
   const [connectedUser, setConnectedUser] = useState(null);
@@ -376,6 +464,34 @@ call npm run dev
           >
             <FlaskConical size={15} />
             <span>🧪 Laboratorio de Pruebas (Lab)</span>
+          </button>
+
+                    {/* TAB 2: IA GEMINI */}
+          <button
+            type="button"
+            className={`cat-pill-btn ${activeTab === 'ai' ? 'active' : ''}`}
+            style={{
+              height: '34px',
+              padding: '0.4rem 0.85rem',
+              gap: '6px',
+              borderColor: activeTab === 'ai' ? 'var(--accent-purple, #a855f7)' : undefined
+            }}
+            onClick={() => setActiveTab('ai')}
+          >
+            <Sparkles size={15} style={{ color: '#a855f7' }} />
+            <span>✨ Inteligencia Artificial</span>
+            {aiConfig.enabled && (
+              <span style={{
+                fontSize: '0.65rem',
+                background: 'rgba(168, 85, 247, 0.2)',
+                color: '#a855f7',
+                padding: '1px 6px',
+                borderRadius: 'var(--radius-full)',
+                fontWeight: 800
+              }}>
+                Gemini
+              </span>
+            )}
           </button>
 
           <button
@@ -786,6 +902,243 @@ call npm run dev
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+            {/* TAB CONTENT: INTELIGENCIA ARTIFICIAL (GOOGLE GEMINI) */}
+      {activeTab === 'ai' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* BANNER PRINCIPAL DE IA */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.12) 0%, rgba(59, 130, 246, 0.08) 100%)',
+            border: '1.5px solid rgba(168, 85, 247, 0.3)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1.25rem 1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '14px',
+                background: 'linear-gradient(135deg, #a855f7, #3b82f6)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                boxShadow: '0 4px 14px rgba(168, 85, 247, 0.35)'
+              }}>
+                <Sparkles size={26} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>
+                    Asistente Inteligente con Google Gemini AI
+                  </h3>
+                  <span style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 800,
+                    padding: '2px 8px',
+                    borderRadius: 'var(--radius-full)',
+                    background: aiConfig.enabled ? 'rgba(37, 211, 102, 0.15)' : 'rgba(100, 116, 139, 0.15)',
+                    color: aiConfig.enabled ? '#25D366' : 'var(--text-muted)'
+                  }}>
+                    {aiConfig.enabled ? '● IA ACTIVA' : '○ DESACTIVADA'}
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                  Responde automáticamente dudas abiertas de clientes, recomienda hamburguesas smash, asesora sobre ingredientes y combos en tiempo real.
+                </p>
+              </div>
+            </div>
+
+            {/* TOGGLE SWITCH */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.84rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                <input
+                  type="checkbox"
+                  checked={aiConfig.enabled}
+                  onChange={(e) => setAiConfig(prev => ({ ...prev, enabled: e.target.checked }))}
+                  style={{ width: '18px', height: '18px', accentColor: '#a855f7', cursor: 'pointer' }}
+                />
+                <span>Habilitar IA en WhatsApp</span>
+              </label>
+            </div>
+          </div>
+
+          {/* GRID: CONFIGURACIÓN Y PROMPT */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(340px, 420px) 1fr', gap: '1.25rem', alignItems: 'start' }}>
+            {/* LEFT: API KEY & MODEL SETTINGS */}
+            <div style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '1.25rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem'
+            }}>
+              <div style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Key size={16} style={{ color: '#a855f7' }} />
+                <span>Credenciales & Modelo</span>
+              </div>
+
+              {/* API KEY INPUT */}
+              <div>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+                  Google Gemini API Key:
+                </label>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <input
+                    type={showAiKey ? 'text' : 'password'}
+                    placeholder="Pegá tu clave de Google Gemini (AI Studio)..."
+                    value={aiConfig.apiKey}
+                    onChange={(e) => setAiConfig(prev => ({ ...prev, apiKey: e.target.value }))}
+                    className="search-input"
+                    style={{ flex: 1, height: '36px', fontSize: '0.8rem', fontFamily: 'monospace' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAiKey(!showAiKey)}
+                    className="qty-btn"
+                    style={{ height: '36px', padding: '0 10px', fontSize: '0.72rem' }}
+                    title={showAiKey ? 'Ocultar clave' : 'Mostrar clave'}
+                  >
+                    {showAiKey ? 'Ocultar' : 'Ver'}
+                  </button>
+                </div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  Podés conseguir tu clave gratuita en <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}>Google AI Studio</a>.
+                </div>
+              </div>
+
+              {/* MODEL SELECTOR */}
+              <div>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+                  Modelo de Inteligencia Artificial:
+                </label>
+                <select
+                  value={aiConfig.model}
+                  onChange={(e) => setAiConfig(prev => ({ ...prev, model: e.target.value }))}
+                  className="search-input"
+                  style={{ width: '100%', height: '36px', fontSize: '0.8rem', cursor: 'pointer' }}
+                >
+                  <option value="gemini-3.6-flash">gemini-3.6-flash (Recomendado - Ultra rápido y contextual)</option>
+                  <option value="gemini-3.5-flash">gemini-3.5-flash (Alta velocidad)</option>
+                </select>
+              </div>
+
+              {/* TEST CONNECTION BUTTON */}
+              <div>
+                <button
+                  type="button"
+                  onClick={handleTestAiConnection}
+                  disabled={aiTestLoading}
+                  className="cat-pill-btn"
+                  style={{
+                    width: '100%',
+                    height: '36px',
+                    fontSize: '0.8rem',
+                    gap: '6px',
+                    justifyContent: 'center',
+                    background: 'rgba(168, 85, 247, 0.15)',
+                    color: '#a855f7',
+                    border: '1px solid rgba(168, 85, 247, 0.3)',
+                    fontWeight: 800
+                  }}
+                >
+                  <RefreshCw size={14} className={aiTestLoading ? 'spin-slow' : ''} />
+                  <span>{aiTestLoading ? 'Probando conexión con Gemini...' : 'Probar Conexión con Gemini'}</span>
+                </button>
+
+                {aiTestResult && (
+                  <div style={{
+                    marginTop: '8px',
+                    padding: '8px 10px',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: '0.75rem',
+                    background: aiTestResult.success ? 'rgba(37, 211, 102, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                    color: aiTestResult.success ? 'var(--accent-emerald)' : 'var(--accent-rose)',
+                    border: `1px solid ${aiTestResult.success ? 'rgba(37, 211, 102, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                  }}>
+                    {aiTestResult.message}
+                  </div>
+                )}
+              </div>
+
+              {/* SAVE BUTTON */}
+              <button
+                type="button"
+                onClick={handleSaveAiConfig}
+                className="btn-confirm-order"
+                style={{ height: '38px', fontSize: '0.82rem', gap: '6px', justifyContent: 'center' }}
+              >
+                <Save size={15} />
+                <span>{aiSavedSuccess ? '¡Configuración Guardada!' : 'Guardar Ajustes de IA'}</span>
+              </button>
+            </div>
+
+            {/* RIGHT: SYSTEM PROMPT / PERSONALITY EDITOR */}
+            <div style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '1.25rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.85rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Settings size={16} style={{ color: 'var(--accent-amber)' }} />
+                  <span>Personalidad del Asistente & Instrucciones (System Prompt)</span>
+                </div>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  Personalizá el tono y respuestas
+                </span>
+              </div>
+
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+                Podés escribir tus propias directivas para la IA. Por defecto, ComandaFast le inyecta automáticamente el <strong>catálogo de hamburguesas en tiempo real</strong>, precios, formas de entrega (Retiro y Delivery) y alias de pago.
+              </p>
+
+              <textarea
+                rows={12}
+                value={aiConfig.systemPrompt}
+                onChange={(e) => setAiConfig(prev => ({ ...prev, systemPrompt: e.target.value }))}
+                placeholder={`Dejá en blanco para usar la personalidad oficial gastronómica de ComandaFast Burgers:\n- Tono canchero y simpático argentino con emojis (🍔, 🔥, 🍟).\n- Respuestas cortas y vendedoras (2-3 párrafos).\n- Recomendación de burgers smash y adicionales.\n- Instrucciones para pedir escribiendo el número o la palabra COMPRAR.`}
+                className="search-input"
+                style={{
+                  width: '100%',
+                  fontSize: '0.82rem',
+                  lineHeight: '1.45',
+                  padding: '0.75rem',
+                  borderRadius: 'var(--radius-md)',
+                  resize: 'vertical',
+                  fontFamily: 'inherit'
+                }}
+              />
+
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  💡 La IA solo interviene en consultas abiertas. Para armar pedidos, el sistema toma el control garantizando la comanda exacta.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAiConfig(prev => ({ ...prev, systemPrompt: '' }))}
+                  className="qty-btn"
+                  style={{ height: '30px', padding: '0 10px', fontSize: '0.72rem', gap: '4px' }}
+                >
+                  <RotateCcw size={12} />
+                  <span>Restablecer Prompt por Defecto</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

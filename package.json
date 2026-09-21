@@ -13,9 +13,11 @@
     "bot:qr": "node server/whatsappBotServer.js --reset"
   },
   "dependencies": {
+    "@google/genai": "^2.23.0",
     "@whiskeysockets/baileys": "^7.0.0-rc14",
     "canvas-confetti": "^1.9.4",
     "cors": "^2.8.6",
+    "dotenv": "^18.0.1",
     "express": "^5.2.1",
     "lucide-react": "^1.16.0",
     "pino": "^10.3.1",
