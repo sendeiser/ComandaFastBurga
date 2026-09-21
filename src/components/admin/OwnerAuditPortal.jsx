@@ -4,7 +4,7 @@ import AuditKpisTab from './AuditKpisTab';
 import AuditCashShiftsTab from './AuditCashShiftsTab';
 import AuditSecurityTab from './AuditSecurityTab';
 import AuditMenuAnalytics from './AuditMenuAnalytics';
-import AdminSecuritySettings from './AuditSecuritySettings';
+import AuditSecuritySettings from './AuditSecuritySettings';
 import AdminWhatsAppBot from './bot/AdminWhatsAppBot';
 import { auditService } from '../../services/auditService';
 import { storageService } from '../../services/storageService';

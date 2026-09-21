@@ -1,12 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Bot, FlaskConical, Settings, ShieldCheck, QrCode, 
   Smartphone, CheckCircle2, Save, RotateCcw, Plus, 
-  Trash2, Copy, Check, Info, Zap, AlertCircle, RefreshCw
+  Trash2, Copy, Check, Info, Zap, AlertCircle, RefreshCw,
+  Power, Wifi, WifiOff, ExternalLink
 } from 'lucide-react';
 import AdminChatbotLab from './AdminChatbotLab';
 import { ALL_TEMPLATE_NODES, DEFAULT_TEMPLATES, DEFAULT_CHATBOT_KEYWORDS } from '../../../services/whatsappBotConstants';
 import { chatbotService } from '../../../services/chatbotService';
+
+const BOT_SERVER_URL = 'http://localhost:3002';
 
 export default function AdminWhatsAppBot() {
   const [activeTab, setActiveTab] = useState('test_lab'); // 'test_lab' | 'templates' | 'security' | 'connection'
@@ -14,7 +17,7 @@ export default function AdminWhatsAppBot() {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Template editor
-  const [templateFilterCategory, setTemplateFilterCategory] = useState('all'); // 'all' | 'menu' | 'buy_flow' | 'notifications'
+  const [templateFilterCategory, setTemplateFilterCategory] = useState('all');
   const [selectedNodeId, setSelectedNodeId] = useState('template_menu');
   const [currentNodeText, setCurrentNodeText] = useState(settings.template_menu || DEFAULT_TEMPLATES.template_menu);
 
@@ -23,10 +26,41 @@ export default function AdminWhatsAppBot() {
   const [newIgnoredPhone, setNewIgnoredPhone] = useState('');
   const [newIgnoredLabel, setNewIgnoredLabel] = useState('');
 
-  // Connection tab state
-  const [connectionStatus, setConnectionStatus] = useState('disconnected'); // 'disconnected' | 'qr_ready' | 'connected'
+  // Live Baileys Server Connection State
+  const [serverOnline, setServerOnline] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState('disconnected'); // 'disconnected' | 'connecting' | 'qr_ready' | 'connected'
   const [qrCodeData, setQrCodeData] = useState(null);
+  const [connectedUser, setConnectedUser] = useState(null);
+  const [loadingAction, setLoadingAction] = useState(false);
 
+  // 1. Consultar estado del microservicio Baileys
+  const fetchServerStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`${BOT_SERVER_URL}/status`, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        setServerOnline(true);
+        setConnectionStatus(data.status || 'disconnected');
+        setQrCodeData(data.qrCode || null);
+        setConnectedUser(data.user || null);
+      } else {
+        setServerOnline(false);
+      }
+    } catch (_) {
+      setServerOnline(false);
+    }
+  }, []);
+
+  // Polling automático cuando está en la pestaña de conexión o esperando QR
+  useEffect(() => {
+    fetchServerStatus();
+    const interval = setInterval(() => {
+      fetchServerStatus();
+    }, 3500);
+    return () => clearInterval(interval);
+  }, [fetchServerStatus]);
+
+  // Actualizar plantilla al cambiar de nodo
   useEffect(() => {
     setCurrentNodeText(settings[selectedNodeId] || DEFAULT_TEMPLATES[selectedNodeId] || '');
   }, [selectedNodeId, settings]);
@@ -96,19 +130,39 @@ export default function AdminWhatsAppBot() {
     chatbotService.saveSettings(updated);
   };
 
-  const handleSimulateQr = () => {
-    setConnectionStatus('qr_ready');
-    setQrCodeData('https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=COMANDAFAST-WHATSAPP-BOT-CONNECT-' + Date.now());
+  // Acciones en vivo con el servidor Baileys
+  const handleStartBot = async () => {
+    setLoadingAction(true);
+    try {
+      const res = await fetch(`${BOT_SERVER_URL}/start`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setConnectionStatus(data.status || 'qr_ready');
+        setQrCodeData(data.qrCode || null);
+      }
+    } catch (e) {
+      console.error('[AdminWhatsAppBot] Error al iniciar bot:', e);
+    } finally {
+      setLoadingAction(false);
+      fetchServerStatus();
+    }
   };
 
-  const handleSimulateConnect = () => {
-    setConnectionStatus('connected');
-    setQrCodeData(null);
-  };
-
-  const handleSimulateDisconnect = () => {
-    setConnectionStatus('disconnected');
-    setQrCodeData(null);
+  const handleLogoutBot = async () => {
+    setLoadingAction(true);
+    try {
+      const res = await fetch(`${BOT_SERVER_URL}/logout`, { method: 'POST' });
+      if (res.ok) {
+        setConnectionStatus('disconnected');
+        setQrCodeData(null);
+        setConnectedUser(null);
+      }
+    } catch (e) {
+      console.error('[AdminWhatsAppBot] Error al desconectar bot:', e);
+    } finally {
+      setLoadingAction(false);
+      fetchServerStatus();
+    }
   };
 
   const filteredNodes = ALL_TEMPLATE_NODES.filter(n => {
@@ -169,6 +223,14 @@ export default function AdminWhatsAppBot() {
           >
             <Smartphone size={15} />
             <span>📱 Conexión WhatsApp Web</span>
+            {serverOnline && (
+              <span style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: connectionStatus === 'connected' ? 'var(--accent-emerald)' : '#25D366'
+              }} />
+            )}
           </button>
         </div>
 
@@ -545,7 +607,7 @@ export default function AdminWhatsAppBot() {
         </div>
       )}
 
-      {/* TAB CONTENT: WHATSAPP CONNECTION */}
+      {/* TAB CONTENT: REAL WHATSAPP CONNECTION */}
       {activeTab === 'connection' && (
         <div style={{
           background: 'var(--bg-card)',
@@ -553,9 +615,9 @@ export default function AdminWhatsAppBot() {
           borderRadius: 'var(--radius-lg)',
           padding: '1.25rem',
           display: 'grid',
-          gridTemplateColumns: '340px 1fr',
+          gridTemplateColumns: '360px 1fr',
           gap: '1.5rem',
-          alignItems: 'center'
+          alignItems: 'start'
         }}>
           {/* QR CODE BOX */}
           <div style={{
@@ -569,62 +631,91 @@ export default function AdminWhatsAppBot() {
             gap: '1rem',
             textAlign: 'center'
           }}>
+            {/* SERVER STATUS CHIP */}
             <div style={{
-              width: '200px',
-              height: '200px',
-              background: '#fff',
-              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '4px 10px',
+              borderRadius: 'var(--radius-full)',
+              background: serverOnline ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+              color: serverOnline ? 'var(--accent-emerald)' : 'var(--accent-rose)',
+              fontSize: '0.75rem',
+              fontWeight: 800
+            }}>
+              {serverOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
+              <span>{serverOnline ? 'Servidor Baileys Activo (Puerto 3002)' : 'Servidor Baileys Desconectado'}</span>
+            </div>
+
+            {/* QR CONTAINER */}
+            <div style={{
+              width: '240px',
+              height: '240px',
+              background: '#ffffff',
+              borderRadius: '16px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              overflow: 'hidden'
+              boxShadow: '0 6px 18px rgba(0,0,0,0.15)',
+              overflow: 'hidden',
+              padding: '8px'
             }}>
               {connectionStatus === 'connected' ? (
-                <div style={{ color: '#25D366', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                  <CheckCircle2 size={56} />
-                  <span style={{ fontSize: '0.85rem', fontWeight: 900, color: 'var(--text-primary)' }}>
+                <div style={{ color: '#25D366', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '1rem' }}>
+                  <CheckCircle2 size={64} />
+                  <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#0f172a' }}>
                     ¡WhatsApp Conectado!
                   </span>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    {connectedUser?.name || connectedUser?.id || 'Dispositivo Vinculado'}
+                  </span>
                 </div>
-              ) : qrCodeData ? (
-                <img src={qrCodeData} alt="Código QR WhatsApp" style={{ width: '100%', height: '100%' }} />
+              ) : connectionStatus === 'qr_ready' && qrCodeData ? (
+                <img 
+                  src={qrCodeData} 
+                  alt="Código QR Real WhatsApp" 
+                  style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+                />
+              ) : connectionStatus === 'connecting' ? (
+                <div style={{ color: 'var(--accent-blue)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                  <RefreshCw size={44} className="spin-slow" />
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>Generando Código QR...</span>
+                </div>
               ) : (
-                <div style={{ color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                  <QrCode size={56} />
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>Código QR Desconectado</span>
+                <div style={{ color: '#94a3b8', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                  <QrCode size={64} />
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>WhatsApp Desconectado</span>
                 </div>
               )}
             </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            {/* QR INSTRUCTION TEXT */}
+            {connectionStatus === 'qr_ready' && (
+              <div style={{ fontSize: '0.75rem', color: 'var(--accent-emerald)', fontWeight: 800 }}>
+                📲 Escaneá este QR ahora con tu WhatsApp
+              </div>
+            )}
+
+            {/* CONTROLS */}
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center', width: '100%' }}>
               {connectionStatus !== 'connected' ? (
-                <>
-                  <button
-                    type="button"
-                    className="cat-pill-btn active"
-                    style={{ height: '34px', padding: '0 1rem', fontSize: '0.8rem', gap: '6px' }}
-                    onClick={handleSimulateQr}
-                  >
-                    <QrCode size={14} />
-                    <span>Generar QR</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-confirm-order"
-                    style={{ width: 'auto', height: '34px', padding: '0 1rem', fontSize: '0.8rem', background: '#25D366', gap: '6px' }}
-                    onClick={handleSimulateConnect}
-                  >
-                    <CheckCircle2 size={14} />
-                    <span>Simular Vinculado</span>
-                  </button>
-                </>
+                <button
+                  type="button"
+                  disabled={loadingAction || !serverOnline}
+                  className="cat-pill-btn active"
+                  style={{ height: '36px', padding: '0 1rem', fontSize: '0.8rem', gap: '6px', flex: 1, justifyContent: 'center' }}
+                  onClick={handleStartBot}
+                >
+                  <RefreshCw size={14} className={loadingAction ? 'spin-slow' : ''} />
+                  <span>{loadingAction ? 'Iniciando...' : 'Generar / Actualizar QR'}</span>
+                </button>
               ) : (
                 <button
                   type="button"
+                  disabled={loadingAction}
                   className="qty-btn"
-                  style={{ width: 'auto', height: '34px', padding: '0 1rem', fontSize: '0.8rem', color: 'var(--accent-rose)', gap: '6px' }}
-                  onClick={handleSimulateDisconnect}
+                  style={{ width: '100%', height: '36px', padding: '0 1rem', fontSize: '0.8rem', color: 'var(--accent-rose)', gap: '6px', justifyContent: 'center' }}
+                  onClick={handleLogoutBot}
                 >
                   <Trash2 size={14} />
                   <span>Desvincular WhatsApp</span>
@@ -633,17 +724,54 @@ export default function AdminWhatsAppBot() {
             </div>
           </div>
 
-          {/* INSTRUCTIONS */}
+          {/* RIGHT: DETAILED INSTRUCTIONS & DIAGNOSTICS */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div>
               <h4 style={{ fontSize: '1.15rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>
-                Vincular WhatsApp de ComandaFast con el Teléfono del Local
+                Vinculación Real Multi-Dispositivo con WhatsApp
               </h4>
               <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px', lineHeight: '1.4' }}>
-                Conecta tu número oficial mediante la tecnología Multi-Dispositivo de WhatsApp. El bot responderá de manera desatendida mientras tu teléfono sigue funcionando normalmente.
+                Este módulo utiliza la tecnología de <strong>Baileys (WebSockets)</strong> para conectarse directamente a los servidores de WhatsApp como un dispositivo vinculado oficial. No requiere suscripciones pagas ni APIs de terceros.
               </p>
             </div>
 
+            {/* IF SERVER IS OFFLINE */}
+            {!serverOnline && (
+              <div style={{
+                background: 'rgba(245, 158, 11, 0.12)',
+                border: '1.5px solid var(--accent-amber)',
+                borderRadius: 'var(--radius-md)',
+                padding: '1rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem'
+              }}>
+                <div style={{ fontSize: '0.88rem', fontWeight: 900, color: 'var(--accent-amber)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <AlertCircle size={18} />
+                  <span>El Servidor de WhatsApp (Puerto 3002) no está encendido</span>
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.45' }}>
+                  Para que el código QR aparezca y el bot responda mensajes en vivo, debés iniciar el servicio en segundo plano:
+                  <ul style={{ margin: '6px 0 0 16px', padding: 0 }}>
+                    <li>Doble clic en el archivo <strong>INICIAR_BOT_WHATSAPP.bat</strong> en la raíz de ComandaFast.</li>
+                    <li>O ejecutá en una terminal: <code>npm run bot-server</code>.</li>
+                  </ul>
+                </div>
+                <div style={{ marginTop: '4px' }}>
+                  <button
+                    type="button"
+                    className="cat-pill-btn active"
+                    style={{ height: '32px', padding: '0 0.85rem', fontSize: '0.78rem', gap: '6px' }}
+                    onClick={fetchServerStatus}
+                  >
+                    <RefreshCw size={13} />
+                    <span>Comprobar Estado del Servidor</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* STEPS TO CONNECT */}
             <div style={{
               background: 'var(--bg-main)',
               border: '1px solid var(--border-subtle)',
@@ -654,26 +782,41 @@ export default function AdminWhatsAppBot() {
               gap: '0.65rem'
             }}>
               <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent-amber)' }}>
-                Pasos para conectar:
+                Pasos para escanear y conectar:
               </div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                1. Abre <strong>WhatsApp</strong> en el teléfono de la hamburguesería.<br />
-                2. Toca el menú de tres puntos (Android) o Ajustes (iPhone) y selecciona <strong>Dispositivos vinculados</strong>.<br />
-                3. Toca <strong>Vincular un dispositivo</strong> y apunta la cámara al código QR de la izquierda.<br />
-                4. ¡Listo! Las comandas recibidas ingresarán automáticamente a la cocina de ComandaFast.
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+                1. Abrí <strong>WhatsApp</strong> en el teléfono oficial de la hamburguesería.<br />
+                2. Tocá los <strong>tres puntos</strong> (Android) o <strong>Ajustes</strong> (iPhone) y seleccioná <strong>Dispositivos vinculados</strong>.<br />
+                3. Tocá <strong>Vincular un dispositivo</strong>.<br />
+                4. Apuntá la cámara al <strong>Código QR de la izquierda</strong>.<br />
+                5. ¡Listo! La pantalla se actualizará automáticamente a <strong>Conectado</strong> y el bot comenzará a responder y cargar pedidos en ComandaFast.
               </div>
             </div>
 
+            {/* STATUS ENDPOINT LINK */}
             <div style={{
-              background: 'rgba(59, 130, 246, 0.1)',
-              border: '1px solid var(--accent-blue)',
+              background: 'rgba(59, 130, 246, 0.08)',
+              border: '1px solid rgba(59, 130, 246, 0.25)',
               borderRadius: 'var(--radius-md)',
-              padding: '0.85rem',
+              padding: '0.75rem 1rem',
               fontSize: '0.78rem',
               color: 'var(--text-secondary)',
-              lineHeight: '1.4'
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
             }}>
-              💡 <strong>Servidor Standalone Baileys:</strong> También incluimos el script <code>server/whatsappBotServer.js</code> y el lanzador <code>INICIAR_BOT_WHATSAPP.bat</code> para ejecutar el servicio en segundo plano con conexión 24/7 sin costos de APIs externas.
+              <div>
+                <strong>Diagnóstico de Servidor:</strong> Endpoint activo en <code>http://localhost:3002/status</code>
+              </div>
+              <a
+                href="http://localhost:3002/status"
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: 'var(--accent-blue)', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none', fontWeight: 700 }}
+              >
+                <span>Ver JSON</span>
+                <ExternalLink size={12} />
+              </a>
             </div>
           </div>
         </div>
