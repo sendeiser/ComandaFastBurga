@@ -159,7 +159,8 @@ export default function App() {
       let nextDelay = 2500;
 
       try {
-        const res = await fetch('http://localhost:3002/api/orders/pending');
+        const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+        const res = await fetch(`http://${botHost}:3002/api/orders/pending`);
         if (res.ok) {
           consecutiveOfflineErrors = 0;
           nextDelay = 2500;
@@ -190,7 +191,8 @@ export default function App() {
             } catch (_) {}
 
             // Confirmar al servidor que los pedidos ya fueron incorporados
-            await fetch('http://localhost:3002/api/orders/ack', {
+            const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+            await fetch(`http://${botHost}:3002/api/orders/ack`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ ids: ackIds })

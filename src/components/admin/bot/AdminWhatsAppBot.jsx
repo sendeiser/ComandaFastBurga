@@ -11,7 +11,7 @@ import { GitBranch } from 'lucide-react';
 import { ALL_TEMPLATE_NODES, DEFAULT_TEMPLATES, DEFAULT_CHATBOT_KEYWORDS } from '../../../services/whatsappBotConstants';
 import { chatbotService } from '../../../services/chatbotService';
 
-const BOT_SERVER_URL = 'http://localhost:3002';
+const BOT_SERVER_URL = typeof window !== 'undefined' && window.location.hostname ? `http://${window.location.hostname}:3002` : 'http://localhost:3002';
 
 export default function AdminWhatsAppBot() {
   const [activeTab, setActiveTab] = useState('test_lab'); // 'test_lab' | 'templates' | 'security' | 'connection'

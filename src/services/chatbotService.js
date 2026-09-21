@@ -45,7 +45,7 @@ export const chatbotService = {
 
   async syncFlowsWithBotServer(flows) {
     try {
-      await fetch('http://localhost:3002/api/flows', {
+      await fetch(`http://${typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost'}:3002/api/flows`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ flows })
@@ -55,7 +55,7 @@ export const chatbotService = {
 
   async fetchServerFlows() {
     try {
-      const res = await fetch('http://localhost:3002/api/flows');
+      const res = await fetch(`http://${typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost'}:3002/api/flows`);
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.flows)) {
@@ -131,7 +131,7 @@ export const chatbotService = {
   // Sincronizar catálogo con el servidor Baileys de WhatsApp en puerto 3002
   async syncWithBotServer(products) {
     try {
-      await fetch('http://localhost:3002/sync-products', {
+      await fetch(`http://${typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost'}:3002/sync-products`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ products })
@@ -211,7 +211,7 @@ export const chatbotService = {
     // Consulta a Google Gemini AI mediante el microservicio local
   async queryGeminiAI(userMessage, persona = {}, availableProducts = []) {
     try {
-      const res = await fetch('http://localhost:3002/api/ai/chat', {
+      const res = await fetch(`http://${typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost'}:3002/api/ai/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
