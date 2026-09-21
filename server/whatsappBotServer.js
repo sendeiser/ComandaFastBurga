@@ -290,9 +290,21 @@ app.post('/sync-products', (req, res) => {
   res.status(400).json({ error: 'Array de productos inválido' });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`\n=========================================================`);
-  console.log(`🤖 SERVIDOR WHATSAPP BOT COMANDAFAST (BAILEYS MULTI-DEVICE)`);
+  console.log(`🍔 SERVIDOR WHATSAPP BOT COMANDAFAST (BAILEYS MULTI-DEVICE)`);
   console.log(`👉 Puerto: ${PORT} | Endpoint: http://localhost:${PORT}/status`);
   console.log(`=========================================================\n`);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n⚠️ [ALERTA] El puerto ${PORT} ya está en uso.`);
+    console.error(`   Es muy probable que el bot ya esté corriendo en segundo plano.`);
+    console.error(`   Podés usarlo directamente o cerrar la ventana previa para reiniciar.`);
+    process.exit(1);
+  } else {
+    console.error('\n❌ Error en el servidor Express:', err);
+    process.exit(1);
+  }
 });

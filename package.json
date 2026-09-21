@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "printer-server": "node server/printerServer.js",
-    "bot-server": "node server/whatsappBotServer.js"
+    "bot-server": "node server/whatsappBotServer.js",
+    "bot": "node server/whatsappBotServer.js"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc14",
