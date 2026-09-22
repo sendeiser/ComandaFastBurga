@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import Header from './components/common/Header';
 import FastOrderPad from './components/pos/FastOrderPad';
@@ -28,7 +28,7 @@ export default function App() {
   const [isOwnerPortalRoute, setIsOwnerPortalRoute] = useState(() => {
     const hash = window.location.hash.toLowerCase();
     const search = window.location.search.toLowerCase();
-    return hash === '#admin' || hash === '#dueno' || hash === '#dueño' || hash === '#auditoria' || search.includes('portal=admin') || search.includes('portal=dueno');
+    return hash === '#admin' || hash === '#dueno' || hash === '#dueÃ±o' || hash === '#auditoria' || search.includes('portal=admin') || search.includes('portal=dueno');
   });
 
   // Secret URL listener and secret keyboard shortcut (Ctrl + Shift + D)
@@ -36,14 +36,14 @@ export default function App() {
     const handleHash = () => {
       const hash = window.location.hash.toLowerCase();
       const search = window.location.search.toLowerCase();
-      const isMatch = hash === '#admin' || hash === '#dueno' || hash === '#dueño' || hash === '#auditoria' || search.includes('portal=admin') || search.includes('portal=dueno');
+      const isMatch = hash === '#admin' || hash === '#dueno' || hash === '#dueÃ±o' || hash === '#auditoria' || search.includes('portal=admin') || search.includes('portal=dueno');
       setIsOwnerPortalRoute(isMatch);
     };
     handleHash();
     window.addEventListener('hashchange', handleHash);
     window.addEventListener('popstate', handleHash);
 
-    // Secret shortcut: Ctrl + Shift + D (Dueño)
+    // Secret shortcut: Ctrl + Shift + D (DueÃ±o)
     const handleKeyDown = (e) => {
       if (e.ctrlKey && e.shiftKey && (e.key === 'D' || e.key === 'd' || e.key === 'A' || e.key === 'a')) {
         e.preventDefault();
@@ -132,7 +132,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Sincronización en tiempo real de pedidos (WhatsApp Bot + Chatbot Lab directo a Cocina)
+  // SincronizaciÃ³n en tiempo real de pedidos (WhatsApp Bot + Chatbot Lab directo a Cocina)
   useEffect(() => {
     // 1. Escuchar pedidos inyectados internamente desde el Chatbot Lab
     const handleInternalOrder = () => {
@@ -148,71 +148,167 @@ export default function App() {
     };
     window.addEventListener('storage', handleStorageChange);
 
-    // 2. Polling activo con backoff inteligente contra el microservicio WhatsApp (puerto 3002)
+    // 2. POLLING HIBRIDO — SINCRONIZACION BIDIRECCIONAL COMPLETA
+    // Web<->Web, App<->Web, Web<->App: Supabase Cloud es la fuente de verdad global.
     let isPolling = false;
     let pollTimer = null;
     let consecutiveOfflineErrors = 0;
 
+    const STATUS_PRIORITY = { pendiente: 0, cocina: 1, listo: 2, entregado: 3, cancelado: 4 };
+
+    const getTs = (ord) => {
+      if (ord.updatedAt && typeof ord.updatedAt === 'number') return ord.updatedAt;
+      if (ord.updatedAt) return new Date(ord.updatedAt).getTime();
+      if (ord.createdAt) return new Date(ord.createdAt).getTime();
+      return 0;
+    };
+
     const pollOrders = async () => {
       if (isPolling) return;
       isPolling = true;
-      let nextDelay = 2500;
+      let nextDelay = 2000;
 
       try {
+        const localOrders = [];
+        const cloudOrders = [];
         const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
-        const res = await fetch(`http://${botHost}:3002/api/orders/pending`);
-        if (res.ok) {
-          consecutiveOfflineErrors = 0;
-          nextDelay = 2500;
-          const data = await res.json();
-          if (data && Array.isArray(data.orders) && data.orders.length > 0) {
-            const ackIds = [];
-            for (const ord of data.orders) {
-              const saved = storageService.saveOrder(ord);
-              ackIds.push(ord.id);
-              if (supabaseSync.isConfigured()) {
-                supabaseSync.pushOrder(saved);
+        let localServerOnline = false;
+
+        // A. Consultar Servidor Local LAN (puerto 3002)
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 2000);
+          const res = await fetch(`http://${botHost}:3002/api/orders`, { signal: controller.signal });
+          clearTimeout(timeoutId);
+          if (res.ok) {
+            consecutiveOfflineErrors = 0;
+            localServerOnline = true;
+            const data = await res.json();
+            if (data && Array.isArray(data.orders)) {
+              for (const ord of data.orders) {
+                if (ord && ord.id) localOrders.push(ord);
               }
             }
-
-            // Actualizar estado de pedidos en el POS
-            setOrders(storageService.getOrders());
-
-            // Alerta sonora en cocina y caja
-            audioService.playOrderChime();
-
-            // Animación de celebración
-            try {
-              confetti({
-                particleCount: 60,
-                spread: 70,
-                origin: { y: 0.7 }
-              });
-            } catch (_) {}
-
-            // Confirmar al servidor que los pedidos ya fueron incorporados
-            const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
-            await fetch(`http://${botHost}:3002/api/orders/ack`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ids: ackIds })
-            });
           }
-        } else {
-          consecutiveOfflineErrors++;
-          if (consecutiveOfflineErrors >= 2) nextDelay = 10000;
+        } catch (_) {}
+
+        // B. Consultar Supabase Cloud (SIEMPRE — fuente de verdad global)
+        if (supabaseSync.isConfigured()) {
+          try {
+            const fetched = await supabaseSync.fetchRecentOrders(50);
+            if (Array.isArray(fetched)) {
+              for (const cord of fetched) {
+                if (cord && cord.id) cloudOrders.push(cord);
+              }
+            }
+          } catch (_) {}
+        }
+
+        // C. MERGE INTELIGENTE: para cada ID, quedarse con la version mas reciente
+        const mergedMap = new Map();
+
+        for (const ord of localOrders) {
+          mergedMap.set(ord.id, { ...ord, _source: 'local' });
+        }
+
+        for (const cord of cloudOrders) {
+          const existing = mergedMap.get(cord.id);
+          if (!existing) {
+            mergedMap.set(cord.id, { ...cord, _source: 'cloud' });
+          } else {
+            const cloudTs = getTs(cord);
+            const localTs = getTs(existing);
+            const cloudPrio = STATUS_PRIORITY[cord.status] ?? -1;
+            const localPrio = STATUS_PRIORITY[existing.status] ?? -1;
+            if (cloudTs > localTs || (cloudTs === localTs && cloudPrio > localPrio)) {
+              mergedMap.set(cord.id, { ...cord, _source: 'cloud' });
+            }
+          }
+        }
+
+        if (mergedMap.size > 0) {
+          const currentOrders = storageService.getOrders();
+          let hasNewPending = false;
+          let hasChanges = false;
+
+          for (const ord of mergedMap.values()) {
+            const existing = currentOrders.find(o => o.id === ord.id);
+            if (!existing) {
+              // NUEVO PEDIDO DETECTADO
+              const saved = storageService.saveOrder(ord);
+              if (ord.status === 'pendiente' || ord.status === 'cocina') {
+                hasNewPending = true;
+              }
+              hasChanges = true;
+
+              // Cross-sync: nube -> servidor local
+              if (ord._source === 'cloud' && localServerOnline) {
+                try {
+                  fetch(`http://${botHost}:3002/api/orders`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(saved)
+                  }).catch(() => {});
+                } catch (_) {}
+              }
+              // Cross-sync: servidor local -> nube
+              if (ord._source === 'local' && supabaseSync.isConfigured()) {
+                supabaseSync.pushOrder(saved).catch(() => {});
+              }
+
+            } else if (existing.status !== ord.status) {
+              // CAMBIO DE ESTADO DETECTADO
+              const ordPrio = STATUS_PRIORITY[ord.status] ?? -1;
+              const existPrio = STATUS_PRIORITY[existing.status] ?? -1;
+              const ordTs = getTs(ord);
+              const existTs = getTs(existing);
+
+              if (ordTs > existTs || ordPrio > existPrio) {
+                storageService.updateOrderStatus(ord.id, ord.status);
+                hasChanges = true;
+
+                if (ord.status === 'listo' && existing.status !== 'listo') {
+                  audioService.playReadyBell();
+                }
+
+                // Cross-sync del cambio de estado
+                if (ord._source === 'cloud' && localServerOnline) {
+                  try {
+                    fetch(`http://${botHost}:3002/api/orders/${ord.id}/status`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ status: ord.status })
+                    }).catch(() => {});
+                  } catch (_) {}
+                }
+                if (ord._source === 'local' && supabaseSync.isConfigured()) {
+                  supabaseSync.updateOrderStatus(ord.id, ord.status).catch(() => {});
+                }
+              }
+            }
+          }
+
+          if (hasChanges) {
+            setOrders(storageService.getOrders());
+          }
+
+          if (hasNewPending) {
+            audioService.playOrderChime();
+            try {
+              confetti({ particleCount: 60, spread: 70, origin: { y: 0.7 } });
+            } catch (_) {}
+          }
         }
       } catch (_) {
-        // Microservicio no disponible o inactivo temporalmente: espaciar reintentos a 10s
         consecutiveOfflineErrors++;
-        if (consecutiveOfflineErrors >= 2) nextDelay = 10000;
+        if (consecutiveOfflineErrors >= 2) nextDelay = 5000;
       } finally {
         isPolling = false;
         pollTimer = setTimeout(pollOrders, nextDelay);
       }
     };
 
-    pollTimer = setTimeout(pollOrders, 1500);
+    pollTimer = setTimeout(pollOrders, 800);
 
     return () => {
       window.removeEventListener('comandafast:new-order', handleInternalOrder);
@@ -230,6 +326,16 @@ export default function App() {
     
     // Sync to Supabase in background
     supabaseSync.pushOrder(savedOrder);
+
+    // Sync to Local WhatsApp Bot / LAN Microservice (puerto 3002) para replicaciÃ³n instantÃ¡nea a celulares Android
+    try {
+      const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+      fetch(`http://${botHost}:3002/api/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(savedOrder)
+      }).catch(() => {});
+    } catch (_) {}
 
     // Audio feedback
     audioService.playOrderChime();
@@ -265,6 +371,16 @@ export default function App() {
     setOrders(storageService.getOrders());
     supabaseSync.updateOrderStatus(orderId, newStatus);
 
+    // Sync status to Local Server (puerto 3002) para reflejar cambios en celulares conectados
+    try {
+      const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+      fetch(`http://${botHost}:3002/api/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      }).catch(() => {});
+    } catch (_) {}
+
     if (newStatus === 'listo') {
       audioService.playReadyBell();
     }
@@ -273,6 +389,13 @@ export default function App() {
   const handleDeleteOrder = (orderId) => {
     storageService.deleteOrder(orderId);
     setOrders(storageService.getOrders());
+    if (supabaseSync.isConfigured()) {
+      supabaseSync.deleteOrder(orderId);
+    }
+    try {
+      const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+      fetch(`http://${botHost}:3002/api/orders/${orderId}`, { method: 'DELETE' }).catch(() => {});
+    } catch (_) {}
   };
 
   const handleSaveProducts = (newProducts) => {

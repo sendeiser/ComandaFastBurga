@@ -4,18 +4,85 @@
 
 import { storageService } from './storageService';
 
+export const DEFAULT_SUPABASE_URL = 'https://yqynuvjpipmvurualgtg.supabase.co';
+export const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxeW51dmpwaXBtdnVydWFsZ3RnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5MzMyOTgsImV4cCI6MjEwNTUwOTI5OH0.mLO52rFPD384yQHdGlBasrx4QvqXiHYH3zRmJ9Bq2go';
+
 export const supabaseSync = {
   getCredentials() {
     const settings = storageService.getSettings();
     return {
-      url: settings?.supabaseUrl || '',
-      anonKey: settings?.supabaseAnonKey || ''
+      url: settings?.supabaseUrl || DEFAULT_SUPABASE_URL,
+      anonKey: settings?.supabaseAnonKey || DEFAULT_SUPABASE_ANON_KEY
     };
   },
 
   isConfigured() {
     const { url, anonKey } = this.getCredentials();
     return Boolean(url && anonKey && url.startsWith('http'));
+  },
+
+  async fetchRecentOrders(limit = 40) {
+    if (!this.isConfigured()) return [];
+    const { url, anonKey } = this.getCredentials();
+    try {
+      const res = await fetch(`${url}/rest/v1/orders?order=created_at.desc&limit=${limit}`, {
+        headers: {
+          'apikey': anonKey,
+          'Authorization': `Bearer ${anonKey}`
+        }
+      });
+      if (res.ok) {
+        const rows = await res.json();
+        if (Array.isArray(rows)) {
+          return rows.map(o => ({
+            id: o.id,
+            orderNumber: o.order_number,
+            channel: o.channel || 'mostrador',
+            tableNumber: o.table_number || '',
+            customer: typeof o.customer === 'object' && o.customer !== null ? o.customer : { name: o.customer || 'Cliente' },
+            items: (o.items || []).map(i => ({
+              id: i.id || `item-${Math.random()}`,
+              qty: i.qty || 1,
+              name: i.name || '',
+              unitPrice: Number(i.unitPrice || i.price) || 0,
+              notes: i.notes || '',
+              modifiers: i.modifiers || []
+            })),
+            subtotal: Number(o.subtotal) || Number(o.total) || 0,
+            deliveryFee: Number(o.delivery_fee) || 0,
+            total: Number(o.total) || 0,
+            paymentMethod: o.payment_method || 'efectivo',
+            cashPaid: o.cash_paid,
+            cashChange: o.cash_change,
+            transferProof: o.transfer_proof,
+            transferConfirmed: o.transfer_confirmed,
+            status: o.status || 'pendiente',
+            statusTimestamps: o.status_timestamps || {},
+            createdAt: o.created_at,
+            updatedAt: o.updated_at ? new Date(o.updated_at).getTime() : (o.created_at ? new Date(o.created_at).getTime() : Date.now())
+          }));
+        }
+      }
+    } catch (e) {
+      // Silently skip if offline
+    }
+    return [];
+  },
+
+  async deleteOrder(orderId) {
+    if (!this.isConfigured()) return;
+    const { url, anonKey } = this.getCredentials();
+    try {
+      await fetch(`${url}/rest/v1/orders?id=eq.${orderId}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': anonKey,
+          'Authorization': `Bearer ${anonKey}`
+        }
+      });
+    } catch (e) {
+      console.warn('Error deleting order in Supabase:', e);
+    }
   },
 
   init(onNewOrder, onStatusChange) {
@@ -57,7 +124,8 @@ export const supabaseSync = {
                   transferConfirmed: o.transfer_confirmed,
                   status: o.status || 'pendiente',
                   statusTimestamps: o.status_timestamps || {},
-                  createdAt: o.created_at
+                  createdAt: o.created_at,
+                  updatedAt: o.updated_at ? new Date(o.updated_at).getTime() : Date.now()
                 });
               }
             });
@@ -68,7 +136,7 @@ export const supabaseSync = {
       }
     };
 
-    const intervalId = setInterval(poll, 12000);
+    const intervalId = setInterval(poll, 6000);
     return () => clearInterval(intervalId);
   },
 

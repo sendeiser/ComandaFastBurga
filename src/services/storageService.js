@@ -249,13 +249,26 @@ export const storageService = {
 
   saveOrder(order) {
     const orders = this.getOrders();
+    const id = order.id || 'ord-' + Date.now();
+    const idx = orders.findIndex(o => o.id === id);
+    if (idx !== -1) {
+      orders[idx] = { 
+        ...orders[idx], 
+        ...order,
+        updatedAt: order.updatedAt || Date.now()
+      };
+      localStorage.setItem(KEYS.ORDERS, JSON.stringify(orders));
+      return orders[idx];
+    }
+
     const newOrder = {
       ...order,
-      id: order.id || 'ord-' + Date.now(),
+      id,
       orderNumber: order.orderNumber || this.getNextOrderNumber(),
       createdAt: order.createdAt || new Date().toISOString(),
+      updatedAt: order.updatedAt || Date.now(),
       status: order.status || 'pendiente',
-      statusTimestamps: {
+      statusTimestamps: order.statusTimestamps || {
         createdAt: new Date().toISOString(),
         cookingAt: null,
         readyAt: null,
@@ -267,11 +280,44 @@ export const storageService = {
     return newOrder;
   },
 
+  saveOrdersBatch(batch) {
+    if (!Array.isArray(batch) || batch.length === 0) return this.getOrders();
+    let orders = this.getOrders();
+    for (const ord of batch) {
+      if (!ord || !ord.id) continue;
+      const idx = orders.findIndex(o => o.id === ord.id);
+      if (idx !== -1) {
+        orders[idx] = {
+          ...orders[idx],
+          ...ord,
+          updatedAt: ord.updatedAt || Date.now()
+        };
+      } else {
+        orders.unshift({
+          ...ord,
+          orderNumber: ord.orderNumber || (Math.floor(Date.now() % 1000) + 1),
+          createdAt: ord.createdAt || new Date().toISOString(),
+          updatedAt: ord.updatedAt || Date.now(),
+          status: ord.status || 'pendiente',
+          statusTimestamps: ord.statusTimestamps || {
+            createdAt: new Date().toISOString(),
+            cookingAt: null,
+            readyAt: null,
+            deliveredAt: null
+          }
+        });
+      }
+    }
+    localStorage.setItem(KEYS.ORDERS, JSON.stringify(orders));
+    return orders;
+  },
+
   updateOrderStatus(orderId, newStatus) {
     const orders = this.getOrders();
     const idx = orders.findIndex(o => o.id === orderId);
     if (idx !== -1) {
       orders[idx].status = newStatus;
+      orders[idx].updatedAt = Date.now();
       if (!orders[idx].statusTimestamps) {
         orders[idx].statusTimestamps = {};
       }

@@ -321,7 +321,19 @@ function getStoredOrders() {
 function saveStoredOrder(order) {
   try {
     const orders = getStoredOrders();
-    orders.unshift(order);
+    const existingIdx = orders.findIndex(o => o.id === order.id);
+    if (existingIdx !== -1) {
+      orders[existingIdx] = { 
+        ...orders[existingIdx], 
+        ...order, 
+        updatedAt: order.updatedAt || Date.now() 
+      };
+    } else {
+      orders.unshift({ 
+        ...order, 
+        updatedAt: order.updatedAt || Date.now() 
+      });
+    }
     fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf-8');
   } catch (e) {
     console.error('[WHATSAPP BOT] Error al guardar order en orders.json:', e);
@@ -1045,6 +1057,85 @@ app.post('/api/orders/ack', (req, res) => {
   res.status(400).json({ error: 'Array de ids requerido' });
 });
 
+// Endpoint para que la App Android o cualquier terminal inyecte pedidos en tiempo real
+app.post('/api/orders', (req, res) => {
+  const order = req.body;
+  if (!order || !order.id) {
+    return res.status(400).json({ success: false, error: 'Pedido inválido o sin id' });
+  }
+
+  const normalizedOrder = {
+    id: order.id,
+    orderNumber: order.orderNumber || order.order_number || (Math.floor(Date.now() % 1000) + 1),
+    channel: order.channel || 'mostrador',
+    tableNumber: order.tableNumber || order.table_number || '',
+    customer: typeof order.customer === 'object' ? order.customer : {
+      name: order.customerName || order.customer || 'Cliente',
+      phone: order.customerPhone || '',
+      address: order.customerAddress || ''
+    },
+    items: Array.isArray(order.items) ? order.items : [],
+    subtotal: Number(order.subtotal) || Number(order.total) || 0,
+    deliveryFee: Number(order.deliveryFee) || 0,
+    total: Number(order.total) || 0,
+    paymentMethod: order.paymentMethod || order.payment_method || 'efectivo',
+    status: order.status || 'pendiente',
+    statusTimestamps: order.statusTimestamps || { pendiente: Date.now() },
+    createdAt: order.createdAt || new Date().toISOString(),
+    updatedAt: Date.now()
+  };
+
+  // Guardar en orders.json
+  saveStoredOrder(normalizedOrder);
+
+  // Inyectar en la cola de pedidos pendientes para que cocina web, KDS y POS lo reciban
+  if (!pendingOrdersForPos.some(o => o.id === normalizedOrder.id)) {
+    pendingOrdersForPos.push(normalizedOrder);
+  }
+
+  console.log(`🛎️ [SYNC LOCAL] Pedido #${normalizedOrder.orderNumber} (${normalizedOrder.channel}) inyectado desde App Móvil/POS -> Sincronizado a cocina.`);
+  res.json({ success: true, order: normalizedOrder });
+});
+
+// Endpoint para actualizar estado de un pedido desde cualquier dispositivo (Android, POS, etc.)
+app.patch('/api/orders/:id/status', (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  if (!status) return res.status(400).json({ error: 'Status requerido' });
+
+// Endpoint para eliminar un pedido desde cualquier dispositivo (Android, POS, etc.)
+app.delete('/api/orders/:id', (req, res) => {
+  const { id } = req.params;
+  let orders = getStoredOrders();
+  orders = orders.filter(o => o.id !== id);
+  try {
+    fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf-8');
+  } catch (_) {}
+
+  pendingOrdersForPos = pendingOrdersForPos.filter(o => o.id !== id);
+  console.log(`🗑️ [SYNC DELETE] Pedido ${id} eliminado en servidor local.`);
+  res.json({ success: true, id });
+});
+
+  const orders = getStoredOrders();
+  const idx = orders.findIndex(o => o.id === id);
+  if (idx !== -1) {
+    orders[idx].status = status;
+    orders[idx].updatedAt = Date.now();
+    try {
+      fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf-8');
+    } catch (_) {}
+  }
+
+  const pIdx = pendingOrdersForPos.findIndex(o => o.id === id);
+  if (pIdx !== -1) {
+    pendingOrdersForPos[pIdx].status = status;
+  }
+
+  console.log(`🔄 [SYNC STATUS] Pedido ${id} actualizado a estado '${status}' en servidor local.`);
+  res.json({ success: true, id, status });
+});
+
 // Endpoint para consultar histórico de pedidos de WhatsApp
 // =========================================================
 // ENDPOINTS DE INTELIGENCIA ARTIFICIAL (GOOGLE GEMINI)
@@ -1118,7 +1209,18 @@ app.get('/download/INICIAR_SISTEMA_COMPLETO.bat', (req, res) => {
 });
 
 app.get('/api/orders', (req, res) => {
-  res.json({ success: true, orders: getStoredOrders() });
+  const { since, status } = req.query;
+  let orders = getStoredOrders();
+  if (status) {
+    orders = orders.filter(o => o.status === status);
+  }
+  if (since) {
+    const sinceNum = Number(since);
+    if (!isNaN(sinceNum)) {
+      orders = orders.filter(o => (o.updatedAt || 0) > sinceNum);
+    }
+  }
+  res.json({ success: true, orders, timestamp: Date.now() });
 });
 
 const server = app.listen(PORT, () => {
