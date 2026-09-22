@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings, Download, Upload, Printer, DollarSign, Database, Bluetooth, Usb, CheckCircle, Palette, FileText, Check } from 'lucide-react';
+import { X, Settings, Download, Upload, Printer, DollarSign, Database, Bluetooth, Usb, CheckCircle, Palette, FileText, Check, Hash, RotateCcw } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 import { printerService } from '../../services/printerService';
 import { supabaseSync } from '../../services/supabaseClient';
@@ -364,6 +364,41 @@ export default function SettingsModal({ settings, onSaveSettings, onClose }) {
                 {supabaseStatus === 'ok' ? '✅ Conexión exitosa a Supabase' : '❌ No se pudo conectar a Supabase (Verifica URL y Key o ejecuta el script SQL)'}
               </div>
             )}
+          </div>
+
+          
+          {/* NUMERACIÓN DE PEDIDOS */}
+          <div style={{ background: 'var(--bg-main)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--accent-amber)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Hash size={18} />
+                <span>Numeración de Órdenes y Comandas</span>
+              </div>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.82rem' }}>
+              <input 
+                type="checkbox" 
+                checked={form.resetDailyOrderNumber !== false} 
+                onChange={e => setForm({ ...form, resetDailyOrderNumber: e.target.checked })} 
+              />
+              <span>Reiniciar número de orden automáticamente cada día (inicia en #1 a medianoche)</span>
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+              <button 
+                type="button" 
+                className="qty-btn"
+                style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.8rem', gap: '6px', background: 'var(--bg-card)', color: 'var(--accent-amber)' }}
+                onClick={() => {
+                  if (window.confirm('¿Deseas reiniciar el contador de órdenes a 0 ahora? El próximo pedido será el #1.')) {
+                    storageService.resetOrderCounter(0);
+                    alert('Contador de órdenes reiniciado a 0. Próxima orden: #1.');
+                  }
+                }}
+              >
+                <RotateCcw size={14} />
+                <span>Reiniciar contador a 0 ahora</span>
+              </button>
+            </div>
           </div>
 
           <button type="submit" className="btn-confirm-order" style={{ marginTop: '0.5rem' }}>

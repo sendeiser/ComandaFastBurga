@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChefHat, Clock, CheckCircle2, Play, AlertCircle, Printer, MessageSquare, ShoppingBag, Utensils, RefreshCw } from 'lucide-react';
+import { ChefHat, Clock, CheckCircle2, Play, AlertCircle, Printer, MessageSquare, ShoppingBag, Utensils, RefreshCw, XCircle, ArrowLeftRight, ChevronUp, ChevronDown, RotateCcw } from 'lucide-react';
 
 export default function KitchenDisplay({ 
   orders, 
@@ -42,7 +42,31 @@ export default function KitchenDisplay({
       >
         <div className="kds-card-top">
           <div>
-            <span className="order-num-badge">#{order.orderNumber}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span className="order-num-badge">#{order.orderNumber}</span>
+              {order.status === 'pendiente' && onReorderOrder && (
+                <div style={{ display: 'inline-flex', gap: '2px' }}>
+                  <button 
+                    type="button" 
+                    className="qty-btn" 
+                    style={{ width: '22px', height: '22px', padding: 0 }} 
+                    title="Subir prioridad en fila"
+                    onClick={() => onReorderOrder(order.id, -1)}
+                  >
+                    <ChevronUp size={13} />
+                  </button>
+                  <button 
+                    type="button" 
+                    className="qty-btn" 
+                    style={{ width: '22px', height: '22px', padding: 0 }} 
+                    title="Bajar prioridad en fila"
+                    onClick={() => onReorderOrder(order.id, 1)}
+                  >
+                    <ChevronDown size={13} />
+                  </button>
+                </div>
+              )}
+            </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
               {new Date(order.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
             </div>
@@ -107,34 +131,80 @@ export default function KitchenDisplay({
         </div>
 
         {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '0.4rem' }}>
+        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
           {order.status === 'pendiente' && (
-            <button 
-              className="btn-kds-action to-cooking"
-              onClick={() => onUpdateStatus(order.id, 'cocina')}
-            >
-              <Play size={16} />
-              <span>Comenzar a Cocinar</span>
-            </button>
+            <>
+              <button 
+                type="button"
+                className="btn-kds-action to-cooking"
+                style={{ flex: 1 }}
+                onClick={() => onUpdateStatus(order.id, 'cocina')}
+              >
+                <Play size={16} />
+                <span>Comenzar a Cocinar</span>
+              </button>
+              <button 
+                type="button"
+                className="qty-btn"
+                style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)', background: 'rgba(239, 68, 68, 0.08)', width: 'auto', padding: '0 8px', height: '36px', fontSize: '0.78rem', gap: '4px' }}
+                title="Cancelar Pedido"
+                onClick={() => {
+                  if (window.confirm(`¿Estás seguro de CANCELAR el pedido #${order.orderNumber}?`)) {
+                    onUpdateStatus(order.id, 'cancelado');
+                  }
+                }}
+              >
+                <XCircle size={15} />
+                <span>Cancelar</span>
+              </button>
+            </>
           )}
 
           {order.status === 'cocina' && (
-            <button 
-              className="btn-kds-action to-ready"
-              onClick={() => onUpdateStatus(order.id, 'listo')}
-            >
-              <CheckCircle2 size={16} />
-              <span>Marcar ¡LISTO!</span>
-            </button>
+            <>
+              <button 
+                type="button"
+                className="qty-btn"
+                style={{ height: '36px', padding: '0 8px', fontSize: '0.78rem', gap: '4px' }}
+                title="Volver a Pendientes"
+                onClick={() => onUpdateStatus(order.id, 'pendiente')}
+              >
+                <RotateCcw size={14} />
+                <span>A Pendiente</span>
+              </button>
+              <button 
+                type="button"
+                className="btn-kds-action to-ready"
+                style={{ flex: 1 }}
+                onClick={() => onUpdateStatus(order.id, 'listo')}
+              >
+                <CheckCircle2 size={16} />
+                <span>Marcar ¡LISTO!</span>
+              </button>
+            </>
           )}
 
           {order.status === 'listo' && (
-            <button 
-              className="btn-kds-action to-done"
-              onClick={() => onUpdateStatus(order.id, 'entregado')}
-            >
-              <span>Despachar / Entregado</span>
-            </button>
+            <>
+              <button 
+                type="button"
+                className="qty-btn"
+                style={{ height: '36px', padding: '0 8px', fontSize: '0.78rem', gap: '4px' }}
+                title="Volver a Cocina"
+                onClick={() => onUpdateStatus(order.id, 'cocina')}
+              >
+                <RotateCcw size={14} />
+                <span>A Cocina</span>
+              </button>
+              <button 
+                type="button"
+                className="btn-kds-action to-done"
+                style={{ flex: 1 }}
+                onClick={() => onUpdateStatus(order.id, 'entregado')}
+              >
+                <span>Despachar / Entregado</span>
+              </button>
+            </>
           )}
 
           <button 
@@ -146,6 +216,30 @@ export default function KitchenDisplay({
           >
             <Printer size={16} />
           </button>
+        </div>
+
+        {/* Cambiar de lugar rápidamente */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px', marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed var(--border-subtle)', fontSize: '0.72rem' }}>
+          <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+            <ArrowLeftRight size={12} /> Mover lugar:
+          </span>
+          <div style={{ display: 'flex', gap: '3px' }}>
+            {order.status !== 'pendiente' && (
+              <button type="button" className="cat-pill-btn" style={{ height: '20px', fontSize: '0.68rem', padding: '0 6px' }} onClick={() => onUpdateStatus(order.id, 'pendiente')}>
+                Pendiente
+              </button>
+            )}
+            {order.status !== 'cocina' && (
+              <button type="button" className="cat-pill-btn" style={{ height: '20px', fontSize: '0.68rem', padding: '0 6px' }} onClick={() => onUpdateStatus(order.id, 'cocina')}>
+                Cocina
+              </button>
+            )}
+            {order.status !== 'listo' && (
+              <button type="button" className="cat-pill-btn" style={{ height: '20px', fontSize: '0.68rem', padding: '0 6px' }} onClick={() => onUpdateStatus(order.id, 'listo')}>
+                Listo
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );

@@ -32,6 +32,7 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const AUTH_DIR = path.join(DATA_DIR, 'baileys_auth');
 const PRODUCTS_FILE = path.join(DATA_DIR, 'products.json');
 const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
+const CASH_SHIFT_FILE = path.join(DATA_DIR, 'cash_shift.json');
 const FLOWS_FILE = path.join(DATA_DIR, 'custom_flows.json');
 const VARIABLES_FILE = path.join(DATA_DIR, 'bot_variables.json');
 
@@ -1140,6 +1141,39 @@ app.delete('/api/orders/:id', (req, res) => {
 // =========================================================
 // ENDPOINTS DE INTELIGENCIA ARTIFICIAL (GOOGLE GEMINI)
 // =========================================================
+
+
+// =========================================================
+// ENDPOINTS DE CAJA / ARQUEO (LAN SYNC)
+// =========================================================
+
+function getStoredCashShift() {
+  try {
+    if (fs.existsSync(CASH_SHIFT_FILE)) {
+      return JSON.parse(fs.readFileSync(CASH_SHIFT_FILE, 'utf-8'));
+    }
+  } catch (_) {}
+  return null;
+}
+
+function saveStoredCashShift(shift) {
+  try {
+    fs.writeFileSync(CASH_SHIFT_FILE, JSON.stringify(shift, null, 2), 'utf-8');
+  } catch (_) {}
+}
+
+app.get('/api/cash-shift', (req, res) => {
+  res.json({ success: true, cashShift: getStoredCashShift() });
+});
+
+app.post('/api/cash-shift', (req, res) => {
+  const { cashShift } = req.body;
+  if (cashShift) {
+    saveStoredCashShift(cashShift);
+    console.log('💵 [SYNC LOCAL CAJA] Turno de caja actualizado en servidor local.');
+  }
+  res.json({ success: true, cashShift: getStoredCashShift() });
+});
 
 app.get('/api/bot-variables', (req, res) => {
   res.json({ success: true, variables: getBotVariables() });

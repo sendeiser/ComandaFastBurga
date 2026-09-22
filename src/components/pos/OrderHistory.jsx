@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Printer, Trash2, CheckCircle2, Clock, MessageSquare, ShoppingBag, Utensils } from 'lucide-react';
+import { Search, Printer, Trash2, CheckCircle2, Clock, MessageSquare, ShoppingBag, Utensils, XCircle } from 'lucide-react';
 
 export default function OrderHistory({ 
   orders, 
@@ -77,7 +77,14 @@ export default function OrderHistory({
                     #{order.orderNumber}
                   </td>
                   <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)' }}>
-                    {new Date(order.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.88rem' }}>
+                        {new Date(order.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      </span>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        {new Date(order.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
+                      </span>
+                    </div>
                   </td>
                   <td style={{ padding: '0.85rem 1rem' }}>
                     <span className={`order-type-chip ${order.channel}`}>
@@ -120,6 +127,23 @@ export default function OrderHistory({
                   </td>
                   <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
                     <div style={{ display: 'inline-flex', gap: '0.35rem' }}>
+                      {(order.status === 'pendiente' || order.status === 'cocina') && (
+                        <button 
+                          type="button"
+                          className="qty-btn"
+                          style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)', background: 'rgba(239, 68, 68, 0.08)' }}
+                          title="Cancelar Orden Pendiente"
+                          onClick={() => {
+                            if (window.confirm(`¿Cancelar la orden pendiente #${order.orderNumber}?`)) {
+                              if (onUpdateStatus) {
+                                onUpdateStatus(order.id, 'cancelado');
+                              }
+                            }
+                          }}
+                        >
+                          <XCircle size={15} />
+                        </button>
+                      )}
                       <button 
                         className="qty-btn"
                         title="Ver / Reimprimir Tickets"

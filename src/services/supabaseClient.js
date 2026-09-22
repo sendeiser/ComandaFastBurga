@@ -21,7 +21,7 @@ export const supabaseSync = {
     return Boolean(url && anonKey && url.startsWith('http'));
   },
 
-  async fetchRecentOrders(limit = 40) {
+  async fetchRecentOrders(limit = 150) {
     if (!this.isConfigured()) return [];
     const { url, anonKey } = this.getCredentials();
     try {
@@ -253,6 +253,141 @@ export const supabaseSync = {
       });
     } catch (e) {
       console.warn('Error syncing order to Supabase:', e);
+    }
+  },
+
+  
+  // CAJA / TURNOS (CASH SHIFT) REALTIME SYNC
+  async fetchActiveCashShift() {
+    if (!this.isConfigured()) return null;
+    const { url, anonKey } = this.getCredentials();
+    try {
+      const res = await fetch(`${url}/rest/v1/cash_shifts?is_closed=eq.false&order=opened_at.desc&limit=1`, {
+        headers: {
+          'apikey': anonKey,
+          'Authorization': `Bearer ${anonKey}`
+        }
+      });
+      if (res.ok) {
+        const rows = await res.json();
+        if (Array.isArray(rows) && rows.length > 0) {
+          const r = rows[0];
+          return {
+            id: r.id,
+            openedAt: r.opened_at,
+            closedAt: r.closed_at,
+            initialCash: Number(r.initial_cash) || 0,
+            countedCash: r.counted_cash !== null ? Number(r.counted_cash) : null,
+            cashierName: r.cashier_name || 'Cajero 1',
+            expenses: Array.isArray(r.expenses) ? r.expenses : [],
+            notes: r.notes || '',
+            isClosed: Boolean(r.is_closed),
+            updatedAt: r.created_at ? new Date(r.created_at).getTime() : Date.now()
+          };
+        }
+      }
+    } catch (_) {}
+    return null;
+  },
+
+  async fetchLatestCashShift() {
+    if (!this.isConfigured()) return null;
+    const { url, anonKey } = this.getCredentials();
+    try {
+      const res = await fetch(`${url}/rest/v1/cash_shifts?order=opened_at.desc&limit=1`, {
+        headers: {
+          'apikey': anonKey,
+          'Authorization': `Bearer ${anonKey}`
+        }
+      });
+      if (res.ok) {
+        const rows = await res.json();
+        if (Array.isArray(rows) && rows.length > 0) {
+          const r = rows[0];
+          return {
+            id: r.id,
+            openedAt: r.opened_at,
+            closedAt: r.closed_at,
+            initialCash: Number(r.initial_cash) || 0,
+            countedCash: r.counted_cash !== null ? Number(r.counted_cash) : null,
+            cashierName: r.cashier_name || 'Cajero 1',
+            expenses: Array.isArray(r.expenses) ? r.expenses : [],
+            notes: r.notes || '',
+            isClosed: Boolean(r.is_closed),
+            updatedAt: r.created_at ? new Date(r.created_at).getTime() : Date.now()
+          };
+        }
+      }
+    } catch (_) {}
+    return null;
+  },
+
+  async pushCashShift(shift) {
+    if (!this.isConfigured() || !shift) return;
+    const { url, anonKey } = this.getCredentials();
+    try {
+      await fetch(`${url}/rest/v1/cash_shifts`, {
+        method: 'POST',
+        headers: {
+          'apikey': anonKey,
+          'Authorization': `Bearer ${anonKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({
+          id: shift.id,
+          opened_at: shift.openedAt,
+          closed_at: shift.closedAt || null,
+          initial_cash: Number(shift.initialCash) || 0,
+          counted_cash: shift.countedCash !== undefined && shift.countedCash !== null ? Number(shift.countedCash) : null,
+          cashier_name: shift.cashierName || 'Cajero 1',
+          expenses: shift.expenses || [],
+          notes: shift.notes || '',
+          is_closed: Boolean(shift.isClosed)
+        })
+      });
+    } catch (e) {
+      console.warn('Error syncing cash shift to Supabase:', e);
+    }
+  },
+
+  async pushOrdersBatch(orders) {
+    if (!this.isConfigured() || !Array.isArray(orders) || orders.length === 0) return;
+    const { url, anonKey } = this.getCredentials();
+    try {
+      const rows = orders.map(order => ({
+        id: order.id,
+        order_number: Number(order.orderNumber) || 1,
+        channel: order.channel || 'mostrador',
+        table_number: order.tableNumber || '',
+        customer: typeof order.customer === 'object' && order.customer ? order.customer : { name: order.customer || 'Cliente' },
+        items: order.items || [],
+        subtotal: Number(order.subtotal) || Number(order.total) || 0,
+        delivery_fee: Number(order.deliveryFee) || 0,
+        total: Number(order.total) || 0,
+        payment_method: order.paymentMethod || 'efectivo',
+        cash_paid: order.cashPaid || null,
+        cash_change: order.cashChange || null,
+        transfer_proof: order.transferProof || null,
+        transfer_confirmed: Boolean(order.transferConfirmed),
+        status: order.status || 'pendiente',
+        status_timestamps: order.statusTimestamps || {},
+        created_at: order.createdAt || new Date().toISOString(),
+        updated_at: order.updatedAt ? new Date(order.updatedAt).toISOString() : new Date().toISOString()
+      }));
+
+      await fetch(`${url}/rest/v1/orders`, {
+        method: 'POST',
+        headers: {
+          'apikey': anonKey,
+          'Authorization': `Bearer ${anonKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify(rows)
+      });
+    } catch (e) {
+      console.warn('Error pushing orders batch to Supabase:', e);
     }
   },
 

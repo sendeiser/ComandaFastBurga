@@ -1,5 +1,81 @@
 [
   {
+    "id": "92ae2d98-101c-46ac-8f7a-7e39815eb913",
+    "orderNumber": 451,
+    "channel": "mostrador",
+    "tableNumber": "",
+    "customer": {
+      "name": "Cliente",
+      "phone": "",
+      "address": ""
+    },
+    "items": [
+      {
+        "productId": "3",
+        "name": "Burger Crispy Chicken",
+        "price": 7900,
+        "qty": 1
+      },
+      {
+        "productId": "6",
+        "name": "Papas Cheddar & Bacon",
+        "price": 5200,
+        "qty": 1
+      },
+      {
+        "productId": "10",
+        "name": "Cerveza Artesanal IPA",
+        "price": 3400,
+        "qty": 1
+      }
+    ],
+    "subtotal": 16500,
+    "deliveryFee": 0,
+    "total": 16500,
+    "paymentMethod": "efectivo",
+    "status": "pendiente",
+    "statusTimestamps": {
+      "pendiente": 1790113851257
+    },
+    "createdAt": "2026-09-22T18:50:51Z",
+    "updatedAt": 1790113851257
+  },
+  {
+    "id": "72467d6e-473d-444c-85a3-22e6ef53ddd7",
+    "orderNumber": 683,
+    "channel": "mostrador",
+    "tableNumber": "",
+    "customer": {
+      "name": "Cliente",
+      "phone": "",
+      "address": ""
+    },
+    "items": [
+      {
+        "productId": "6",
+        "name": "Papas Cheddar & Bacon",
+        "price": 5200,
+        "qty": 1
+      },
+      {
+        "productId": "5",
+        "name": "Papas Fritas Rústicas",
+        "price": 3800,
+        "qty": 1
+      }
+    ],
+    "subtotal": 9000,
+    "deliveryFee": 0,
+    "total": 9000,
+    "paymentMethod": "efectivo",
+    "status": "entregado",
+    "statusTimestamps": {
+      "pendiente": 1790113183479
+    },
+    "createdAt": "2026-09-22T18:39:43Z",
+    "updatedAt": 1790113799511
+  },
+  {
     "id": "ord-1790111704496",
     "orderNumber": 102,
     "channel": "whatsapp",
@@ -32,7 +108,7 @@
     "deliveryFee": 1000,
     "total": 13300,
     "paymentMethod": "efectivo",
-    "status": "listo",
+    "status": "entregado",
     "statusTimestamps": {
       "createdAt": "2026-09-22T21:26:48.199Z",
       "cookingAt": null,
@@ -40,7 +116,7 @@
       "deliveredAt": null
     },
     "createdAt": "2026-09-22T21:15:04.496+00:00",
-    "updatedAt": 1790112408218
+    "updatedAt": 1790113780723
   },
   {
     "id": "ord-1790111859411",
@@ -67,7 +143,7 @@
     "deliveryFee": 1000,
     "total": 12000,
     "paymentMethod": "efectivo",
-    "status": "pendiente",
+    "status": "entregado",
     "statusTimestamps": {
       "createdAt": "2026-09-22T21:26:48.198Z",
       "cookingAt": null,
@@ -75,7 +151,7 @@
       "deliveredAt": null
     },
     "createdAt": "2026-09-22T21:17:39.411+00:00",
-    "updatedAt": 1790112408216
+    "updatedAt": 1790113780016
   },
   {
     "id": "ord-1790112304098",
@@ -102,7 +178,7 @@
     "deliveryFee": 1000,
     "total": 11000,
     "paymentMethod": "efectivo",
-    "status": "pendiente",
+    "status": "entregado",
     "statusTimestamps": {
       "createdAt": "2026-09-22T21:26:48.196Z",
       "cookingAt": null,
@@ -110,7 +186,7 @@
       "deliveredAt": null
     },
     "createdAt": "2026-09-22T21:25:04.098+00:00",
-    "updatedAt": 1790112408214
+    "updatedAt": 1790113779817
   },
   {
     "id": "ord-1790111956310",
@@ -137,7 +213,7 @@
     "deliveryFee": 1000,
     "total": 4000,
     "paymentMethod": "efectivo",
-    "status": "pendiente",
+    "status": "entregado",
     "statusTimestamps": {
       "createdAt": "2026-09-22T21:26:48.197Z",
       "cookingAt": null,
@@ -145,7 +221,7 @@
       "deliveredAt": null
     },
     "createdAt": "2026-09-22T21:19:16.311+00:00",
-    "updatedAt": 1790112408211
+    "updatedAt": 1790113779261
   },
   {
     "id": "ord-1789943144649",
@@ -536,7 +612,7 @@
     "deliveryFee": 0,
     "total": 5200,
     "paymentMethod": "efectivo",
-    "status": "cocina",
+    "status": "entregado",
     "statusTimestamps": {
       "createdAt": "2026-09-22T21:13:21.900Z",
       "cookingAt": null,
@@ -544,7 +620,7 @@
       "deliveredAt": null
     },
     "createdAt": "2026-09-22T14:31:02+00:00",
-    "updatedAt": 1790111601942
+    "updatedAt": 1790113805725
   },
   {
     "id": "2ecb40bc-1132-4c52-9414-aaa9714006c7",
@@ -586,7 +662,7 @@
     "deliveryFee": 0,
     "total": 10400,
     "paymentMethod": "efectivo",
-    "status": "cocina",
+    "status": "entregado",
     "statusTimestamps": {
       "createdAt": "2026-09-22T21:13:21.899Z",
       "cookingAt": null,
@@ -594,7 +670,7 @@
       "deliveredAt": null
     },
     "createdAt": "2026-09-22T17:07:21+00:00",
-    "updatedAt": 1790111601941
+    "updatedAt": 1790113805173
   },
   {
     "id": "ord-1790098037298",
@@ -792,7 +868,7 @@
     "deliveryFee": 0,
     "total": 5000,
     "paymentMethod": "efectivo",
-    "status": "pendiente",
+    "status": "entregado",
     "statusTimestamps": {
       "createdAt": "2026-09-22T21:13:21.889Z",
       "cookingAt": null,
@@ -800,7 +876,7 @@
       "deliveredAt": null
     },
     "createdAt": "2026-09-22T20:58:40.175+00:00",
-    "updatedAt": 1790111601923
+    "updatedAt": 1790113804658
   },
   {
     "id": "test-postgrest-check-1",
@@ -815,7 +891,7 @@
     "deliveryFee": 0,
     "total": 1000,
     "paymentMethod": "efectivo",
-    "status": "pendiente",
+    "status": "entregado",
     "statusTimestamps": {
       "createdAt": "2026-09-22T21:13:21.889Z",
       "cookingAt": null,
@@ -823,7 +899,7 @@
       "deliveredAt": null
     },
     "createdAt": "2026-09-22T21:10:00+00:00",
-    "updatedAt": 1790111601921
+    "updatedAt": 1790113804160
   },
   {
     "id": "68c95689-4963-49df-af31-9e7e10a2761d",
@@ -853,7 +929,7 @@
     "deliveryFee": 0,
     "total": 11200,
     "paymentMethod": "efectivo",
-    "status": "pendiente",
+    "status": "entregado",
     "statusTimestamps": {
       "createdAt": "2026-09-22T21:13:21.884Z",
       "cookingAt": null,
@@ -861,7 +937,7 @@
       "deliveredAt": null
     },
     "createdAt": "2026-09-22T17:46:13Z",
-    "updatedAt": 1790111601915
+    "updatedAt": 1790113803506
   },
   {
     "id": "04a45ee3-d1b6-4223-8870-d9ac05b0d146",
@@ -897,7 +973,7 @@
     "deliveryFee": 0,
     "total": 16100,
     "paymentMethod": "efectivo",
-    "status": "pendiente",
+    "status": "entregado",
     "statusTimestamps": {
       "createdAt": "2026-09-22T21:13:21.885Z",
       "cookingAt": null,
@@ -905,7 +981,7 @@
       "deliveredAt": null
     },
     "createdAt": "2026-09-22T17:45:47Z",
-    "updatedAt": 1790111601931
+    "updatedAt": 1790113802923
   },
   {
     "id": "1cde554e-55be-4fd8-a046-5fb787825f12",
@@ -935,7 +1011,7 @@
     "deliveryFee": 0,
     "total": 11700,
     "paymentMethod": "efectivo",
-    "status": "pendiente",
+    "status": "entregado",
     "statusTimestamps": {
       "createdAt": "2026-09-22T21:13:21.886Z",
       "cookingAt": null,
@@ -943,7 +1019,7 @@
       "deliveredAt": null
     },
     "createdAt": "2026-09-22T17:43:25Z",
-    "updatedAt": 1790111601933
+    "updatedAt": 1790113802404
   },
   {
     "id": "68c2e3b7-8b07-4ec5-b366-06933f62cb9f",
@@ -973,7 +1049,7 @@
     "deliveryFee": 0,
     "total": 12600,
     "paymentMethod": "efectivo",
-    "status": "pendiente",
+    "status": "entregado",
     "statusTimestamps": {
       "createdAt": "2026-09-22T21:13:21.886Z",
       "cookingAt": null,
@@ -981,7 +1057,7 @@
       "deliveredAt": null
     },
     "createdAt": "2026-09-22T17:31:11Z",
-    "updatedAt": 1790111601907
+    "updatedAt": 1790113801915
   },
   {
     "id": "09c322f1-44ad-492b-bee2-9443b54e29a8",
@@ -1011,7 +1087,7 @@
     "deliveryFee": 0,
     "total": 17700,
     "paymentMethod": "efectivo",
-    "status": "pendiente",
+    "status": "entregado",
     "statusTimestamps": {
       "createdAt": "2026-09-22T21:13:21.887Z",
       "cookingAt": null,
@@ -1019,7 +1095,7 @@
       "deliveredAt": null
     },
     "createdAt": "2026-09-22T17:19:22Z",
-    "updatedAt": 1790111601918
+    "updatedAt": 1790113801355
   },
   {
     "id": "test-order-live",
@@ -1043,7 +1119,7 @@
     "deliveryFee": 0,
     "total": 6000,
     "paymentMethod": "efectivo",
-    "status": "pendiente",
+    "status": "entregado",
     "statusTimestamps": {
       "createdAt": "2026-09-22T21:13:21.888Z",
       "cookingAt": null,
@@ -1051,6 +1127,6 @@
       "deliveredAt": null
     },
     "createdAt": "2026-09-22T20:14:39.337Z",
-    "updatedAt": 1790111601919
+    "updatedAt": 1790113800076
   }
 ]

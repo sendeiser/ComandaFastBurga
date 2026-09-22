@@ -147,6 +147,8 @@ export default function App() {
       }
     };
     window.addEventListener('storage', handleStorageChange);
+    const handleCashShiftChange = () => setCashShift(storageService.getCashShift());
+    window.addEventListener('comandafast:cash-shift-change', handleCashShiftChange);
 
     // 2. POLLING HIBRIDO — SINCRONIZACION BIDIRECCIONAL COMPLETA
     // Web<->Web, App<->Web, Web<->App: Supabase Cloud es la fuente de verdad global.
@@ -195,7 +197,7 @@ export default function App() {
         // B. Consultar Supabase Cloud (SIEMPRE — fuente de verdad global)
         if (supabaseSync.isConfigured()) {
           try {
-            const fetched = await supabaseSync.fetchRecentOrders(50);
+            const fetched = await supabaseSync.fetchRecentOrders(150);
             if (Array.isArray(fetched)) {
               for (const cord of fetched) {
                 if (cord && cord.id) cloudOrders.push(cord);
@@ -292,6 +294,16 @@ export default function App() {
             setOrders(storageService.getOrders());
           }
 
+          // D. Sincronizar historial faltante hacia Supabase Cloud
+          if (supabaseSync.isConfigured() && cloudOrders.length > 0) {
+            const cloudIds = new Set(cloudOrders.map(c => c.id));
+            const localList = storageService.getOrders();
+            const missingInCloud = localList.filter(o => o && o.id && !cloudIds.has(o.id));
+            if (missingInCloud.length > 0) {
+              supabaseSync.pushOrdersBatch(missingInCloud.slice(0, 30)).catch(() => {});
+            }
+          }
+
           if (hasNewPending) {
             audioService.playOrderChime();
             try {
@@ -299,6 +311,45 @@ export default function App() {
             } catch (_) {}
           }
         }
+
+        // E. Sincronización de Caja Abierta (Cash Shift) en tiempo real
+        try {
+          let remoteShift = null;
+          if (supabaseSync.isConfigured()) {
+            remoteShift = await supabaseSync.fetchLatestCashShift();
+          }
+          if (!remoteShift && localServerOnline) {
+            try {
+              const csRes = await fetch(`http://${botHost}:3002/api/cash-shift`);
+              if (csRes.ok) {
+                const csData = await csRes.json();
+                if (csData && csData.cashShift) remoteShift = csData.cashShift;
+              }
+            } catch (_) {}
+          }
+
+          if (remoteShift) {
+            const localShift = storageService.getCashShift();
+            if (!localShift || (remoteShift.id !== localShift.id && !remoteShift.isClosed)) {
+              storageService.saveCashShift(remoteShift);
+              setCashShift(remoteShift);
+            } else if (localShift && remoteShift.id === localShift.id) {
+              if (remoteShift.isClosed && !localShift.isClosed) {
+                storageService.saveCashShift(remoteShift);
+                setCashShift(remoteShift);
+              } else if (!remoteShift.isClosed && (remoteShift.expenses?.length || 0) > (localShift.expenses?.length || 0)) {
+                storageService.saveCashShift(remoteShift);
+                setCashShift(remoteShift);
+              }
+            }
+          } else {
+            const localShift = storageService.getCashShift();
+            if (localShift && !localShift.isClosed) {
+              supabaseSync.pushCashShift(localShift).catch(() => {});
+            }
+          }
+        } catch (_) {}
+
       } catch (_) {
         consecutiveOfflineErrors++;
         if (consecutiveOfflineErrors >= 2) nextDelay = 5000;
@@ -313,9 +364,15 @@ export default function App() {
     return () => {
       window.removeEventListener('comandafast:new-order', handleInternalOrder);
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('comandafast:cash-shift-change', handleCashShiftChange);
       if (pollTimer) clearTimeout(pollTimer);
     };
   }, []);
+
+  const handleReorderOrder = (orderId, direction) => {
+    const updated = storageService.reorderOrders(orderId, direction);
+    setOrders(updated);
+  };
 
   const pendingKitchenCount = orders.filter(o => o.status === 'pendiente' || o.status === 'cocina').length;
 
@@ -410,20 +467,47 @@ export default function App() {
     setSettings(newSettings);
   };
 
-  // Cash Handlers
+  // Cash Handlers (Sincronización Total con Supabase y Red Local)
   const handleOpenShift = (initialAmount, cashierName) => {
     const shift = storageService.openCashShift(initialAmount, cashierName);
     setCashShift(shift);
+    supabaseSync.pushCashShift(shift);
+    try {
+      const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+      fetch(`http://${botHost}:3002/api/cash-shift`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cashShift: shift })
+      }).catch(() => {});
+    } catch (_) {}
   };
 
   const handleAddExpense = (amount, reason) => {
     const shift = storageService.addCashExpense(amount, reason);
     setCashShift(shift);
+    supabaseSync.pushCashShift(shift);
+    try {
+      const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+      fetch(`http://${botHost}:3002/api/cash-shift`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cashShift: shift })
+      }).catch(() => {});
+    } catch (_) {}
   };
 
   const handleCloseShift = (countedCash, notes) => {
     const shift = storageService.closeCashShift(countedCash, notes);
     setCashShift(shift);
+    supabaseSync.pushCashShift(shift);
+    try {
+      const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+      fetch(`http://${botHost}:3002/api/cash-shift`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cashShift: shift })
+      }).catch(() => {});
+    } catch (_) {}
   };
 
   if (!settings) return null;
@@ -476,6 +560,7 @@ export default function App() {
             orders={orders}
             onUpdateStatus={handleUpdateOrderStatus}
             onReprintTicket={(order, type) => setPreviewOrder(order)}
+            onReorderOrder={handleReorderOrder}
           />
         )}
 
@@ -484,6 +569,7 @@ export default function App() {
             orders={orders}
             onViewTickets={(order) => setPreviewOrder(order)}
             onDeleteOrder={handleDeleteOrder}
+            onUpdateStatus={handleUpdateOrderStatus}
           />
         )}
 

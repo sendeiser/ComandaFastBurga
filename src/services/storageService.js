@@ -153,7 +153,8 @@ const KEYS = {
   CASH_SHIFTS_HISTORY: 'comandafast_cash_shifts_history',
   CANCELLED_ORDERS: 'comandafast_cancelled_orders',
   SETTINGS: 'comandafast_settings',
-  ORDER_COUNTER: 'comandafast_order_counter'
+  ORDER_COUNTER: 'comandafast_order_counter',
+  ORDER_COUNTER_DATE: 'comandafast_order_counter_date'
 };
 
 
@@ -241,10 +242,55 @@ export const storageService = {
   },
 
   getNextOrderNumber() {
-    let current = parseInt(localStorage.getItem(KEYS.ORDER_COUNTER) || '100', 10);
+    const settings = this.getSettings();
+    const today = new Date().toLocaleDateString('en-CA');
+    const lastDate = localStorage.getItem(KEYS.ORDER_COUNTER_DATE);
+
+    if (settings.resetDailyOrderNumber !== false && lastDate !== today) {
+      localStorage.setItem(KEYS.ORDER_COUNTER_DATE, today);
+      localStorage.setItem(KEYS.ORDER_COUNTER, '0');
+    }
+
+    let current = parseInt(localStorage.getItem(KEYS.ORDER_COUNTER) || '0', 10);
     current += 1;
     localStorage.setItem(KEYS.ORDER_COUNTER, current.toString());
     return current;
+  },
+
+  resetOrderCounter(val = 0) {
+    localStorage.setItem(KEYS.ORDER_COUNTER, val.toString());
+    localStorage.setItem(KEYS.ORDER_COUNTER_DATE, new Date().toLocaleDateString('en-CA'));
+    return val;
+  },
+
+  reorderOrders(orderId, direction) {
+    const orders = this.getOrders();
+    const target = orders.find(o => o.id === orderId);
+    if (!target) return orders;
+
+    const sameStatusIndices = [];
+    orders.forEach((o, i) => {
+      if (o.status === target.status) sameStatusIndices.push(i);
+    });
+
+    const currentPos = sameStatusIndices.findIndex(i => orders[i].id === orderId);
+    if (currentPos === -1) return orders;
+
+    const newPos = currentPos + direction;
+    if (newPos < 0 || newPos >= sameStatusIndices.length) return orders;
+
+    const idx1 = sameStatusIndices[currentPos];
+    const idx2 = sameStatusIndices[newPos];
+
+    const temp = orders[idx1];
+    orders[idx1] = orders[idx2];
+    orders[idx2] = temp;
+
+    localStorage.setItem(KEYS.ORDERS, JSON.stringify(orders));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('comandafast:new-order', { detail: orders }));
+    }
+    return orders;
   },
 
   saveOrder(order) {
@@ -382,6 +428,14 @@ export const storageService = {
     } catch {
       return SAMPLE_MOCK_SHIFTS;
     }
+  },
+
+  saveCashShift(shift) {
+    localStorage.setItem(KEYS.CASH_SHIFT, JSON.stringify(shift));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('comandafast:cash-shift-change', { detail: shift }));
+    }
+    return shift;
   },
 
   closeCashShift(countedCash, notes = '') {
