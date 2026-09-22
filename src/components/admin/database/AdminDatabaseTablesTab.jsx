@@ -8,6 +8,28 @@ import {
 import { storageService } from '../../../services/storageService';
 import { chatbotService } from '../../../services/chatbotService';
 
+// Funciones seguras para desanidar datos del cliente (string u objeto)
+function getCustomerName(customer) {
+  if (!customer) return 'Cliente sin nombre';
+  if (typeof customer === 'object') return customer.name || 'Cliente';
+  return String(customer);
+}
+
+function getCustomerPhone(order) {
+  if (!order) return '';
+  if (order.phone) return String(order.phone);
+  if (order.customer && typeof order.customer === 'object') return String(order.customer.phone || '');
+  return '';
+}
+
+function getCustomerAddress(order) {
+  if (!order) return '';
+  if (order.address) return String(order.address);
+  if (order.customer && typeof order.customer === 'object') return String(order.customer.address || '');
+  return '';
+}
+
+
 export default function AdminDatabaseTablesTab() {
   // 1. Estados de Navegación y Tablas
   const [activeTable, setActiveTable] = useState('products'); // 'products' | 'orders' | 'shifts' | 'settings'
@@ -84,13 +106,18 @@ export default function AdminDatabaseTablesTab() {
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      list = list.filter(o => 
-        o.id?.toLowerCase().includes(q) ||
-        String(o.orderNumber || '').includes(q) ||
-        o.customer?.toLowerCase().includes(q) ||
-        o.phone?.includes(q) ||
-        o.address?.toLowerCase().includes(q)
-      );
+      list = list.filter(o => {
+        const custName = getCustomerName(o.customer).toLowerCase();
+        const custPhone = getCustomerPhone(o).toLowerCase();
+        const custAddress = getCustomerAddress(o).toLowerCase();
+        return (
+          o.id?.toLowerCase().includes(q) ||
+          String(o.orderNumber || '').includes(q) ||
+          custName.includes(q) ||
+          custPhone.includes(q) ||
+          custAddress.includes(q)
+        );
+      });
     }
     return list;
   }, [orders, statusFilter, searchQuery]);
@@ -134,9 +161,9 @@ export default function AdminDatabaseTablesTab() {
       setFormData({
         id: item.id,
         orderNumber: item.orderNumber || '',
-        customer: item.customer || '',
-        phone: item.phone || '',
-        address: item.address || '',
+        customer: getCustomerName(item.customer),
+        phone: getCustomerPhone(item),
+        address: getCustomerAddress(item),
         channel: item.channel || 'mostrador',
         paymentMethod: item.paymentMethod || 'efectivo',
         status: item.status || 'pendiente',
@@ -690,8 +717,8 @@ export default function AdminDatabaseTablesTab() {
                           </div>
                         </td>
                         <td style={{ padding: '12px 14px' }}>
-                          <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{order.customer || 'Cliente'}</div>
-                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{order.phone || 'Sin teléfono'}</div>
+                          <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{getCustomerName(order.customer)}</div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{getCustomerPhone(order) || 'Sin teléfono'}</div>
                         </td>
                         <td style={{ padding: '12px 14px' }}>
                           <span style={{
