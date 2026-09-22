@@ -434,5 +434,119 @@ export const storageService = {
       console.error(e);
       return false;
     }
-  }
+  },
+
+  // =========================================================
+  // GESTIÓN DIRECTA DE TABLAS (PARA EL PANEL DEL DUEÑO)
+  // =========================================================
+
+  updateProduct(id, updatedFields) {
+    const products = this.getProducts();
+    const idx = products.findIndex(p => p.id === id);
+    if (idx !== -1) {
+      products[idx] = { ...products[idx], ...updatedFields };
+      this.saveProducts(products);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('comandafast:products_updated', { detail: products }));
+      }
+      return products[idx];
+    }
+    return null;
+  },
+
+  deleteProduct(id) {
+    let products = this.getProducts();
+    products = products.filter(p => p.id !== id);
+    this.saveProducts(products);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('comandafast:products_updated', { detail: products }));
+    }
+    return true;
+  },
+
+  addProduct(newProduct) {
+    const products = this.getProducts();
+    const item = {
+      ...newProduct,
+      id: newProduct.id || 'prod-' + Date.now(),
+      price: Number(newProduct.price) || 0,
+      modifiers: Array.isArray(newProduct.modifiers) ? newProduct.modifiers : []
+    };
+    products.push(item);
+    this.saveProducts(products);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('comandafast:products_updated', { detail: products }));
+    }
+    return item;
+  },
+
+  updateOrder(id, updatedFields) {
+    const orders = this.getOrders();
+    const idx = orders.findIndex(o => o.id === id);
+    if (idx !== -1) {
+      orders[idx] = { ...orders[idx], ...updatedFields };
+      if (updatedFields.total !== undefined) {
+        orders[idx].total = Number(updatedFields.total);
+      }
+      localStorage.setItem(KEYS.ORDERS, JSON.stringify(orders));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('comandafast:orders_updated', { detail: orders }));
+      }
+      return orders[idx];
+    }
+    return null;
+  },
+
+  updateCashShiftHistoryItem(id, updatedFields) {
+    const history = this.getCashShiftsHistory();
+    const idx = history.findIndex(s => s.id === id);
+    if (idx !== -1) {
+      history[idx] = { ...history[idx], ...updatedFields };
+      if (updatedFields.initialCash !== undefined || updatedFields.countedCash !== undefined) {
+        const initial = Number(history[idx].initialCash) || 0;
+        const sales = Number(history[idx].cashSales) || 0;
+        const counted = Number(history[idx].countedCash) || 0;
+        const expected = Number(history[idx].expectedCash) || (initial + sales);
+        history[idx].difference = counted - expected;
+      }
+      localStorage.setItem(KEYS.CASH_SHIFTS_HISTORY, JSON.stringify(history));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('comandafast:shifts_updated', { detail: history }));
+      }
+      return history[idx];
+    }
+    return null;
+  },
+
+  deleteCashShiftHistoryItem(id) {
+    let history = this.getCashShiftsHistory();
+    history = history.filter(s => s.id !== id);
+    localStorage.setItem(KEYS.CASH_SHIFTS_HISTORY, JSON.stringify(history));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('comandafast:shifts_updated', { detail: history }));
+    }
+    return true;
+  },
+
+  addCashShiftHistoryItem(newShift) {
+    const history = this.getCashShiftsHistory();
+    const item = {
+      ...newShift,
+      id: newShift.id || 'shift-' + Date.now(),
+      openedAt: newShift.openedAt || new Date().toISOString(),
+      closedAt: newShift.closedAt || new Date().toISOString(),
+      initialCash: Number(newShift.initialCash) || 0,
+      countedCash: Number(newShift.countedCash) || 0,
+      expectedCash: Number(newShift.expectedCash) || Number(newShift.initialCash) || 0,
+      difference: Number(newShift.difference) || 0,
+      isClosed: true
+    };
+    history.unshift(item);
+    localStorage.setItem(KEYS.CASH_SHIFTS_HISTORY, JSON.stringify(history));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('comandafast:shifts_updated', { detail: history }));
+    }
+    return item;
+  },
+
 };

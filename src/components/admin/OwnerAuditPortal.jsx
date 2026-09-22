@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { ShieldCheck, Bot, BarChart3, DollarSign, ShieldAlert, Sparkles, LogOut, ArrowLeft, Download, Calendar, Printer } from 'lucide-react';
+import { ShieldCheck, Bot, BarChart3, DollarSign, ShieldAlert, Sparkles, LogOut, ArrowLeft, Download, Calendar, Printer , Database} from 'lucide-react';
 import AuditKpisTab from './AuditKpisTab';
 import AuditCashShiftsTab from './AuditCashShiftsTab';
 import AuditSecurityTab from './AuditSecurityTab';
 import AuditMenuAnalytics from './AuditMenuAnalytics';
 import AuditSecuritySettings from './AuditSecuritySettings';
 import AdminWhatsAppBot from './bot/AdminWhatsAppBot';
+import AdminDatabaseTablesTab from './database/AdminDatabaseTablesTab';
 import { auditService } from '../../services/auditService';
 import { storageService } from '../../services/storageService';
 import { authService } from '../../services/authService';
@@ -121,7 +122,7 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout })
       </div>
 
       {/* TOOLBAR: DATE FILTER & EXPORT BUTTONS */}
-      {activeTab !== 'bot' && <div style={{
+      {activeTab !== 'bot' && activeTab !== 'database' && <div style={{
         background: 'var(--bg-card)',
         border: '1px solid var(--border-subtle)',
         borderRadius: 'var(--radius-md)',
@@ -222,6 +223,16 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout })
 
         <button
           type="button"
+          className={`cat-pill-btn ${activeTab === 'database' ? 'active' : ''}`}
+          style={{ height: '38px', padding: '0.5rem 1rem', gap: '6px' }}
+          onClick={() => setActiveTab('database')}
+        >
+          <Database size={16} />
+          <span>Tablas BD</span>
+        </button>
+
+        <button
+          type="button"
           className={`cat-pill-btn ${activeTab === 'settings' ? 'active' : ''}`}
           style={{ height: '38px', padding: '0.5rem 1rem', gap: '6px' }}
           onClick={() => setActiveTab('settings')}
@@ -238,6 +249,7 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout })
         {activeTab === 'security' && <AuditSecurityTab cancelledOrders={cancelledOrders} orders={orders} />}
         {activeTab === 'menu' && <AuditMenuAnalytics analytics={productAnalytics} />}
         {activeTab === 'bot' && <AdminWhatsAppBot />}
+        {activeTab === 'database' && <AdminDatabaseTablesTab />}
         {activeTab === 'settings' && <AuditSecuritySettings />}
       </div>
     </div>
