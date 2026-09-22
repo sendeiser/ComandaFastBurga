@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { ChefHat, Clock, CheckCircle2, Play, AlertCircle, Printer, MessageSquare, ShoppingBag, Utensils, RefreshCw, XCircle, ArrowLeftRight, ChevronUp, ChevronDown, RotateCcw } from 'lucide-react';
 
 export default function KitchenDisplay({ 
   orders, 
   onUpdateStatus, 
-  onReprintTicket 
+  onReprintTicket,
+  onReorderOrder
 }) {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [channelFilter, setChannelFilter] = useState('all');
@@ -29,6 +30,20 @@ export default function KitchenDisplay({
   const pendingOrders = activeOrders.filter(o => o.status === 'pendiente');
   const cookingOrders = activeOrders.filter(o => o.status === 'cocina');
   const readyOrders = activeOrders.filter(o => o.status === 'listo');
+
+  
+  const getSafeItems = (items) => {
+    if (Array.isArray(items)) return items;
+    if (typeof items === 'string') {
+      try {
+        const parsed = JSON.parse(items);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  };
 
   const renderOrderCard = (order) => {
     const elapsed = getElapsedMinutes(order.createdAt);
@@ -74,10 +89,10 @@ export default function KitchenDisplay({
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
             <span className={`order-type-chip ${order.channel}`}>
-              {order.channel === 'whatsapp' ? (order.deliveryType === 'local' ? '🛍️ WA RETIRO' : '🛵 WA DELIVERY') :
-               order.channel === 'mesa' ? `🍽️ MESA #${order.tableNumber || 'S/N'}` :
+              {order.channel === 'whatsapp' ? (order.deliveryType === 'local' ? 'ðŸ›ï¸ WA RETIRO' : '🛵 WA DELIVERY') :
+               order.channel === 'mesa' ? `ðŸ½ï¸ MESA #${order.tableNumber || 'S/N'}` :
                order.channel === 'delivery' ? '🛵 DELIVERY' :
-               '🛍️ MOSTRADOR'}
+               'ðŸ›ï¸ MOSTRADOR'}
             </span>
 
             <div className={`kds-timer-chip ${isDelayed ? 'danger' : isWarning ? 'warning' : ''}`}>
@@ -96,7 +111,7 @@ export default function KitchenDisplay({
 
         {typeof order.customer === 'object' && order.customer.address && order.deliveryType === 'delivery' && (
           <div style={{ fontSize: '0.75rem', color: 'var(--accent-amber)', marginTop: '2px', fontWeight: 600 }}>
-            📍 Envío: {order.customer.address}
+            ðŸ“ Envío: {order.customer.address}
           </div>
         )}
 
@@ -108,13 +123,13 @@ export default function KitchenDisplay({
 
         {/* Item List */}
         <div className="kds-items-list">
-          {order.items.map((item, idx) => (
+          {getSafeItems(order.items).map((item, idx) => (
             <div key={idx} style={{ marginBottom: '4px' }}>
               <div className="kds-item-line">
                 <span className="kds-item-qty">{item.qty || item.quantity || 1}x</span>
                 <span>{item.name.toUpperCase()}</span>
               </div>
-              {item.modifiers && item.modifiers.length > 0 && (
+              {Array.isArray(item.modifiers) && item.modifiers.length > 0 && (
                 <div className="kds-item-mod-list">
                   {item.modifiers.map((m, mi) => (
                     <div key={mi}>• {m}</div>
@@ -339,3 +354,4 @@ export default function KitchenDisplay({
     </div>
   );
 }
+

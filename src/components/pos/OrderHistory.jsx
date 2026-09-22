@@ -4,13 +4,14 @@ import { Search, Printer, Trash2, CheckCircle2, Clock, MessageSquare, ShoppingBa
 export default function OrderHistory({ 
   orders, 
   onViewTickets, 
-  onDeleteOrder 
+  onDeleteOrder,
+  onUpdateStatus
 }) {
   const [search, setSearch] = useState('');
   const [filterChannel, setFilterChannel] = useState('all');
 
   const filteredOrders = orders.filter(o => {
-    const matchSearch = o.orderNumber.toString().includes(search) ||
+    const matchSearch = (o.orderNumber != null ? o.orderNumber.toString() : (o.id || "")).includes(search) ||
                         (o.customer?.name && o.customer.name.toLowerCase().includes(search.toLowerCase())) ||
                         (o.customer?.phone && o.customer.phone.includes(search));
     const matchChannel = filterChannel === 'all' || o.channel === filterChannel;
@@ -74,7 +75,7 @@ export default function OrderHistory({
               filteredOrders.map(order => (
                 <tr key={order.id} style={{ borderBottom: '1px solid var(--border-subtle)', transition: 'background 0.15s' }}>
                   <td style={{ padding: '0.85rem 1rem', fontWeight: 900, color: 'var(--text-primary)', fontSize: '1rem' }}>
-                    #{order.orderNumber}
+                    #{order.orderNumber ?? order.id?.slice?.(-4)}
                   </td>
                   <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>

@@ -1,4 +1,4 @@
-// =========================================================
+﻿// =========================================================
 // SUPABASE CLIENT & REAL-TIME SYNC SERVICE
 // =========================================================
 
@@ -40,7 +40,7 @@ export const supabaseSync = {
             channel: o.channel || 'mostrador',
             tableNumber: o.table_number || '',
             customer: typeof o.customer === 'object' && o.customer !== null ? o.customer : { name: o.customer || 'Cliente' },
-            items: (o.items || []).map(i => ({
+            items: (Array.isArray(o.items) ? o.items : (typeof o.items === "string" ? ((() => { try { return JSON.parse(o.items); } catch(e) { return []; } })()) : [])).map(i => ({
               id: i.id || `item-${Math.random()}`,
               qty: i.qty || 1,
               name: i.name || '',
@@ -113,7 +113,7 @@ export const supabaseSync = {
                   channel: o.channel,
                   tableNumber: o.table_number,
                   customer: o.customer,
-                  items: o.items || [],
+                  items: Array.isArray(o.items) ? o.items : (typeof o.items === "string" ? ((() => { try { return JSON.parse(o.items); } catch(e) { return []; } })()) : []),
                   subtotal: Number(o.subtotal) || 0,
                   deliveryFee: Number(o.delivery_fee) || 0,
                   total: Number(o.total) || 0,
@@ -174,7 +174,7 @@ export const supabaseSync = {
             name: p.name,
             category: p.category,
             price: Number(p.price),
-            emoji: p.emoji || '🍔',
+            emoji: p.emoji || 'ðŸ”',
             description: p.description || '',
             modifiers: Array.isArray(p.modifiers) ? p.modifiers : []
           }));
@@ -196,7 +196,7 @@ export const supabaseSync = {
         name: p.name,
         category: p.category,
         price: p.price,
-        emoji: p.emoji || '🍔',
+        emoji: p.emoji || 'ðŸ”',
         description: p.description || '',
         modifiers: p.modifiers || [],
         is_active: true,
@@ -409,3 +409,5 @@ export const supabaseSync = {
     }
   }
 };
+
+
