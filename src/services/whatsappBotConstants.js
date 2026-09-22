@@ -330,3 +330,207 @@ export function formatItemNumber(n) {
   if (numEmojis[n]) return numEmojis[n];
   return `*[${n}]*`;
 }
+
+
+// =========================================================
+// VARIABLES GLOBALES DEL BOT Y NEGOCIO (EDITABLES POR EL DUEÑO)
+// =========================================================
+
+export const DEFAULT_BOT_VARIABLES = [
+  // 1. Negocio & Local
+  {
+    key: 'nombre_local',
+    label: 'Nombre del Local',
+    category: 'business',
+    defaultValue: 'ComandaFast Burgers',
+    value: 'ComandaFast Burgers',
+    description: 'Nombre de la hamburguesería o marca gastronómica',
+    icon: 'Store'
+  },
+  {
+    key: 'direccion',
+    label: 'Dirección para Retiros',
+    category: 'business',
+    defaultValue: 'Av. Belgrano 1234, Centro',
+    value: 'Av. Belgrano 1234, Centro',
+    description: 'Ubicación física del local para Take Away y cadetes',
+    icon: 'MapPin'
+  },
+  {
+    key: 'horarios',
+    label: 'Días y Horarios de Atención',
+    category: 'business',
+    defaultValue: 'Miércoles a Domingos de 19:30 a 00:30 hs',
+    value: 'Miércoles a Domingos de 19:30 a 00:30 hs',
+    description: 'Turnos en los que la cocina se encuentra abierta y despachando',
+    icon: 'Clock'
+  },
+  {
+    key: 'telefono_contacto',
+    label: 'Teléfono / WhatsApp de Atención',
+    category: 'business',
+    defaultValue: '+54 9 3826 40-1234',
+    value: '+54 9 3826 40-1234',
+    description: 'Número de línea directa para consultas o derivación a humano',
+    icon: 'Phone'
+  },
+  {
+    key: 'catalogo_url',
+    label: 'Enlace a la Carta Web',
+    category: 'business',
+    defaultValue: 'https://comandafast.online',
+    value: 'https://comandafast.online',
+    description: 'URL de la carta digital para que los clientes vean fotos y promociones',
+    icon: 'Globe'
+  },
+  {
+    key: 'zona_envio',
+    label: 'Zona de Cobertura de Envíos',
+    category: 'business',
+    defaultValue: 'Casco céntrico y barrios aledaños (hasta 5 km)',
+    value: 'Casco céntrico y barrios aledaños (hasta 5 km)',
+    description: 'Área geográfica de despacho del servicio de delivery',
+    icon: 'Compass'
+  },
+
+  // 2. Pagos & Bancos
+  {
+    key: 'alias_banco',
+    label: 'Alias Bancario / Mercado Pago',
+    category: 'payments',
+    defaultValue: 'comandafast.mp',
+    value: 'comandafast.mp',
+    description: 'Alias corto para transferencias bancarias o virtuales',
+    icon: 'CreditCard'
+  },
+  {
+    key: 'banco',
+    label: 'Entidad Bancaria o Billetera',
+    category: 'payments',
+    defaultValue: 'Mercado Pago / Banco Galicia',
+    value: 'Mercado Pago / Banco Galicia',
+    description: 'Nombre del banco emisor o app financiera',
+    icon: 'Building'
+  },
+  {
+    key: 'titular',
+    label: 'Titular de la Cuenta',
+    category: 'payments',
+    defaultValue: 'ComandaFast Burgers S.R.L.',
+    value: 'ComandaFast Burgers S.R.L.',
+    description: 'Nombre de la persona o razón social a la que se transfiere',
+    icon: 'UserCheck'
+  },
+  {
+    key: 'cbu',
+    label: 'CBU / CVU (22 dígitos)',
+    category: 'payments',
+    defaultValue: '0000003100092138928374',
+    value: '0000003100092138928374',
+    description: 'Clave Bancaria Uniforme completa para transferencias tradicionales',
+    icon: 'Hash'
+  },
+  {
+    key: 'cuit',
+    label: 'CUIT / CUIL',
+    category: 'payments',
+    defaultValue: '30-71829384-9',
+    value: '30-71829384-9',
+    description: 'Identificación tributaria del negocio',
+    icon: 'FileText'
+  },
+  {
+    key: 'descuento_efectivo',
+    label: 'Beneficio Pago en Efectivo',
+    category: 'payments',
+    defaultValue: '10% de descuento',
+    value: '10% de descuento',
+    description: 'Promoción o porcentaje especial al pagar en efectivo en mano',
+    icon: 'Percent'
+  },
+
+  // 3. Tiempos & Delivery
+  {
+    key: 'demora',
+    label: 'Tiempo Promedio de Espera',
+    category: 'delivery',
+    defaultValue: '30 a 45 minutos',
+    value: '30 a 45 minutos',
+    description: 'Frase que se le comunica al cliente para estimar la cocción y viaje',
+    icon: 'Hourglass'
+  },
+  {
+    key: 'demora_min',
+    label: 'Demora Mínima (Minutos)',
+    category: 'delivery',
+    defaultValue: '30',
+    value: '30',
+    description: 'Tiempo mínimo en minutos en días habituales',
+    icon: 'Timer'
+  },
+  {
+    key: 'demora_max',
+    label: 'Demora Máxima (Minutos)',
+    category: 'delivery',
+    defaultValue: '45',
+    value: '45',
+    description: 'Tiempo máximo de entrega en picos de demanda',
+    icon: 'Timer'
+  },
+  {
+    key: 'costo_envio',
+    label: 'Costo Base de Delivery',
+    category: 'delivery',
+    defaultValue: '$1.500',
+    value: '$1.500',
+    description: 'Tarifa del cadete para envíos a domicilio',
+    icon: 'Bike'
+  },
+  {
+    key: 'envio_gratis_desde',
+    label: 'Envío Gratis a partir de',
+    category: 'delivery',
+    defaultValue: '$18.000',
+    value: '$18.000',
+    description: 'Monto de compra mínima donde el costo de envío es bonificado',
+    icon: 'Gift'
+  },
+
+  // 4. Mensajes & Avisos
+  {
+    key: 'mensaje_bienvenida',
+    label: 'Mensaje de Saludo y Bienvenida',
+    category: 'messages',
+    defaultValue: '¡Hola {cliente}! Bienvenido a ComandaFast Burgers 🔥 Las mejores hamburguesas smashadas a la plancha.',
+    value: '¡Hola {cliente}! Bienvenido a ComandaFast Burgers 🔥 Las mejores hamburguesas smashadas a la plancha.',
+    description: 'Saludo inicial automático cuando el cliente contacta por primera vez',
+    icon: 'MessageSquare'
+  },
+  {
+    key: 'mensaje_demora',
+    label: 'Aviso de Cocina con Demora Alta',
+    category: 'messages',
+    defaultValue: '⚠️ ¡Estamos a pleno fuego en la cocina! La demora actual es de 50 a 65 min. ¡Gracias por la paciencia!',
+    value: '⚠️ ¡Estamos a pleno fuego en la cocina! La demora actual es de 50 a 65 min. ¡Gracias por la paciencia!',
+    description: 'Mensaje opcional para activar en días de alta demanda o lluvia',
+    icon: 'AlertTriangle'
+  },
+  {
+    key: 'mensaje_fuera_horario',
+    label: 'Respuesta Fuera de Horario',
+    category: 'messages',
+    defaultValue: '🌙 En este momento nuestro local está cerrado. Abrimos de {horarios}. ¡Te esperamos luego!',
+    value: '🌙 En este momento nuestro local está cerrado. Abrimos de {horarios}. ¡Te esperamos luego!',
+    description: 'Mensaje de guardia cuando ingresan mensajes fuera de turno',
+    icon: 'Moon'
+  }
+];
+
+export const BOT_VARIABLE_CATEGORIES = [
+  { id: 'all', label: 'Todas', emoji: '🧩' },
+  { id: 'business', label: 'Negocio & Local', emoji: '🏢' },
+  { id: 'payments', label: 'Pagos & Bancos', emoji: '💳' },
+  { id: 'delivery', label: 'Delivery & Tiempos', emoji: '🛵' },
+  { id: 'messages', label: 'Mensajes & Avisos', emoji: '💬' },
+  { id: 'custom', label: 'Personalizadas', emoji: '✨' }
+];

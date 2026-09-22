@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 import AdminChatbotLab from './AdminChatbotLab';
 import AdminBotFlowsTab from './AdminBotFlowsTab';
-import { GitBranch } from 'lucide-react';
+import AdminBotVariablesTab from './AdminBotVariablesTab';
+import { GitBranch, Variable } from 'lucide-react';
 import { ALL_TEMPLATE_NODES, DEFAULT_TEMPLATES, DEFAULT_CHATBOT_KEYWORDS } from '../../../services/whatsappBotConstants';
 import { chatbotService } from '../../../services/chatbotService';
 
@@ -508,6 +509,22 @@ call npm run dev
             </span>
           </button>
 
+          {/* TAB: GESTOR DE VARIABLES DEL BOT */}
+          <button
+            type="button"
+            className={`cat-pill-btn ${activeTab === 'variables' ? 'active' : ''}`}
+            style={{
+              height: '34px',
+              padding: '0.4rem 0.85rem',
+              gap: '6px',
+              borderColor: activeTab === 'variables' ? 'var(--accent-amber)' : undefined
+            }}
+            onClick={() => setActiveTab('variables')}
+          >
+            <Variable size={15} style={{ color: 'var(--accent-amber)' }} />
+            <span>🧩 Variables del Bot</span>
+          </button>
+
                     {/* TAB 2: IA GEMINI */}
           <button
             type="button"
@@ -604,6 +621,11 @@ call npm run dev
             setActiveTab('test_lab');
           }}
         />
+      )}
+
+      {/* TAB: GESTOR DE VARIABLES DEL BOT */}
+      {activeTab === 'variables' && (
+        <AdminBotVariablesTab />
       )}
 
       {/* TAB CONTENT: TEMPLATES STUDIO */}

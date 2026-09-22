@@ -3,12 +3,13 @@
 // Motor de atención automática, toma de pedidos y lab de simulación
 // =========================================================
 
-import { DEFAULT_CHATBOT_KEYWORDS, DEFAULT_TEMPLATES, DEFAULT_CUSTOM_FLOWS, formatItemNumber } from './whatsappBotConstants.js';
+import { DEFAULT_CHATBOT_KEYWORDS, DEFAULT_TEMPLATES, DEFAULT_CUSTOM_FLOWS, DEFAULT_BOT_VARIABLES, formatItemNumber } from './whatsappBotConstants.js';
 import { storageService } from './storageService';
 import { audioService } from './audioService';
 import { supabaseSync } from './supabaseClient';
 
 const BOT_SETTINGS_KEY = 'comandafast_bot_settings';
+const BOT_VARIABLES_KEY = 'comandafast_bot_variables';
 
 export const chatbotService = {
   // --- GESTIÓN DE FLUJOS PERSONALIZADOS Y CONDICIONES ---

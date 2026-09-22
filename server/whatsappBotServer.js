@@ -33,6 +33,7 @@ const AUTH_DIR = path.join(DATA_DIR, 'baileys_auth');
 const PRODUCTS_FILE = path.join(DATA_DIR, 'products.json');
 const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
 const FLOWS_FILE = path.join(DATA_DIR, 'custom_flows.json');
+const VARIABLES_FILE = path.join(DATA_DIR, 'bot_variables.json');
 
 const DEFAULT_SERVER_FLOWS = [
   {
@@ -164,6 +165,68 @@ function saveStoredFlows(flows) {
   } catch (e) {
     console.error('[WHATSAPP BOT] Error al guardar en custom_flows.json:', e);
   }
+}
+
+
+const DEFAULT_SERVER_VARIABLES = [
+  { key: 'nombre_local', label: 'Nombre del Local', category: 'business', value: 'ComandaFast Burgers', defaultValue: 'ComandaFast Burgers', description: 'Nombre de la hamburguesería o marca gastronómica' },
+  { key: 'direccion', label: 'Dirección para Retiros', category: 'business', value: 'Av. Belgrano 1234, Centro', defaultValue: 'Av. Belgrano 1234, Centro', description: 'Ubicación física del local para Take Away y cadetes' },
+  { key: 'horarios', label: 'Días y Horarios de Atención', category: 'business', value: 'Miércoles a Domingos de 19:30 a 00:30 hs', defaultValue: 'Miércoles a Domingos de 19:30 a 00:30 hs', description: 'Turnos en los que la cocina se encuentra abierta y despachando' },
+  { key: 'telefono_contacto', label: 'Teléfono / WhatsApp de Atención', category: 'business', value: '+54 9 3826 40-1234', defaultValue: '+54 9 3826 40-1234', description: 'Número de línea directa para consultas o derivación a humano' },
+  { key: 'catalogo_url', label: 'Enlace a la Carta Web', category: 'business', value: 'https://comandafast.online', defaultValue: 'https://comandafast.online', description: 'URL de la carta digital para ver fotos y promociones' },
+  { key: 'zona_envio', label: 'Zona de Cobertura de Envíos', category: 'business', value: 'Casco céntrico y barrios aledaños (hasta 5 km)', defaultValue: 'Casco céntrico y barrios aledaños (hasta 5 km)', description: 'Área geográfica de despacho del delivery' },
+  { key: 'alias_banco', label: 'Alias Bancario / Mercado Pago', category: 'payments', value: 'comandafast.mp', defaultValue: 'comandafast.mp', description: 'Alias corto para transferencias bancarias o virtuales' },
+  { key: 'banco', label: 'Entidad Bancaria o Billetera', category: 'payments', value: 'Mercado Pago / Banco Galicia', defaultValue: 'Mercado Pago / Banco Galicia', description: 'Nombre del banco emisor o app financiera' },
+  { key: 'titular', label: 'Titular de la Cuenta', category: 'payments', value: 'ComandaFast Burgers S.R.L.', defaultValue: 'ComandaFast Burgers S.R.L.', description: 'Nombre del titular a quien se transfiere' },
+  { key: 'cbu', label: 'CBU / CVU (22 dígitos)', category: 'payments', value: '0000003100092138928374', defaultValue: '0000003100092138928374', description: 'Clave Bancaria Uniforme completa' },
+  { key: 'cuit', label: 'CUIT / CUIL', category: 'payments', value: '30-71829384-9', defaultValue: '30-71829384-9', description: 'Identificación tributaria del negocio' },
+  { key: 'descuento_efectivo', label: 'Beneficio Pago en Efectivo', category: 'payments', value: '10% de descuento', defaultValue: '10% de descuento', description: 'Promoción especial al pagar en efectivo en mano' },
+  { key: 'demora', label: 'Tiempo Promedio de Espera', category: 'delivery', value: '30 a 45 minutos', defaultValue: '30 a 45 minutos', description: 'Frase para estimar la cocción y viaje' },
+  { key: 'demora_min', label: 'Demora Mínima (Minutos)', category: 'delivery', value: '30', defaultValue: '30', description: 'Tiempo mínimo en minutos' },
+  { key: 'demora_max', label: 'Demora Máxima (Minutos)', category: 'delivery', value: '45', defaultValue: '45', description: 'Tiempo máximo de entrega' },
+  { key: 'costo_envio', label: 'Costo Base de Delivery', category: 'delivery', value: '$1.500', defaultValue: '$1.500', description: 'Tarifa del cadete para envíos' },
+  { key: 'envio_gratis_desde', label: 'Envío Gratis a partir de', category: 'delivery', value: '$18.000', defaultValue: '$18.000', description: 'Monto de compra mínima para envío sin cargo' },
+  { key: 'mensaje_bienvenida', label: 'Mensaje de Saludo y Bienvenida', category: 'messages', value: '¡Hola {cliente}! Bienvenido a ComandaFast Burgers 🔥 Las mejores hamburguesas smashadas a la plancha.', defaultValue: '¡Hola {cliente}! Bienvenido a ComandaFast Burgers 🔥 Las mejores hamburguesas smashadas a la plancha.', description: 'Saludo inicial automático' },
+  { key: 'mensaje_demora', label: 'Aviso de Cocina con Demora Alta', category: 'messages', value: '⚠️ ¡Estamos a pleno fuego en la cocina! La demora actual es de 50 a 65 min. ¡Gracias por la paciencia!', defaultValue: '⚠️ ¡Estamos a pleno fuego en la cocina! La demora actual es de 50 a 65 min. ¡Gracias por la paciencia!', description: 'Mensaje de aviso en alta demanda' },
+  { key: 'mensaje_fuera_horario', label: 'Respuesta Fuera de Horario', category: 'messages', value: '🌙 En este momento nuestro local está cerrado. Abrimos de {horarios}. ¡Te esperamos luego!', defaultValue: '🌙 En este momento nuestro local está cerrado. Abrimos de {horarios}. ¡Te esperamos luego!', description: 'Mensaje cuando ingresan consultas fuera de horario' }
+];
+
+function getBotVariables() {
+  try {
+    if (fs.existsSync(VARIABLES_FILE)) {
+      const raw = fs.readFileSync(VARIABLES_FILE, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const map = new Map(parsed.map(v => [v.key, v]));
+        DEFAULT_SERVER_VARIABLES.forEach(def => {
+          if (!map.has(def.key)) map.set(def.key, def);
+        });
+        return Array.from(map.values());
+      }
+    }
+  } catch (e) {
+    console.error('[WHATSAPP BOT] Error al leer bot_variables.json:', e);
+  }
+  return DEFAULT_SERVER_VARIABLES;
+}
+
+function saveBotVariables(vars) {
+  try {
+    fs.writeFileSync(VARIABLES_FILE, JSON.stringify(vars, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('[WHATSAPP BOT] Error al guardar en bot_variables.json:', e);
+  }
+}
+
+function getBotVariablesMap() {
+  const vars = getBotVariables();
+  const map = {};
+  for (const v of vars) {
+    if (v && v.key) {
+      map[v.key] = v.value !== undefined ? v.value : v.defaultValue;
+    }
+  }
+  return map;
 }
 
 function interpolateTemplate(template, vars = {}) {
@@ -986,6 +1049,20 @@ app.post('/api/orders/ack', (req, res) => {
 // =========================================================
 // ENDPOINTS DE INTELIGENCIA ARTIFICIAL (GOOGLE GEMINI)
 // =========================================================
+
+app.get('/api/bot-variables', (req, res) => {
+  res.json({ success: true, variables: getBotVariables() });
+});
+
+app.post('/api/bot-variables', (req, res) => {
+  const { variables } = req.body;
+  if (!variables || !Array.isArray(variables)) {
+    return res.status(400).json({ success: false, error: 'Formato inválido de variables' });
+  }
+  saveBotVariables(variables);
+  return res.json({ success: true, count: variables.length });
+});
+
 app.get('/api/flows', (req, res) => {
   res.json({ success: true, flows: getCustomFlows() });
 });

@@ -1,64 +1,142 @@
 [
   {
-    "id": "prod-8",
-    "name": "Aros de Cebolla",
-    "category": "Agregados",
-    "price": 9000,
-    "emoji": "🧅",
-    "description": "Porción de 12 aros de cebolla",
-    "modifiers": []
+    "id": "prod-1",
+    "name": "Burger Clásica",
+    "category": "Hamburguesas",
+    "price": 6500,
+    "emoji": "🍔",
+    "image": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format&fit=crop&q=80",
+    "description": "Medallón 150g, lechuga, tomate, queso y mayonesa casera",
+    "modifiers": [
+      "Sin cebolla",
+      "Sin tomate",
+      "Extra Cheddar (+$800)",
+      "Extra Bacon (+$900)",
+      "Papas Rústicas"
+    ]
+  },
+  {
+    "id": "prod-2",
+    "name": "Doble Cuarto Cheddar",
+    "category": "Hamburguesas",
+    "price": 8200,
+    "emoji": "🧀",
+    "image": "https://images.unsplash.com/photo-1586190848861-99aa4a171e90?w=800&auto=format&fit=crop&q=80",
+    "description": "Doble medallón 300g, 4 fetas de cheddar, cebolla picada y ketchup",
+    "modifiers": [
+      "Sin cebolla",
+      "Extra Cheddar (+$800)",
+      "Doble Bacon (+$1200)",
+      "Medallón Extra (+$2000)"
+    ]
+  },
+  {
+    "id": "prod-3",
+    "name": "Triple Bacon BBQ",
+    "category": "Hamburguesas",
+    "price": 9800,
+    "emoji": "🥓",
+    "image": "https://images.unsplash.com/photo-1553979459-d2229ba7433b?w=800&auto=format&fit=crop&q=80",
+    "description": "Triple medallón 450g, 6 fetas de cheddar, abundante bacon crocante y salsa BBQ",
+    "modifiers": [
+      "Sin salsa BBQ",
+      "Extra Bacon (+$900)",
+      "Salsa Picante",
+      "Papas Grandes"
+    ]
+  },
+  {
+    "id": "prod-4",
+    "name": "Crispy Chicken",
+    "category": "Hamburguesas",
+    "price": 7400,
+    "emoji": "🍗",
+    "image": "https://images.unsplash.com/photo-1625813506062-0aeb1d7a094b?w=800&auto=format&fit=crop&q=80",
+    "description": "Pechuga rebozada super crocante, coleslaw, pepinillos y salsa tártara",
+    "modifiers": [
+      "Sin pepinillos",
+      "Sin coleslaw",
+      "Extra Queso (+$800)"
+    ]
+  },
+  {
+    "id": "prod-5",
+    "name": "Burger Veggie Deluxe",
+    "category": "Hamburguesas",
+    "price": 6900,
+    "emoji": "🥑",
+    "image": "https://images.unsplash.com/photo-1520072959219-c595dc870360?w=800&auto=format&fit=crop&q=80",
+    "description": "Medallón de lentejas y champignones, rúcula, tomate seco y queso provoleta",
+    "modifiers": [
+      "Vegano sin queso",
+      "Sin rúcula"
+    ]
   },
   {
     "id": "prod-6",
     "name": "Papas Fritas Clásicas",
     "category": "Agregados",
-    "price": 8000,
+    "price": 3500,
     "emoji": "🍟",
+    "image": "https://images.unsplash.com/photo-1576107232684-1279f3908594?w=800&auto=format&fit=crop&q=80",
     "description": "Porción grande de papas bastón crocantes",
     "modifiers": [
-      "Sin sal."
+      "Sin sal",
+      "Con provenzal"
     ]
   },
   {
     "id": "prod-7",
     "name": "Papas Cheddar & Bacon",
     "category": "Agregados",
-    "price": 12000,
+    "price": 4900,
     "emoji": "🧀",
-    "description": "Papas fritas con cheddar y bacon crocante",
+    "image": "https://images.unsplash.com/photo-1585109649139-366815a0d713?w=800&auto=format&fit=crop&q=80",
+    "description": "Papas fritas bañadas en salsa cheddar y lluvia de bacon crocante con verdeo",
     "modifiers": [
-      "Sin bacon."
+      "Sin verdeo",
+      "Cheddar aparte",
+      "Doble Bacon (+$900)"
     ]
   },
   {
-    "id": "prod-1789951903950",
-    "name": "NUGGETS DE POLLO",
+    "id": "prod-8",
+    "name": "Aros de Cebolla (x10)",
     "category": "Agregados",
-    "price": 11000,
-    "emoji": "🍗",
-    "description": "12 piezas de nuggets de pollo + 1 salsa",
+    "price": 4200,
+    "emoji": "🧅",
+    "image": "https://images.unsplash.com/photo-1639024471284-0af5676d738d?w=800&auto=format&fit=crop&q=80",
+    "description": "Aros de cebolla rebozados con salsa barbacoa",
     "modifiers": [
-      "salsa (ketchup",
-      "lactonesa o big)"
+      "Con salsa picante",
+      "Con alioli"
     ]
   },
   {
     "id": "prod-9",
-    "name": "Coca Cola 354ml",
+    "name": "Coca Cola 500ml",
     "category": "Bebidas",
-    "price": 3000,
+    "price": 2000,
     "emoji": "🥤",
-    "description": "Lata de coca",
-    "modifiers": []
+    "image": "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=800&auto=format&fit=crop&q=80",
+    "description": "Botella 500ml bien fría",
+    "modifiers": [
+      "Fría",
+      "Natural"
+    ]
   },
   {
     "id": "prod-10",
-    "name": "Sprite 354 ml",
+    "name": "Sprite 500ml",
     "category": "Bebidas",
-    "price": 3000,
-    "emoji": "🍋",
-    "description": "Lata de sprite",
-    "modifiers": []
+    "price": 2000,
+    "emoji": "🥤",
+    "image": "https://images.unsplash.com/photo-1625772299848-391b6a87d7b3?w=800&auto=format&fit=crop&q=80",
+    "description": "Botella 500ml bien fría",
+    "modifiers": [
+      "Fría",
+      "Natural"
+    ]
   },
   {
     "id": "prod-11",
@@ -66,6 +144,7 @@
     "category": "Bebidas",
     "price": 3200,
     "emoji": "🍺",
+    "image": "https://images.unsplash.com/photo-1608270191763-71860d5b7808?w=800&auto=format&fit=crop&q=80",
     "description": "Lata de cerveza artesanal rubia o IPA",
     "modifiers": [
       "Muy fría"
@@ -76,234 +155,14 @@
     "name": "Mega Combo Doble + Papas + Bebida",
     "category": "Combos",
     "price": 11200,
-    "emoji": "⭐",
+    "emoji": "🔥",
+    "image": "https://images.unsplash.com/photo-1550547660-d9450f859349?w=800&auto=format&fit=crop&q=80",
     "description": "Doble Cuarto Cheddar + Papas Fritas + Gaseosa 500ml",
     "modifiers": [
       "Con Coca Cola",
       "Con Sprite",
       "Con Cerveza (+$1000)",
       "Papas con Cheddar (+$1200)"
-    ]
-  },
-  {
-    "id": "prod-1789951132988",
-    "name": "GUACAMOLE",
-    "category": "Hamburguesas",
-    "price": 11000,
-    "emoji": "🥑",
-    "description": "Doble medallón, cheddar, guacamole y lactonesa.",
-    "modifiers": [
-      "sin aderezo",
-      "sin queso",
-      "con queso tybo."
-    ]
-  },
-  {
-    "id": "prod-1789951228468",
-    "name": "BAJONERA",
-    "category": "Hamburguesas",
-    "price": 12000,
-    "emoji": "🍳",
-    "description": "Doble medallón, cheddar, cebolla caramelizada, bacon, huevo, salsa bbq y aderezos.",
-    "modifiers": [
-      "sin aderezo",
-      "sin cebolla",
-      "sin salsa bbq."
-    ]
-  },
-  {
-    "id": "prod-1789951325338",
-    "name": "TEXAS",
-    "category": "Hamburguesas",
-    "price": 12000,
-    "emoji": "🍔",
-    "description": "Doble medallón, cheddar, aros de cebolla, salsa fugazza, salsa bbq y ketchup.",
-    "modifiers": [
-      "sin aderezo",
-      "sin salsa bbq",
-      "sin cheddar",
-      "con queso tybo."
-    ]
-  },
-  {
-    "id": "prod-1789951431708",
-    "name": "MEXICANA",
-    "category": "Hamburguesas",
-    "price": 10000,
-    "emoji": "🌶️",
-    "description": "Doble medallon, cheddar, morrones y cebolla salteados con un toque de picante, mayonesa y ketchup.",
-    "modifiers": [
-      "Sin aderezo",
-      "sin queso",
-      "con queso tybo."
-    ]
-  },
-  {
-    "id": "prod-1789951532547",
-    "name": "4x4",
-    "category": "Hamburguesas",
-    "price": 15000,
-    "emoji": "🍔",
-    "description": "4 medallones, cheddar, lechuga, tomate y salsa big.",
-    "modifiers": [
-      "Sin salsa big",
-      "sin lechuga",
-      "sin tomate."
-    ]
-  },
-  {
-    "id": "prod-1789951634719",
-    "name": "BIG BURGA",
-    "category": "Hamburguesas",
-    "price": 10000,
-    "emoji": "🥒",
-    "description": "Doble medallon, cheddar, lechuga, bacon y salsa big.",
-    "modifiers": [
-      "sin salsa big",
-      "sin lechuga",
-      "sin bacon",
-      "sin queso",
-      "con queso tybo."
-    ]
-  },
-  {
-    "id": "prod-1789951712431",
-    "name": "CRIOLLA",
-    "category": "Hamburguesas",
-    "price": 10000,
-    "emoji": "🫑",
-    "description": "Doble medallon, cheddar, queso tybo, salsa criolla y lactonesa.",
-    "modifiers": [
-      "Sin lactonesa",
-      "sin cheddar",
-      "con queso tybo."
-    ]
-  },
-  {
-    "id": "prod-1",
-    "name": "CLASICA",
-    "category": "Hamburguesas",
-    "price": 8000,
-    "emoji": "🍔",
-    "description": "Medallón simple, cheddar, lechuga, tomate, cebolla y aderezos",
-    "modifiers": [
-      "sin cebolla",
-      "sin tomate",
-      "sin lechuga",
-      "sin aderezo."
-    ]
-  },
-  {
-    "id": "prod-1790030788077",
-    "name": "LOMITO COMPLETO",
-    "category": "Hamburguesas",
-    "price": 16000,
-    "emoji": "🥪",
-    "description": "Carne de ternera, queso tybo, tomate, lechuga, huevo, jamón y aderezo.",
-    "modifiers": [
-      "sin aderezo",
-      "sin queso"
-    ]
-  },
-  {
-    "id": "prod-2",
-    "name": "CHEESE",
-    "category": "Hamburguesas",
-    "price": 10000,
-    "emoji": "🧀",
-    "description": "Doble medallón, cheddar, cebolla, bacon, ketchup y mostaza.",
-    "modifiers": [
-      "Sin aderezo",
-      "sin cebolla",
-      "sin pepinillos",
-      "Extra Cheddar (+$3000)",
-      "Extra Bacon (+$3000)",
-      "Medallón Extra (+$4000)"
-    ]
-  },
-  {
-    "id": "prod-1789943679524",
-    "name": "Burga",
-    "category": "Hamburguesas",
-    "price": 8500,
-    "emoji": "🍔",
-    "description": "asdasdada",
-    "modifiers": [
-      "Sin cebolla",
-      "Extra Cheddar (+$800)",
-      "Extra Bacon (+$900)"
-    ]
-  },
-  {
-    "id": "prod-3",
-    "name": "DOÑA BURGA",
-    "category": "Hamburguesas",
-    "price": 10000,
-    "emoji": "🥓",
-    "description": "Doble medallón, cheddar, cebolla caramelizada, bacon, mayonesa, ketchup y lactonesa.",
-    "modifiers": [
-      "Sin aderezo",
-      "sin cebolla",
-      "sin bacon",
-      "sin queso",
-      "con queso tybo",
-      "medallon extra ($4000)"
-    ]
-  },
-  {
-    "id": "prod-4",
-    "name": "COMPLETA",
-    "category": "Hamburguesas",
-    "price": 11000,
-    "emoji": "🍅",
-    "description": "Doble medallón, cheddar, lechuga, tomate, cebolla, jamón, huevo y aderezos.",
-    "modifiers": [
-      "sin aderezo",
-      "sin cebolla",
-      "sin tomate",
-      "sin lechuga",
-      "sin queso",
-      "con queso tybo."
-    ]
-  },
-  {
-    "id": "prod-5",
-    "name": "VEGGIE",
-    "category": "Hamburguesas",
-    "price": 10000,
-    "emoji": "🌱",
-    "description": "Medallón veggie, cheddar, tomate, lechuga, cebolla caramelizada y lactonesa.",
-    "modifiers": [
-      "Sin aderezo",
-      "sin cebolla",
-      "sin queso",
-      "con queso tybo."
-    ]
-  },
-  {
-    "id": "prod-1789950964816",
-    "name": "OKLAHOMA",
-    "category": "Hamburguesas",
-    "price": 10000,
-    "emoji": "🧅",
-    "description": "Doble smash, cheddar, cebolla finita prensada en la carne, kétchup y mostaza.",
-    "modifiers": [
-      "Sin aderezo",
-      "Sin cebolla",
-      "Extra Cheddar (+$3000)",
-      "Extra Medallon (+$4000)"
-    ]
-  },
-  {
-    "id": "prod-1789951049134",
-    "name": "CRISPY",
-    "category": "Hamburguesas",
-    "price": 10000,
-    "emoji": "🍔",
-    "description": "Doble medallón, cheddar, cebolla crispy, bacon y lactonesa.",
-    "modifiers": [
-      "Sin aderezo",
-      "medallon extra ($4000)"
     ]
   }
 ]
