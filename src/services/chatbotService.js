@@ -12,6 +12,88 @@ const BOT_SETTINGS_KEY = 'comandafast_bot_settings';
 const BOT_VARIABLES_KEY = 'comandafast_bot_variables';
 
 export const chatbotService = {
+  // --- GESTIÓN DE VARIABLES GLOBALES DEL BOT ---
+  getBotVariables() {
+    try {
+      const saved = localStorage.getItem(BOT_VARIABLES_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const map = new Map(parsed.map(v => [v.key, v]));
+          DEFAULT_BOT_VARIABLES.forEach(def => {
+            if (!map.has(def.key)) {
+              map.set(def.key, def);
+            }
+          });
+          return Array.from(map.values());
+        }
+      }
+    } catch (e) {
+      console.error('[chatbotService] Error al leer bot_variables:', e);
+    }
+    return DEFAULT_BOT_VARIABLES;
+  },
+
+  saveBotVariables(variables) {
+    try {
+      localStorage.setItem(BOT_VARIABLES_KEY, JSON.stringify(variables));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('comandafast:bot_variables_updated', { detail: variables }));
+      }
+      this.syncBotVariablesWithServer(variables);
+      return true;
+    } catch (e) {
+      console.error('[chatbotService] Error al guardar bot_variables:', e);
+      return false;
+    }
+  },
+
+  resetBotVariables() {
+    this.saveBotVariables(DEFAULT_BOT_VARIABLES);
+    return DEFAULT_BOT_VARIABLES;
+  },
+
+  getBotVariablesMap() {
+    const list = this.getBotVariables();
+    const map = {};
+    for (const v of list) {
+      if (v && v.key) {
+        map[v.key] = v.value !== undefined ? v.value : v.defaultValue;
+      }
+    }
+    return map;
+  },
+
+  async fetchServerBotVariables() {
+    try {
+      const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+      const res = await fetch(`http://${host}:3002/api/bot-variables`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.variables) && data.variables.length > 0) {
+          localStorage.setItem(BOT_VARIABLES_KEY, JSON.stringify(data.variables));
+          return data.variables;
+        }
+      }
+    } catch (e) {
+      // Offline fallback
+    }
+    return this.getBotVariables();
+  },
+
+  async syncBotVariablesWithServer(variables) {
+    try {
+      const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+      await fetch(`http://${host}:3002/api/bot-variables`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ variables })
+      });
+    } catch (e) {
+      // Live server might be offline
+    }
+  },
+
   // --- GESTIÓN DE FLUJOS PERSONALIZADOS Y CONDICIONES ---
   getCustomFlows() {
     try {
