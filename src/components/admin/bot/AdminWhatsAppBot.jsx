@@ -472,11 +472,11 @@ call npm run dev
         flexWrap: 'wrap',
         gap: '0.5rem'
       }}>
-        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+        <div className="scrollable-tabs-bar" style={{ gap: '0.4rem', flex: 1, paddingBottom: '2px' }}>
           <button
             type="button"
             className={`cat-pill-btn ${activeTab === 'test_lab' ? 'active' : ''}`}
-            style={{ height: '34px', padding: '0.4rem 0.85rem', gap: '6px' }}
+            style={{ height: '34px', padding: '0.4rem 0.85rem', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}
             onClick={() => setActiveTab('test_lab')}
           >
             <FlaskConical size={15} />
@@ -487,12 +487,7 @@ call npm run dev
           <button
             type="button"
             className={`cat-pill-btn ${activeTab === 'flows' ? 'active' : ''}`}
-            style={{
-              height: '34px',
-              padding: '0.4rem 0.85rem',
-              gap: '6px',
-              borderColor: activeTab === 'flows' ? 'var(--accent-amber)' : undefined
-            }}
+            style={{ height: '34px', padding: '0.4rem 0.85rem', gap: '6px', borderColor: activeTab === 'flows' ? 'var(--accent-amber)' : undefined, flexShrink: 0, whiteSpace: 'nowrap' }}
             onClick={() => setActiveTab('flows')}
           >
             <GitBranch size={15} style={{ color: 'var(--accent-amber)' }} />
@@ -513,12 +508,7 @@ call npm run dev
           <button
             type="button"
             className={`cat-pill-btn ${activeTab === 'variables' ? 'active' : ''}`}
-            style={{
-              height: '34px',
-              padding: '0.4rem 0.85rem',
-              gap: '6px',
-              borderColor: activeTab === 'variables' ? 'var(--accent-amber)' : undefined
-            }}
+            style={{ height: '34px', padding: '0.4rem 0.85rem', gap: '6px', borderColor: activeTab === 'variables' ? 'var(--accent-amber)' : undefined, flexShrink: 0, whiteSpace: 'nowrap' }}
             onClick={() => setActiveTab('variables')}
           >
             <Variable size={15} style={{ color: 'var(--accent-amber)' }} />
@@ -529,12 +519,7 @@ call npm run dev
           <button
             type="button"
             className={`cat-pill-btn ${activeTab === 'ai' ? 'active' : ''}`}
-            style={{
-              height: '34px',
-              padding: '0.4rem 0.85rem',
-              gap: '6px',
-              borderColor: activeTab === 'ai' ? 'var(--accent-purple, #a855f7)' : undefined
-            }}
+            style={{ height: '34px', padding: '0.4rem 0.85rem', gap: '6px', borderColor: activeTab === 'ai' ? 'var(--accent-purple, #a855f7)' : undefined, flexShrink: 0, whiteSpace: 'nowrap' }}
             onClick={() => setActiveTab('ai')}
           >
             <Sparkles size={15} style={{ color: '#a855f7' }} />
@@ -556,7 +541,7 @@ call npm run dev
           <button
             type="button"
             className={`cat-pill-btn ${activeTab === 'templates' ? 'active' : ''}`}
-            style={{ height: '34px', padding: '0.4rem 0.85rem', gap: '6px' }}
+            style={{ height: '34px', padding: '0.4rem 0.85rem', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}
             onClick={() => setActiveTab('templates')}
           >
             <Bot size={15} />
@@ -566,7 +551,7 @@ call npm run dev
           <button
             type="button"
             className={`cat-pill-btn ${activeTab === 'security' ? 'active' : ''}`}
-            style={{ height: '34px', padding: '0.4rem 0.85rem', gap: '6px' }}
+            style={{ height: '34px', padding: '0.4rem 0.85rem', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}
             onClick={() => setActiveTab('security')}
           >
             <ShieldCheck size={15} />
@@ -576,7 +561,7 @@ call npm run dev
           <button
             type="button"
             className={`cat-pill-btn ${activeTab === 'connection' ? 'active' : ''}`}
-            style={{ height: '34px', padding: '0.4rem 0.85rem', gap: '6px' }}
+            style={{ height: '34px', padding: '0.4rem 0.85rem', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}
             onClick={() => setActiveTab('connection')}
           >
             <Smartphone size={15} />

@@ -335,7 +335,7 @@ export default function AdminBotVariablesTab() {
             onClick={handleSaveAll}
           >
             {saveSuccess ? <Check size={16} /> : <Save size={16} />}
-            <span>{saveSuccess ? '¡Guardado con Éxito!' : 'Guardar Todo'}</span>
+            <span>{saveSuccess ? '¡Guardado con éxito!' : 'Guardar Todo'}</span>
           </button>
         </div>
       </div>
@@ -353,7 +353,7 @@ export default function AdminBotVariablesTab() {
         gap: '0.75rem'
       }}>
         {/* Category Pills */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+        <div className="scrollable-tabs-bar" style={{ alignItems: 'center', gap: '0.4rem', flex: 1, minWidth: '260px' }}>
           {BOT_VARIABLE_CATEGORIES.map(cat => {
             const count = categoryCounts[cat.id] || 0;
             const isActive = activeCategory === cat.id;
@@ -362,7 +362,7 @@ export default function AdminBotVariablesTab() {
                 key={cat.id}
                 type="button"
                 className={`cat-pill-btn ${isActive ? 'active' : ''}`}
-                style={{ height: '34px', padding: '0 0.85rem', fontSize: '0.8rem', gap: '6px' }}
+                style={{ height: '34px', padding: '0 0.85rem', fontSize: '0.8rem', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}
                 onClick={() => setActiveCategory(cat.id)}
               >
                 <span>{cat.emoji}</span>

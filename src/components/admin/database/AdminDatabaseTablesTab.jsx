@@ -426,12 +426,12 @@ export default function AdminDatabaseTablesTab() {
         </div>
 
         {/* SELECTOR DE TABLAS (CHIPS) */}
-        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+        <div className="scrollable-tabs-bar" style={{ gap: '8px', paddingBottom: '4px' }}>
           <button
             type="button"
             className={`cat-pill-btn ${activeTable === 'products' ? 'active' : ''}`}
             onClick={() => { setActiveTable('products'); setSearchQuery(''); }}
-            style={{ gap: '6px', fontSize: '0.82rem', padding: '6px 14px' }}
+            style={{ gap: '6px', fontSize: '0.82rem', padding: '6px 14px', flexShrink: 0, whiteSpace: 'nowrap' }}
           >
             <span>🍔 Productos & Menú</span>
             <span style={{ 
@@ -449,7 +449,7 @@ export default function AdminDatabaseTablesTab() {
             type="button"
             className={`cat-pill-btn ${activeTable === 'orders' ? 'active' : ''}`}
             onClick={() => { setActiveTable('orders'); setSearchQuery(''); }}
-            style={{ gap: '6px', fontSize: '0.82rem', padding: '6px 14px' }}
+            style={{ gap: '6px', fontSize: '0.82rem', padding: '6px 14px', flexShrink: 0, whiteSpace: 'nowrap' }}
           >
             <span>📋 Pedidos & Comandas</span>
             <span style={{ 
@@ -467,7 +467,7 @@ export default function AdminDatabaseTablesTab() {
             type="button"
             className={`cat-pill-btn ${activeTable === 'shifts' ? 'active' : ''}`}
             onClick={() => { setActiveTable('shifts'); setSearchQuery(''); }}
-            style={{ gap: '6px', fontSize: '0.82rem', padding: '6px 14px' }}
+            style={{ gap: '6px', fontSize: '0.82rem', padding: '6px 14px', flexShrink: 0, whiteSpace: 'nowrap' }}
           >
             <span>💵 Turnos de Caja</span>
             <span style={{ 
@@ -485,7 +485,7 @@ export default function AdminDatabaseTablesTab() {
             type="button"
             className={`cat-pill-btn ${activeTable === 'settings' ? 'active' : ''}`}
             onClick={() => { setActiveTable('settings'); setSearchQuery(''); }}
-            style={{ gap: '6px', fontSize: '0.82rem', padding: '6px 14px' }}
+            style={{ gap: '6px', fontSize: '0.82rem', padding: '6px 14px', flexShrink: 0, whiteSpace: 'nowrap' }}
           >
             <Store size={15} />
             <span>🏪 Configuración del Local</span>
@@ -552,12 +552,7 @@ export default function AdminDatabaseTablesTab() {
       {/* VISTA TABLA 1: PRODUCTOS                                  */}
       {/* ========================================================= */}
       {activeTable === 'products' && (
-        <div style={{
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-lg)',
-          overflow: 'hidden'
-        }}>
+        <div className="table-responsive-wrapper">
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
               <thead>
@@ -672,12 +667,7 @@ export default function AdminDatabaseTablesTab() {
       {/* VISTA TABLA 2: PEDIDOS & COMANDAS                          */}
       {/* ========================================================= */}
       {activeTable === 'orders' && (
-        <div style={{
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-lg)',
-          overflow: 'hidden'
-        }}>
+        <div className="table-responsive-wrapper">
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
               <thead>
@@ -787,12 +777,7 @@ export default function AdminDatabaseTablesTab() {
       {/* VISTA TABLA 3: TURNOS DE CAJA                             */}
       {/* ========================================================= */}
       {activeTable === 'shifts' && (
-        <div style={{
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-lg)',
-          overflow: 'hidden'
-        }}>
+        <div className="table-responsive-wrapper">
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
               <thead>

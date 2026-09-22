@@ -134,7 +134,7 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout })
         gap: '0.75rem'
       }}>
         {/* Date Filter Pills */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+        <div className="scrollable-tabs-bar" style={{ alignItems: 'center', gap: '0.4rem', flex: 1, minWidth: '280px' }}>
           <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)', marginRight: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <Calendar size={14} /> Período:
           </span>
@@ -170,11 +170,11 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout })
       </div>}
 
       {/* PORTAL NAVIGATION TABS */}
-      <div style={{ display: 'flex', gap: '0.4rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '4px', overflowX: 'auto' }}>
+      <div className="scrollable-tabs-bar" style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px' }}>
         <button
           type="button"
           className={`cat-pill-btn ${activeTab === 'kpis' ? 'active' : ''}`}
-          style={{ height: '38px', padding: '0.5rem 1rem', gap: '6px' }}
+          style={{ height: '38px', padding: '0.45rem 0.95rem', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}
           onClick={() => setActiveTab('kpis')}
         >
           <BarChart3 size={16} />
@@ -184,7 +184,7 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout })
         <button
           type="button"
           className={`cat-pill-btn ${activeTab === 'shifts' ? 'active' : ''}`}
-          style={{ height: '38px', padding: '0.5rem 1rem', gap: '6px' }}
+          style={{ height: '38px', padding: '0.45rem 0.95rem', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}
           onClick={() => setActiveTab('shifts')}
         >
           <DollarSign size={16} />
@@ -194,7 +194,7 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout })
         <button
           type="button"
           className={`cat-pill-btn ${activeTab === 'security' ? 'active' : ''}`}
-          style={{ height: '38px', padding: '0.5rem 1rem', gap: '6px' }}
+          style={{ height: '38px', padding: '0.45rem 0.95rem', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}
           onClick={() => setActiveTab('security')}
         >
           <ShieldAlert size={16} />
@@ -204,7 +204,7 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout })
         <button
           type="button"
           className={`cat-pill-btn ${activeTab === 'menu' ? 'active' : ''}`}
-          style={{ height: '38px', padding: '0.5rem 1rem', gap: '6px' }}
+          style={{ height: '38px', padding: '0.45rem 0.95rem', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}
           onClick={() => setActiveTab('menu')}
         >
           <Sparkles size={16} />
@@ -214,7 +214,7 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout })
         <button
           type="button"
           className={`cat-pill-btn ${activeTab === 'bot' ? 'active' : ''}`}
-          style={{ height: '38px', padding: '0.5rem 1rem', gap: '6px' }}
+          style={{ height: '38px', padding: '0.45rem 0.95rem', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}
           onClick={() => setActiveTab('bot')}
         >
           <Bot size={16} />
@@ -224,7 +224,7 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout })
         <button
           type="button"
           className={`cat-pill-btn ${activeTab === 'database' ? 'active' : ''}`}
-          style={{ height: '38px', padding: '0.5rem 1rem', gap: '6px' }}
+          style={{ height: '38px', padding: '0.45rem 0.95rem', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}
           onClick={() => setActiveTab('database')}
         >
           <Database size={16} />
@@ -234,7 +234,7 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout })
         <button
           type="button"
           className={`cat-pill-btn ${activeTab === 'settings' ? 'active' : ''}`}
-          style={{ height: '38px', padding: '0.5rem 1rem', gap: '6px' }}
+          style={{ height: '38px', padding: '0.45rem 0.95rem', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}
           onClick={() => setActiveTab('settings')}
         >
           <ShieldCheck size={16} />
