@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { storageService } from '../../services/storageService';
-import { Search, ShoppingBag, Plus, Trash2, Send, MessageSquare, Utensils, DollarSign, Sparkles } from 'lucide-react';
+import { Search, ShoppingBag, Plus, Trash2, Send, MessageSquare, Utensils, DollarSign, Sparkles, Image as ImageIcon } from 'lucide-react';
 import ItemModifierModal from './ItemModifierModal';
 import PaymentModal from './PaymentModal';
 import WhatsAppImportModal from './WhatsAppImportModal';
@@ -16,6 +16,26 @@ export default function FastOrderPad({
   const [selectedProductForModal, setSelectedProductForModal] = useState(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isWhatsAppImportOpen, setIsWhatsAppImportOpen] = useState(false);
+
+  // Toggle para ver fotos de productos en Mostrador (por defecto activado)
+  const [showPhotos, setShowPhotos] = useState(() => {
+    try {
+      const saved = localStorage.getItem('comandafast_pos_show_photos');
+      return saved !== null ? saved === 'true' : true;
+    } catch (_) {
+      return true;
+    }
+  });
+
+  const toggleShowPhotos = () => {
+    setShowPhotos(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('comandafast_pos_show_photos', String(next));
+      } catch (_) {}
+      return next;
+    });
+  };
 
   // Mobile tab state ('catalog' or 'cart') - only affects mobile screens <= 768px
   const [mobileTab, setMobileTab] = useState('catalog');
@@ -142,7 +162,15 @@ export default function FastOrderPad({
       phone: parsed.customer?.phone || '',
       notes: ''
     });
-    setCartItems(parsed.items.map(it => ({ ...it, id: 'item-' + Date.now() + '-' + Math.random() })));
+    setCartItems(parsed.items.map(it => {
+      const match = products.find(p => p.id === it.productId);
+      return { 
+        ...it, 
+        image: it.image || match?.image || '',
+        emoji: it.emoji || match?.emoji || '🍔',
+        id: 'item-' + Date.now() + '-' + Math.random() 
+      };
+    }));
   };
 
   const handleKickDrawer = () => {
@@ -187,6 +215,17 @@ export default function FastOrderPad({
 
             <button 
               type="button" 
+              className={`cat-pill-btn ${showPhotos ? 'active' : ''}`}
+              onClick={toggleShowPhotos}
+              title={showPhotos ? 'Ocultar fotos (modo compacto)' : 'Mostrar fotos de productos'}
+              style={{ gap: '6px' }}
+            >
+              <ImageIcon size={16} />
+              <span>{showPhotos ? 'Fotos' : 'Sin fotos'}</span>
+            </button>
+
+            <button 
+              type="button" 
               className="cat-pill-btn"
               style={{ background: 'linear-gradient(135deg, #15803d, #16a34a)', color: '#fff', border: 'none', gap: '6px' }}
               onClick={() => setIsWhatsAppImportOpen(true)}
@@ -221,11 +260,39 @@ export default function FastOrderPad({
           {filteredProducts.map(prod => (
             <div 
               key={prod.id} 
-              className="product-card"
+              className={`product-card ${!showPhotos ? 'compact' : ''}`}
               onClick={() => handleAddDirect(prod)}
             >
               <div>
-                <div className="product-emoji-icon">{prod.emoji || '🍔'}</div>
+                {showPhotos ? (
+                  <div className="product-card-media">
+                    {prod.image ? (
+                      <img 
+                        src={prod.image} 
+                        alt={prod.name} 
+                        className="product-card-img"
+                        loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const fb = e.currentTarget.parentElement?.querySelector('.product-card-fallback');
+                          if (fb) fb.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <div 
+                      className="product-card-fallback"
+                      style={{ display: prod.image ? 'none' : 'flex' }}
+                    >
+                      <span className="product-emoji-icon">{prod.emoji || '🍔'}</span>
+                    </div>
+                    {prod.emoji && prod.image && (
+                      <span className="product-card-emoji-badge">{prod.emoji}</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="product-emoji-icon">{prod.emoji || '🍔'}</div>
+                )}
+
                 <div className="product-name">{prod.name}</div>
                 <div className="product-desc">{prod.description}</div>
               </div>
@@ -382,7 +449,21 @@ export default function FastOrderPad({
             cartItems.map((item, idx) => (
               <div key={item.id || idx} className="cart-item-row">
                 <div className="cart-item-header">
-                  <span className="cart-item-title">{item.name}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                    {item.image ? (
+                      <img 
+                        src={item.image} 
+                        alt={item.name} 
+                        className="cart-item-thumb"
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      />
+                    ) : item.emoji ? (
+                      <span className="cart-item-thumb-emoji">{item.emoji}</span>
+                    ) : null}
+                    <span className="cart-item-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {item.name}
+                    </span>
+                  </div>
                   <span className="cart-item-price">${(item.unitPrice * item.qty).toLocaleString('es-AR')}</span>
                 </div>
 

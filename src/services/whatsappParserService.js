@@ -80,7 +80,9 @@ export const whatsappParserService = {
               unitPrice: prod.price,
               qty: Math.max(1, qty),
               modifiers,
-              notes: ''
+              notes: '',
+              image: prod.image || '',
+              emoji: prod.emoji || '🍔'
             });
           }
         }

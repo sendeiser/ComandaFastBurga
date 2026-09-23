@@ -23,7 +23,9 @@ export default function ItemModifierModal({ product, onAddToCart, onClose }) {
       unitPrice: product.price,
       qty: qty,
       modifiers: selectedModifiers,
-      notes: notes.trim()
+      notes: notes.trim(),
+      image: product.image,
+      emoji: product.emoji
     });
     onClose();
   };
@@ -38,6 +40,15 @@ export default function ItemModifierModal({ product, onAddToCart, onClose }) {
           </div>
           <button className="btn-close-modal" onClick={onClose}><X size={20} /></button>
         </div>
+
+        {product.image && (
+          <img 
+            src={product.image} 
+            alt={product.name} 
+            className="modifier-modal-header-img"
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
+        )}
 
         <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
           {product.description}
