@@ -200,7 +200,9 @@ export const supabaseSync = {
       });
       if (res.ok) {
         const rows = await res.json();
-        if (Array.isArray(rows)) return rows.map(mapOrderFromDB);
+        if (Array.isArray(rows)) {
+          return rows.map(mapOrderFromDB).filter(o => o && !storageService.isOrderDeleted(o.id));
+        }
       }
     } catch (_) {}
     return [];
@@ -279,14 +281,16 @@ export const supabaseSync = {
   },
 
   async deleteOrder(orderId) {
-    if (!this.isConfigured()) return;
+    if (!this.isConfigured() || !orderId) return false;
     try {
-      await fetch(this._url('orders', `id=eq.${orderId}`), {
+      const res = await fetch(this._url('orders', `id=eq.${orderId}`), {
         method: 'DELETE',
-        headers: this._headers()
+        headers: this._headers({ 'Prefer': 'return=representation' })
       });
+      return res.ok;
     } catch (e) {
       console.warn('[Supabase] deleteOrder error:', e);
+      return false;
     }
   },
 
@@ -655,8 +659,9 @@ export const supabaseSync = {
           if (Array.isArray(orders) && orders.length > 0) {
             lastChecked = new Date().toISOString();
             orders.forEach(o => {
-              if (typeof onNewOrder === 'function') {
-                onNewOrder(mapOrderFromDB(o));
+              const mapped = mapOrderFromDB(o);
+              if (mapped && !storageService.isOrderDeleted(mapped.id) && typeof onNewOrder === 'function') {
+                onNewOrder(mapped);
               }
             });
           }

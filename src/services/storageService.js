@@ -151,6 +151,7 @@ const KEYS = {
   CURRENT_CASHIER: 'comandafast_current_cashier',
   PRODUCTS: 'comandafast_products',
   ORDERS: 'comandafast_orders',
+  DELETED_ORDER_IDS: 'comandafast_deleted_order_ids',
   CASH_SHIFT: 'comandafast_cash_shift',
   CASH_SHIFTS_HISTORY: 'comandafast_cash_shifts_history',
   CANCELLED_ORDERS: 'comandafast_cancelled_orders',
@@ -240,7 +241,18 @@ export const storageService = {
 
   getOrders() {
     const raw = localStorage.getItem(KEYS.ORDERS);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      const deleted = this.getDeletedOrderIds();
+      if (deleted.size > 0) {
+        return parsed.filter(o => o && o.id && !deleted.has(String(o.id)));
+      }
+      return parsed;
+    } catch (_) {
+      return [];
+    }
   },
 
   getNextOrderNumber() {
@@ -296,6 +308,10 @@ export const storageService = {
   },
 
   saveOrder(order) {
+    if (!order || !order.id) return null;
+    if (this.isOrderDeleted(order.id)) {
+      return null;
+    }
     const orders = this.getOrders();
     const id = order.id || 'ord-' + Date.now();
     const idx = orders.findIndex(o => o.id === id);
@@ -330,9 +346,11 @@ export const storageService = {
 
   saveOrdersBatch(batch) {
     if (!Array.isArray(batch) || batch.length === 0) return this.getOrders();
+    const deleted = this.getDeletedOrderIds();
     let orders = this.getOrders();
     for (const ord of batch) {
       if (!ord || !ord.id) continue;
+      if (deleted.has(String(ord.id))) continue;
       const idx = orders.findIndex(o => o.id === ord.id);
       if (idx !== -1) {
         orders[idx] = {
@@ -379,10 +397,41 @@ export const storageService = {
     return null;
   },
 
+  getDeletedOrderIds() {
+    try {
+      const raw = localStorage.getItem(KEYS.DELETED_ORDER_IDS);
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch (_) {
+      return new Set();
+    }
+  },
+
+  isOrderDeleted(orderId) {
+    if (!orderId) return false;
+    const deleted = this.getDeletedOrderIds();
+    return deleted.has(String(orderId));
+  },
+
+  markOrderDeleted(orderId) {
+    if (!orderId) return;
+    try {
+      const deleted = this.getDeletedOrderIds();
+      deleted.add(String(orderId));
+      const arr = Array.from(deleted);
+      const trimmed = arr.length > 500 ? arr.slice(-500) : arr;
+      localStorage.setItem(KEYS.DELETED_ORDER_IDS, JSON.stringify(trimmed));
+    } catch (_) {}
+  },
+
   deleteOrder(orderId) {
+    if (!orderId) return;
+    this.markOrderDeleted(orderId);
     let orders = this.getOrders();
-    orders = orders.filter(o => o.id !== orderId);
+    orders = orders.filter(o => String(o.id) !== String(orderId));
     localStorage.setItem(KEYS.ORDERS, JSON.stringify(orders));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('comandafast:orders_updated', { detail: { orders } }));
+    }
   },
 
   // CASH SHIFTS (Control de Caja)

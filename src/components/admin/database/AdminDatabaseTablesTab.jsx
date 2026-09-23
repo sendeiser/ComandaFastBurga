@@ -72,7 +72,8 @@ export default function AdminDatabaseTablesTab() {
         setProducts(cloudProds);
       }
       if (cloudOrders && cloudOrders.length > 0) {
-        storageService.saveOrdersBatch(cloudOrders);
+        const validOrders = cloudOrders.filter(o => o && !storageService.isOrderDeleted(o.id));
+        storageService.saveOrdersBatch(validOrders);
         setOrders(storageService.getOrders());
       }
       if (cloudShifts && cloudShifts.length > 0) {
@@ -332,25 +333,30 @@ export default function AdminDatabaseTablesTab() {
     }
   };
 
-  const handleDeleteConfirmed = () => {
+  const handleDeleteConfirmed = async () => {
     if (!itemToDelete) return;
     try {
+      const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
       if (activeTable === 'products') {
         storageService.deleteProduct(itemToDelete.id);
-        supabaseSync.deleteProduct(itemToDelete.id);
+        await supabaseSync.deleteProduct(itemToDelete.id);
         chatbotService.syncWithBaileysServer().catch(() => {});
         showToast(`🗑️ Producto eliminado de la base de datos y Supabase.`);
       } else if (activeTable === 'orders') {
         storageService.deleteOrder(itemToDelete.id);
-        supabaseSync.deleteOrder(itemToDelete.id);
-        showToast(`🗑️ Comanda eliminada de BD y Supabase.`);
+        setOrders(storageService.getOrders());
+        await Promise.allSettled([
+          supabaseSync.deleteOrder(itemToDelete.id),
+          fetch(`http://${botHost}:3002/api/orders/${itemToDelete.id}`, { method: 'DELETE' }).catch(() => {})
+        ]);
+        showToast(`🗑️ Comanda eliminada permanentemente de BD, Supabase y servidor.`);
       } else if (activeTable === 'shifts') {
         storageService.deleteCashShiftHistoryItem(itemToDelete.id);
-        supabaseSync.deleteCashShift(itemToDelete.id);
+        await supabaseSync.deleteCashShift(itemToDelete.id);
         showToast(`🗑️ Registro de turno eliminado de BD y Supabase.`);
       }
       setItemToDelete(null);
-      loadAllData();
+      await loadAllData();
     } catch (err) {
       showToast('❌ Error al eliminar el registro.', 'error');
     }

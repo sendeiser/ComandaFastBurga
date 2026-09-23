@@ -129,7 +129,8 @@ export default function App() {
       }
 
       if (cloudOrders && cloudOrders.length > 0) {
-        storageService.saveOrdersBatch(cloudOrders);
+        const validOrders = cloudOrders.filter(o => o && !storageService.isOrderDeleted(o.id));
+        storageService.saveOrdersBatch(validOrders);
         setOrders(storageService.getOrders());
       }
 
@@ -244,10 +245,22 @@ export default function App() {
         const mergedMap = new Map();
 
         for (const ord of localOrders) {
+          if (!ord || !ord.id) continue;
+          if (storageService.isOrderDeleted(ord.id)) {
+            // Asegurar que el servidor local lo elimine si todavía lo retenía
+            fetch(`http://${botHost}:3002/api/orders/${ord.id}`, { method: 'DELETE' }).catch(() => {});
+            continue;
+          }
           mergedMap.set(ord.id, { ...ord, _source: 'local' });
         }
 
         for (const cord of cloudOrders) {
+          if (!cord || !cord.id) continue;
+          if (storageService.isOrderDeleted(cord.id)) {
+            // Asegurar que Supabase lo elimine si todavía lo devolvió
+            supabaseSync.deleteOrder(cord.id).catch(() => {});
+            continue;
+          }
           const existing = mergedMap.get(cord.id);
           if (!existing) {
             mergedMap.set(cord.id, { ...cord, _source: 'cloud' });
@@ -332,7 +345,7 @@ export default function App() {
           if (supabaseSync.isConfigured() && cloudOrders.length > 0) {
             const cloudIds = new Set(cloudOrders.map(c => c.id));
             const localList = storageService.getOrders();
-            const missingInCloud = localList.filter(o => o && o.id && !cloudIds.has(o.id));
+            const missingInCloud = localList.filter(o => o && o.id && !cloudIds.has(o.id) && !storageService.isOrderDeleted(o.id));
             if (missingInCloud.length > 0) {
               supabaseSync.pushOrdersBatch(missingInCloud.slice(0, 30)).catch(() => {});
             }
@@ -483,15 +496,15 @@ export default function App() {
     }
   };
 
-  const handleDeleteOrder = (orderId) => {
+  const handleDeleteOrder = async (orderId) => {
     storageService.deleteOrder(orderId);
     setOrders(storageService.getOrders());
-    // Eliminar permanentemente de Supabase Cloud
-    supabaseSync.deleteOrder(orderId);
-    try {
-      const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
-      fetch(`http://${botHost}:3002/api/orders/${orderId}`, { method: 'DELETE' }).catch(() => {});
-    } catch (_) {}
+    // Eliminar permanentemente de Supabase Cloud y del servidor local de forma segura
+    const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+    await Promise.allSettled([
+      supabaseSync.deleteOrder(orderId),
+      fetch(`http://${botHost}:3002/api/orders/${orderId}`, { method: 'DELETE' }).catch(() => {})
+    ]);
   };
 
   const handleSaveProducts = (newProducts) => {
