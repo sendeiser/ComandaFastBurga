@@ -68,7 +68,7 @@ const DEFAULT_PRODUCTS = [
     category: 'Agregados',
     price: 3500,
     emoji: '🍟',
-    image: 'https://images.unsplash.com/photo-1576107232684-1279f3908594?w=800&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=800&auto=format&fit=crop&q=80',
     description: 'Porción grande de papas bastón crocantes',
     modifiers: ['Sin sal', 'Con provenzal']
   },
@@ -118,7 +118,7 @@ const DEFAULT_PRODUCTS = [
     category: 'Bebidas',
     price: 3200,
     emoji: '🍺',
-    image: 'https://images.unsplash.com/photo-1608270191763-71860d5b7808?w=800&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1535958636474-b021ee887b13?w=800&auto=format&fit=crop&q=80',
     description: 'Lata de cerveza artesanal rubia o IPA',
     modifiers: ['Muy fría']
   },

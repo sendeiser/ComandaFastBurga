@@ -35,3 +35,9 @@ pnpm-debug.log*
 data/baileys_auth/
 
 data/ai_config.json
+
+# Tool / Editor skill mirrors
+.claude/
+.trae/
+.windsurf/
+skills/

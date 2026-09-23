@@ -224,33 +224,35 @@ export default function FastOrderPad({
               />
             </div>
 
-            <button 
-              type="button" 
-              className={`cat-pill-btn ${showPhotos ? 'active' : ''}`}
-              onClick={toggleShowPhotos}
-              title={showPhotos ? 'Ocultar fotos (modo compacto)' : 'Mostrar fotos de productos'}
-              style={{ gap: '6px' }}
-            >
-              <ImageIcon size={16} />
-              <span>{showPhotos ? 'Fotos' : 'Sin fotos'}</span>
-            </button>
+            <div className="search-filter-actions">
+              <button 
+                type="button" 
+                className={`cat-pill-btn ${showPhotos ? 'active' : ''}`}
+                onClick={toggleShowPhotos}
+                title={showPhotos ? 'Ocultar fotos (modo compacto)' : 'Mostrar fotos de productos'}
+                style={{ gap: '6px' }}
+              >
+                <ImageIcon size={16} />
+                <span>{showPhotos ? 'Fotos' : 'Sin fotos'}</span>
+              </button>
 
-            <button 
-              type="button" 
-              className="cat-pill-btn"
-              style={{ background: 'linear-gradient(135deg, #15803d, #16a34a)', color: '#fff', border: 'none', gap: '6px' }}
-              onClick={() => {
-                if (!isCashOpen) {
-                  onOpenCashModal?.();
-                  return;
-                }
-                setIsWhatsAppImportOpen(true);
-              }}
-              title="Pegar y parsear texto de WhatsApp"
-            >
-              <Sparkles size={16} />
-              <span>Pegar WhatsApp</span>
-            </button>
+              <button 
+                type="button" 
+                className="cat-pill-btn"
+                style={{ background: 'linear-gradient(135deg, #15803d, #16a34a)', color: '#fff', border: 'none', gap: '6px' }}
+                onClick={() => {
+                  if (!isCashOpen) {
+                    onOpenCashModal?.();
+                    return;
+                  }
+                  setIsWhatsAppImportOpen(true);
+                }}
+                title="Pegar y parsear texto de WhatsApp"
+              >
+                <Sparkles size={16} />
+                <span>Pegar WhatsApp</span>
+              </button>
+            </div>
           </div>
 
           {/* Category Filter Pills */}
@@ -387,7 +389,8 @@ export default function FastOrderPad({
               onClick={() => setChannel('whatsapp')}
             >
               <MessageSquare size={16} />
-              <span>WhatsApp / Delivery</span>
+              <span className="channel-label-desktop">WhatsApp / Delivery</span>
+              <span className="channel-label-mobile">Delivery</span>
             </button>
 
             <button 
@@ -405,7 +408,8 @@ export default function FastOrderPad({
               onClick={() => setChannel('mesa')}
             >
               <Utensils size={16} />
-              <span>Mesa Local</span>
+              <span className="channel-label-desktop">Mesa Local</span>
+              <span className="channel-label-mobile">Mesa</span>
             </button>
           </div>
 

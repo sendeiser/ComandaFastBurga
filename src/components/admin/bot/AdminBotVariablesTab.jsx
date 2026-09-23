@@ -668,7 +668,6 @@ export default function AdminBotVariablesTab() {
           right: 0,
           bottom: 0,
           background: 'rgba(0, 0, 0, 0.75)',
-          backdropFilter: 'blur(4px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

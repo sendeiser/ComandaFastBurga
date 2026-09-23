@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   Database, Table, Upload, Search, Plus, Edit2, Trash2, Download, RefreshCw, 
   CheckCircle2, AlertTriangle, X, Save, Eye, DollarSign, ShoppingBag, 
@@ -504,8 +504,7 @@ export default function AdminDatabaseTablesTab() {
           alignItems: 'center',
           gap: '8px',
           fontWeight: 700,
-          fontSize: '0.85rem',
-          animation: 'fade-in 0.2s ease'
+          fontSize: '0.85rem'
         }}>
           {feedbackMsg.type === 'success' ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
           <span>{feedbackMsg.text}</span>
@@ -1244,8 +1243,7 @@ export default function AdminDatabaseTablesTab() {
         <div style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(0,0,0,0.65)',
-          backdropFilter: 'blur(3px)',
+          background: 'rgba(0,0,0,0.75)',
           zIndex: 999,
           display: 'flex',
           alignItems: 'center',
@@ -1671,8 +1669,7 @@ export default function AdminDatabaseTablesTab() {
         <div style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(0,0,0,0.65)',
-          backdropFilter: 'blur(3px)',
+          background: 'rgba(0,0,0,0.75)',
           zIndex: 1000,
           display: 'flex',
           alignItems: 'center',

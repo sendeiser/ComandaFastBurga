@@ -247,8 +247,7 @@ export default function AdminBotFlowsTab({ flows = [], onSaveFlows, onTestInLab 
           gap: '8px',
           fontSize: '0.88rem',
           fontWeight: 800,
-          zIndex: 9999,
-          animation: 'fadeIn 0.2s ease-out'
+          zIndex: 9999
         }}>
           <CheckCircle2 size={18} />
           <span>{notification.message}</span>
@@ -714,13 +713,11 @@ export default function AdminBotFlowsTab({ flows = [], onSaveFlows, onTestInLab 
           position: 'fixed',
           inset: 0,
           background: 'rgba(0, 0, 0, 0.78)',
-          backdropFilter: 'blur(5px)',
           zIndex: 9999,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '1rem',
-          animation: 'fadeIn 0.2s ease-out'
+          padding: '1rem'
         }}>
           <div style={{
             background: 'var(--bg-card)',

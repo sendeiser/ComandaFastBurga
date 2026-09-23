@@ -41,6 +41,7 @@ export default function Header({
   };
 
   return (
+    <>
     <header className="top-header">
       <div className="brand-section">
         <div className="brand-logo-icon">
@@ -54,7 +55,7 @@ export default function Header({
         </div>
       </div>
 
-      <nav className="nav-tabs">
+      <nav className="nav-tabs desktop-nav-tabs">
         <button 
           className={`nav-tab-btn ${currentTab === 'pos' ? 'active' : ''}`}
           onClick={() => setCurrentTab('pos')}
@@ -99,20 +100,22 @@ export default function Header({
         {/* Cashier Badge & Logout */}
         {currentCashier && (
           <div 
+            className="tactile-btn"
             style={{ 
               display: 'flex', 
               alignItems: 'center', 
               gap: '6px',
-              background: 'var(--bg-input)',
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))',
               border: '1px solid var(--border-subtle)',
               borderRadius: 'var(--radius-full)',
               padding: '2px 8px 2px 10px',
-              height: '34px'
+              height: '34px',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
             }}
             title={`Cajero conectado: ${currentCashier.name} (@${currentCashier.username})`}
           >
-            <User size={15} style={{ color: 'var(--accent-amber)' }} />
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <User size={15} style={{ color: 'var(--accent-amber)', flexShrink: 0 }} />
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', maxWidth: '95px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {currentCashier.name}
             </span>
             <button
@@ -123,10 +126,12 @@ export default function Header({
                 border: 'none',
                 color: 'var(--text-muted)',
                 cursor: 'pointer',
-                padding: '2px 4px',
+                padding: '3px 4px',
                 borderRadius: 'var(--radius-sm)',
                 display: 'flex',
-                alignItems: 'center'
+                alignItems: 'center',
+                minWidth: '22px',
+                minHeight: '22px'
               }}
               title="Cerrar sesión de cajero"
             >
@@ -203,5 +208,50 @@ export default function Header({
         </button>
       </div>
     </header>
+
+    {/* MOBILE BOTTOM NAVIGATION BAR */}
+    <nav className="mobile-bottom-nav">
+      <button 
+        type="button"
+        className={`mobile-nav-item ${currentTab === 'pos' ? 'active' : ''}`}
+        onClick={() => setCurrentTab('pos')}
+      >
+        <ShoppingCart size={19} />
+        <span>Mostrador</span>
+      </button>
+
+      <button 
+        type="button"
+        className={`mobile-nav-item ${currentTab === 'kds' ? 'active' : ''}`}
+        onClick={() => setCurrentTab('kds')}
+      >
+        <div className="mobile-nav-icon-container">
+          <ChefHat size={19} />
+          {pendingKitchenCount > 0 && (
+            <span className="mobile-nav-badge">{pendingKitchenCount}</span>
+          )}
+        </div>
+        <span>Cocina</span>
+      </button>
+
+      <button 
+        type="button"
+        className={`mobile-nav-item ${currentTab === 'history' ? 'active' : ''}`}
+        onClick={() => setCurrentTab('history')}
+      >
+        <History size={19} />
+        <span>Historial</span>
+      </button>
+
+      <button 
+        type="button"
+        className={`mobile-nav-item ${currentTab === 'menu' ? 'active' : ''}`}
+        onClick={() => setCurrentTab('menu')}
+      >
+        <UtensilsCrossed size={19} />
+        <span>Menú</span>
+      </button>
+    </nav>
+    </>
   );
 }

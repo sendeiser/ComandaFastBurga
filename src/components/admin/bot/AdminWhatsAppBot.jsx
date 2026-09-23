@@ -637,17 +637,17 @@ call npm run dev
 
       {/* TAB CONTENT: TEMPLATES STUDIO */}
       {activeTab === 'templates' && (
-        <div style={{
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-lg)',
-          padding: '1rem',
-          display: 'grid',
-          gridTemplateColumns: '320px 1fr',
-          gap: '1rem',
-          flex: 1,
-          minHeight: '520px'
-        }}>
+        <div 
+          className="bot-studio-grid"
+          style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1rem',
+            flex: 1,
+            minHeight: '520px'
+          }}
+        >
           {/* LEFT: NODES LIST */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
             {/* Category Filter */}
@@ -1059,7 +1059,7 @@ call npm run dev
           </div>
 
           {/* GRID: CONFIGURACIÓN Y PROMPT */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(340px, 420px) 1fr', gap: '1.25rem', alignItems: 'start' }}>
+          <div className="bot-connection-grid">
             {/* LEFT: API KEY & MODEL SETTINGS */}
             <div style={{
               background: 'var(--bg-card)',
@@ -1273,16 +1273,15 @@ call npm run dev
 
       {/* TAB CONTENT: REAL WHATSAPP CONNECTION */}
       {activeTab === 'connection' && (
-        <div style={{
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-lg)',
-          padding: '1.25rem',
-          display: 'grid',
-          gridTemplateColumns: '360px 1fr',
-          gap: '1.5rem',
-          alignItems: 'start'
-        }}>
+        <div 
+          className="bot-qr-grid"
+          style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1.25rem'
+          }}
+        >
           {/* QR CODE BOX */}
           <div style={{
             background: 'var(--bg-main)',

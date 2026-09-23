@@ -331,8 +331,7 @@ export default function AdminChatbotLab() {
           fontWeight: 800,
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
-          animation: 'slideIn 0.2s ease-out'
+          gap: '8px'
         }}>
           <CheckCircle2 size={18} />
           <span>{injectedAlert}</span>
