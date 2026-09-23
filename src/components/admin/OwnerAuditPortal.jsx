@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { ShieldCheck, Bot, BarChart3, DollarSign, ShieldAlert, Sparkles, LogOut, ArrowLeft, Download, Calendar, Printer , Database} from 'lucide-react';
+import { ShieldCheck, Bot, BarChart3, DollarSign, ShieldAlert, Sparkles, LogOut, ArrowLeft, Download, Calendar, Printer, Database, Smartphone } from 'lucide-react';
 import AuditKpisTab from './AuditKpisTab';
 import AuditCashShiftsTab from './AuditCashShiftsTab';
 import AuditSecurityTab from './AuditSecurityTab';
@@ -14,7 +14,13 @@ import { authService } from '../../services/authService';
 
 export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout }) {
   const portalRef = useRef(null);
-  const [activeTab, setActiveTab] = useState('kpis'); // 'kpis' | 'shifts' | 'security' | 'menu' | 'settings'
+  const [activeTab, setActiveTab] = useState('kpis'); // 'kpis' | 'shifts' | 'security' | 'menu' | 'settings' | 'bot' | 'database'
+  const [botSubTab, setBotSubTab] = useState('connection'); // 'connection' | 'security' | 'templates' | 'flows'
+
+  const handleOpenBot = (subTab = 'connection') => {
+    setBotSubTab(subTab);
+    setActiveTab('bot');
+  };
 
   // Al cambiar de pestaña, asegurar que la vista comience siempre arriba sin saltos
   useEffect(() => {
@@ -22,7 +28,9 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout })
       portalRef.current.scrollTop = 0;
     }
     window.scrollTo(0, 0);
-  }, [activeTab]);  const [rangeType, setRangeType] = useState('today'); // 'today' | 'yesterday' | 'week' | 'month' | 'all'
+  }, [activeTab]);
+
+  const [rangeType, setRangeType] = useState('today'); // 'today' | 'yesterday' | 'week' | 'month' | 'all'
 
   // Turnos históricos
   const [shifts, setShifts] = React.useState(() => storageService.getCashShiftsHistory());
@@ -118,7 +126,49 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout })
         </div>
 
         {/* Action Buttons */}
-        <div className="executive-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div className="executive-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="qty-btn tactile-btn"
+            style={{ 
+              width: 'auto', 
+              padding: '0.45rem 0.85rem', 
+              fontSize: '0.82rem', 
+              gap: '6px', 
+              minHeight: '38px',
+              color: '#059669',
+              background: 'rgba(16, 185, 129, 0.08)',
+              borderColor: 'rgba(16, 185, 129, 0.35)',
+              fontWeight: 800
+            }}
+            onClick={() => handleOpenBot('connection')}
+            title="Conexión y Estado de WhatsApp Web"
+          >
+            <Smartphone size={16} />
+            <span>Conexión Bot</span>
+          </button>
+
+          <button
+            type="button"
+            className="qty-btn tactile-btn"
+            style={{ 
+              width: 'auto', 
+              padding: '0.45rem 0.85rem', 
+              fontSize: '0.82rem', 
+              gap: '6px', 
+              minHeight: '38px',
+              color: '#d97706',
+              background: 'rgba(245, 158, 11, 0.08)',
+              borderColor: 'rgba(245, 158, 11, 0.35)',
+              fontWeight: 800
+            }}
+            onClick={() => handleOpenBot('security')}
+            title="Seguridad, Escudo Anti-Baneo y Filtro Anti-Spam"
+          >
+            <ShieldCheck size={16} />
+            <span>Seguridad & Anti-Spam</span>
+          </button>
+
           <button
             type="button"
             className="qty-btn tactile-btn"
@@ -272,7 +322,7 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout })
           onClick={() => setActiveTab('bot')}
         >
           <Bot size={16} />
-          <span>Bot WhatsApp & Lab</span>
+          <span>Bot WhatsApp</span>
         </button>
 
         <button
@@ -298,11 +348,11 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout })
 
       {/* TAB CONTENTS */}
       <div style={{ flex: 1 }}>
-        {activeTab === 'kpis' && <AuditKpisTab kpis={kpis} />}
+        {activeTab === 'kpis' && <AuditKpisTab kpis={kpis} onOpenBot={handleOpenBot} />}
         {activeTab === 'shifts' && <AuditCashShiftsTab shifts={shifts} onExportCsv={handleExportShifts} />}
         {activeTab === 'security' && <AuditSecurityTab cancelledOrders={cancelledOrders} orders={orders} />}
         {activeTab === 'menu' && <AuditMenuAnalytics analytics={productAnalytics} />}
-        {activeTab === 'bot' && <AdminWhatsAppBot />}
+        {activeTab === 'bot' && <AdminWhatsAppBot initialTab={botSubTab} />}
         {activeTab === 'database' && <AdminDatabaseTablesTab />}
         {activeTab === 'settings' && <AuditSecuritySettings />}
       </div>

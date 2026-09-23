@@ -415,16 +415,63 @@ function getBotVariablesMap() {
   return map;
 }
 
+const DEFAULT_SERVER_TEMPLATES = {
+  template_order_preparing: `👨‍🍳🔥 *¡Buenas noticias {cliente}! Tu pedido #{pedido_id} ya está en la plancha.*
+
+Nuestros cocineros están preparando tus hamburguesas con la carne recién smashada y el cheddar fundido. ¡Te avisamos apenas esté listo! 🍔✨`,
+  template_order_ready: `🔔 *¡Tu pedido #{pedido_id} está LISTO {cliente}!* 🍔🍟
+
+Ya podés pasar a retirarlo por nuestro local en {direccion}. ¡Te esperamos con las burgers calentitas!`,
+  template_order_shipped: `🛵💨 *¡Tu pedido #{pedido_id} va en camino {cliente}!*
+
+Destino: *{direccion}*
+El repartidor ya salió del local. ¡Mantenete atento para recibir tu comida bien caliente! 🍔🔥`,
+  template_order_confirmed: `🎉 *¡PEDIDO #{pedido_id} CONFIRMADO Y ENVIADO A COCINA!* 🔥🍔
+
+¡Muchas gracias *{cliente}*, tu comanda ya ingresó al sistema de la plancha!
+
+💵 *Total:* \${total}
+🛵 *Entrega:* {direccion}`
+};
+
+/**
+ * Normaliza cualquier formato telefónico a un JID válido de WhatsApp (@s.whatsapp.net)
+ */
+function formatPhoneToRemoteJid(phone) {
+  if (!phone || typeof phone !== 'string') return null;
+  const trimmed = phone.trim();
+  if (trimmed.includes('@s.whatsapp.net')) return trimmed;
+  if (trimmed.includes('@lid')) return trimmed;
+
+  let digits = trimmed.replace(/\D/g, '');
+  if (!digits || digits.length < 7) return null;
+
+  if (digits.startsWith('0')) {
+    digits = digits.slice(1);
+  }
+
+  if (digits.startsWith('15') && digits.length >= 10) {
+    digits = '549' + digits.slice(2);
+  } else if (digits.length === 10) {
+    digits = '549' + digits;
+  } else if (digits.startsWith('54') && !digits.startsWith('549')) {
+    digits = '549' + digits.slice(2);
+  }
+
+  return `${digits}@s.whatsapp.net`;
+}
+
 function getBotTemplates() {
   try {
     if (fs.existsSync(TEMPLATES_FILE)) {
       const raw = fs.readFileSync(TEMPLATES_FILE, 'utf-8');
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      return { ...DEFAULT_SERVER_TEMPLATES, ...parsed };
     }
   } catch (e) {
     console.error('[WHATSAPP BOT] Error al leer bot_templates.json:', e);
   }
-  return {};
+  return { ...DEFAULT_SERVER_TEMPLATES };
 }
 
 function saveBotTemplates(tpls) {
@@ -711,6 +758,109 @@ class WhatsAppBotServer {
     }
   }
 
+  /**
+   * Envía notificación automática de cambio de estado de comanda a WhatsApp
+   * @param {Object} order Objeto de pedido
+   * @param {string} newStatus 'cocina' | 'listo' | 'entregado'
+   * @param {boolean} force Si es true, ignora el filtro anti-duplicados
+   */
+  async sendOrderStatusNotification(order, newStatus, force = false) {
+    if (!this.sock || this.status !== 'connected') {
+      console.log(`ℹ️ [NOTIF WHATSAPP]: Bot no conectado. No se pudo enviar notificación para pedido #${order?.orderNumber || order?.id}.`);
+      return { success: false, reason: 'bot_disconnected' };
+    }
+
+    if (!order) return { success: false, reason: 'order_missing' };
+
+    const targetStatus = (newStatus || '').toLowerCase();
+    if (!['cocina', 'listo', 'entregado', 'preparando'].includes(targetStatus)) {
+      return { success: false, reason: 'status_ignored' };
+    }
+
+    const normalizedStatus = (targetStatus === 'preparando') ? 'cocina' : targetStatus;
+
+    // Control anti-duplicados: evitar reenvíos accidentales por doble click
+    const notified = Array.isArray(order.notifiedStatuses) ? order.notifiedStatuses : [];
+    if (!force && notified.includes(normalizedStatus)) {
+      console.log(`ℹ️ [NOTIF WHATSAPP]: Estado '${normalizedStatus}' ya fue notificado previamente al cliente del pedido #${order.orderNumber || order.id}.`);
+      return { success: false, reason: 'already_notified' };
+    }
+
+    // Determinar destino JID
+    const customerObj = typeof order.customer === 'object' && order.customer ? order.customer : {};
+    let targetJid = order.remoteJid || customerObj.remoteJid || null;
+
+    if (!targetJid) {
+      const phone = customerObj.phone || order.phone || order.customerPhone || null;
+      if (phone) {
+        targetJid = formatPhoneToRemoteJid(phone);
+      }
+    }
+
+    if (!targetJid) {
+      console.log(`ℹ️ [NOTIF WHATSAPP]: Pedido #${order.orderNumber || order.id} no tiene teléfono ni remoteJid de WhatsApp asociado.`);
+      return { success: false, reason: 'no_phone' };
+    }
+
+    // Resolver plantilla y variables
+    const tpls = getBotTemplates();
+    const vars = getBusinessContext();
+    const customerName = customerObj.name || (typeof order.customer === 'string' ? order.customer : 'Cliente') || 'Cliente';
+    const orderNum = order.orderNumber || order.code || (order.id ? String(order.id).slice(-4) : 'Comanda');
+    const address = customerObj.address || order.address || vars.direccion || 'Nuestro Local';
+
+    let templateText = '';
+    if (normalizedStatus === 'cocina') {
+      templateText = tpls.template_order_preparing || DEFAULT_SERVER_TEMPLATES.template_order_preparing;
+    } else if (normalizedStatus === 'listo') {
+      templateText = tpls.template_order_ready || DEFAULT_SERVER_TEMPLATES.template_order_ready;
+    } else if (normalizedStatus === 'entregado') {
+      if (order.deliveryType === 'delivery' || order.channel === 'delivery') {
+        templateText = tpls.template_order_shipped || DEFAULT_SERVER_TEMPLATES.template_order_shipped;
+      } else {
+        return { success: false, reason: 'takeaway_delivered_no_notify' };
+      }
+    }
+
+    if (!templateText) return { success: false, reason: 'template_empty' };
+
+    const finalMessage = templateText
+      .replace(/{cliente}/gi, customerName)
+      .replace(/{pedido_id}/gi, orderNum)
+      .replace(/{direccion}/gi, address)
+      .replace(/{total}/gi, Number(order.total || 0).toLocaleString('es-AR'))
+      .replace(/{horarios}/gi, vars.horarios)
+      .replace(/{demora}/gi, vars.demora || '30 a 45 min');
+
+    console.log(`🚀 [NOTIF WHATSAPP]: Enviando aviso de estado '${normalizedStatus}' a ${targetJid} (Pedido #${orderNum})...`);
+
+    const sendResult = await this.safeSendMessage(targetJid, { text: finalMessage });
+
+    if (sendResult) {
+      if (!order.notifiedStatuses) order.notifiedStatuses = [];
+      if (!order.notifiedStatuses.includes(normalizedStatus)) {
+        order.notifiedStatuses.push(normalizedStatus);
+      }
+      order.lastNotifiedAt = Date.now();
+
+      try {
+        const stored = getStoredOrders();
+        const sIdx = stored.findIndex(o => o.id === order.id);
+        if (sIdx !== -1) {
+          stored[sIdx].notifiedStatuses = order.notifiedStatuses;
+          stored[sIdx].lastNotifiedAt = order.lastNotifiedAt;
+          fs.writeFileSync(ORDERS_FILE, JSON.stringify(stored, null, 2), 'utf-8');
+        }
+      } catch (_) {}
+
+      console.log(`✅ [NOTIF WHATSAPP]: Notificación de estado '${normalizedStatus}' entregada con éxito a ${targetJid}.`);
+      return { success: true, jid: targetJid, status: normalizedStatus };
+    } else {
+      console.warn(`⚠️ [NOTIF WHATSAPP]: Falló el envío de notificación a ${targetJid}.`);
+      return { success: false, reason: 'send_failed' };
+    }
+  }
+
   async start(force = false) {
     if (this.sock && this.status === 'connected' && !force) {
       return { status: this.status, qrCode: this.qrCode };
@@ -992,8 +1142,10 @@ class WhatsAppBotServer {
                 customer: {
                   name: session.customerName || 'Cliente WhatsApp',
                   phone: cleanPhone,
+                  remoteJid: remoteJid,
                   address: session.shippingAddress || (session.shippingMethod === 'delivery' ? 'Domicilio' : 'Retiro en Local')
                 },
+                remoteJid: remoteJid,
                 channel: 'whatsapp',
                 deliveryType: session.shippingMethod, // 'local' o 'delivery'
                 paymentMethod: session.paymentMethod, // 'efectivo' o 'transferencia'
@@ -1210,11 +1362,47 @@ class WhatsAppBotServer {
           // -------------------------------------------------------------
           // OPCIONES DEL MENÚ PRINCIPAL (1, 2, 3, 4, 5)
           // -------------------------------------------------------------
-          if (lower === '1') {
-            await this.safeSendMessage(remoteJid, {
-              text: '📋 *Estado de Pedido:*\n\nIngresá tu número de orden (ej: *CMD-1234*) o aguardá un instante que un encargado verifique el estado en la plancha. 🔥'
-            }, msg.key);
-            continue;
+          if (lower === '1' || lower.includes('estado') || lower.includes('mi pedido') || lower.includes('mi orden')) {
+            const cleanPhone = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '');
+            const allOrders = getStoredOrders();
+            // Buscar pedido activo de este cliente (últimas 24 horas y no entregado/cancelado)
+            const activeUserOrder = allOrders.slice().reverse().find(o => {
+              const custPhone = o.customer?.phone || o.phone || '';
+              const matchesPhone = custPhone && (custPhone.includes(cleanPhone.slice(-8)) || cleanPhone.includes(custPhone.slice(-8)));
+              const matchesJid = o.remoteJid === remoteJid || o.customer?.remoteJid === remoteJid;
+              const isRecent = (Date.now() - new Date(o.createdAt || o.updatedAt || Date.now()).getTime()) < 24 * 60 * 60 * 1000;
+              const isActive = o.status !== 'cancelado';
+              return (matchesPhone || matchesJid) && isRecent && isActive;
+            });
+
+            if (activeUserOrder) {
+              const statusMap = {
+                pendiente: '🕒 *Pendiente:* Recibido en cola de espera.',
+                cocina: '👨‍🍳🔥 *En Cocina:* Hamburguesas smashadas en la plancha.',
+                listo: '🔔 *¡Listo para retirar!* Ya podés pasar a buscarlo.',
+                entregado: '🎉 *Entregado:* Pedido despachado con éxito.'
+              };
+              const itemsList = Array.isArray(activeUserOrder.items)
+                ? activeUserOrder.items.map(it => `• ${it.name} (x${it.qty || it.quantity || 1})`).join('\n')
+                : '';
+              const orderNum = activeUserOrder.orderNumber || activeUserOrder.code || activeUserOrder.id;
+
+              const statusText = `📋 *SEGUIMIENTO DE TU COMANDA* 🔥\n\n` +
+                `🍔 *Pedido:* #${orderNum}\n` +
+                `📊 *Estado actual:* ${statusMap[activeUserOrder.status] || activeUserOrder.status}\n` +
+                `💵 *Total:* $${Number(activeUserOrder.total || 0).toLocaleString('es-AR')}\n` +
+                (itemsList ? `🛒 *Items:*\n${itemsList}\n` : '') +
+                `📍 *Entrega:* ${activeUserOrder.customer?.address || 'Retiro en Local'}\n\n` +
+                `_Te avisaremos automáticamente por aquí cuando haya novedades en la cocina._`;
+
+              await this.safeSendMessage(remoteJid, { text: statusText }, msg.key);
+              continue;
+            } else {
+              await this.safeSendMessage(remoteJid, {
+                text: '📋 *Estado de Pedido:*\n\nNo encontramos ninguna comanda activa asociada a tu número en este momento.\n\n👉 Para pedir unas hamburguesas recién hechas, escribí *COMPRAR* o *MENU*.'
+              }, msg.key);
+              continue;
+            }
           }
 
           if (lower === '2') {
@@ -1488,6 +1676,11 @@ app.post('/api/human-mode/pause', (req, res) => {
   res.json({ success: true, jid: normalizedJid, minutes: Math.round(durationMs / 60000) });
 });
 
+// Endpoint para obtener plantillas del bot
+app.get('/api/bot-templates', (req, res) => {
+  res.json({ success: true, templates: getBotTemplates() });
+});
+
 // Endpoint para actualizar plantillas y configuración del negocio
 app.post('/api/bot-templates', (req, res) => {
   const { templates } = req.body;
@@ -1582,19 +1775,34 @@ app.post('/api/orders', (req, res) => {
 });
 
 // Endpoint para actualizar estado de un pedido desde cualquier dispositivo (Android, POS, etc.)
-app.patch('/api/orders/:id/status', (req, res) => {
+app.patch('/api/orders/:id/status', async (req, res) => {
   const { id } = req.params;
-  const { status } = req.body;
+  const { status, order: payloadOrder } = req.body;
   if (!status) return res.status(400).json({ error: 'Status requerido' });
 
   const orders = getStoredOrders();
-  const idx = orders.findIndex(o => o.id === id);
+  let idx = orders.findIndex(o => o.id === id);
+  let targetOrder = null;
+
   if (idx !== -1) {
     orders[idx].status = status;
     orders[idx].updatedAt = Date.now();
+    if (payloadOrder?.customer && !orders[idx].customer?.phone) {
+      orders[idx].customer = { ...orders[idx].customer, ...payloadOrder.customer };
+    }
+    if (payloadOrder?.phone && !orders[idx].phone) {
+      orders[idx].phone = payloadOrder.phone;
+    }
+    if (payloadOrder?.remoteJid && !orders[idx].remoteJid) {
+      orders[idx].remoteJid = payloadOrder.remoteJid;
+    }
+    targetOrder = orders[idx];
     try {
       fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf-8');
     } catch (_) {}
+  } else if (payloadOrder) {
+    targetOrder = { ...payloadOrder, status, updatedAt: Date.now() };
+    saveStoredOrder(targetOrder);
   }
 
   const pIdx = pendingOrdersForPos.findIndex(o => o.id === id);
@@ -1604,8 +1812,34 @@ app.patch('/api/orders/:id/status', (req, res) => {
 
   updateOrderStatusInSupabase(id, status).catch(() => {});
 
+  // Notificar automáticamente a WhatsApp si aplica
+  if (targetOrder) {
+    botServer.sendOrderStatusNotification(targetOrder, status).catch(e => {
+      console.warn(`[NOTIF WHATSAPP] Error en notificación de pedido ${id}:`, e.message);
+    });
+  }
+
   console.log(`🔄 [SYNC STATUS] Pedido ${id} actualizado a estado '${status}' en servidor local y Supabase.`);
-  res.json({ success: true, id, status });
+  res.json({ 
+    success: true, 
+    id, 
+    status, 
+    notified: Boolean(targetOrder?.notifiedStatuses?.includes(status)) 
+  });
+});
+
+// Endpoint para reenviar manualmente la notificación por WhatsApp desde KDS o POS
+app.post('/api/orders/:id/notify', async (req, res) => {
+  const { id } = req.params;
+  const { status, force = true } = req.body || {};
+
+  const orders = getStoredOrders();
+  const target = orders.find(o => o.id === id) || req.body?.order;
+  if (!target) return res.status(404).json({ success: false, error: 'Pedido no encontrado' });
+
+  const currentStatus = status || target.status || 'cocina';
+  const result = await botServer.sendOrderStatusNotification(target, currentStatus, force);
+  res.json(result);
 });
 
 // Endpoint para vaciar todas las órdenes

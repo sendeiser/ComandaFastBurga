@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Bot, Sparkles, Key, Download, Terminal, FlaskConical, Settings, ShieldCheck, QrCode, 
+  Bot, Sparkles, Key, Download, Terminal, Settings, ShieldCheck, QrCode, 
   Smartphone, CheckCircle2, Save, RotateCcw, Plus, 
   Trash2, Copy, Check, Info, Zap, AlertCircle, RefreshCw,
   Power, Wifi, WifiOff, ExternalLink, Clock, UserCheck, MessageSquare
 } from 'lucide-react';
-import AdminChatbotLab from './AdminChatbotLab';
 import AdminBotFlowsTab from './AdminBotFlowsTab';
 import AdminBotVariablesTab from './AdminBotVariablesTab';
 import { GitBranch, Variable } from 'lucide-react';
@@ -15,10 +14,16 @@ import { supabaseSync } from '../../../services/supabaseClient';
 
 const BOT_SERVER_URL = typeof window !== 'undefined' && window.location.hostname ? `http://${window.location.hostname}:3002` : 'http://localhost:3002';
 
-export default function AdminWhatsAppBot() {
-  const [activeTab, setActiveTab] = useState('test_lab'); // 'test_lab' | 'templates' | 'security' | 'connection'
+export default function AdminWhatsAppBot({ initialTab }) {
+  const [activeTab, setActiveTab] = useState(initialTab || 'connection'); // 'connection' | 'flows' | 'variables' | 'ai' | 'templates' | 'security'
   const [settings, setSettings] = useState(chatbotService.getSettings());
   const [flows, setFlows] = useState(() => chatbotService.getCustomFlows());
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   useEffect(() => {
     // 1. Cargar plantillas actualizadas desde Supabase Cloud
@@ -533,16 +538,6 @@ call npm run dev
         gap: '0.5rem'
       }}>
         <div className="scrollable-tabs-bar" style={{ gap: '0.4rem', flex: 1, paddingBottom: '2px' }}>
-          <button
-            type="button"
-            className={`cat-pill-btn ${activeTab === 'test_lab' ? 'active' : ''}`}
-            style={{ height: '34px', padding: '0.4rem 0.85rem', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}
-            onClick={() => setActiveTab('test_lab')}
-          >
-            <FlaskConical size={15} />
-            <span>🧪 Laboratorio de Pruebas (Lab)</span>
-          </button>
-
           {/* TAB: GESTOR DE FLUJOS Y CONDICIONES (BUILDER) */}
           <button
             type="button"
@@ -645,13 +640,6 @@ call npm run dev
         )}
       </div>
 
-      {/* TAB CONTENT: CHATBOT LAB */}
-      {activeTab === 'test_lab' && (
-        <div style={{ flex: 1 }}>
-          <AdminChatbotLab />
-        </div>
-      )}
-
       {/* TAB CONTENT: FLUJOS & CONDICIONES (BUILDER) */}
       {activeTab === 'flows' && (
         <AdminBotFlowsTab
@@ -661,9 +649,6 @@ call npm run dev
             await chatbotService.saveCustomFlows(updatedFlows);
             setSaveSuccess(true);
             setTimeout(() => setSaveSuccess(false), 3000);
-          }}
-          onTestInLab={(flow) => {
-            setActiveTab('test_lab');
           }}
         />
       )}
@@ -924,120 +909,138 @@ call npm run dev
               gap: '0.75rem'
             }}>
               <div style={{
-                background: 'rgba(15, 23, 42, 0.6)',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
                 borderRadius: '8px',
-                padding: '0.75rem',
+                padding: '0.85rem',
                 display: 'flex',
                 alignItems: 'flex-start',
-                gap: '0.6rem'
+                gap: '0.65rem',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
               }}>
-                <Clock size={16} color="var(--accent-amber)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(245, 158, 11, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+                  <Clock size={16} color="#d97706" />
+                </div>
                 <div>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
                     Retardo de Tipeo Humano
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.74rem', color: '#334155', marginTop: '3px', lineHeight: '1.35' }}>
                     Espera dinámica (1.4s - 3.6s) proporcional al tamaño de cada mensaje para imitar escritura real.
                   </div>
                 </div>
               </div>
 
               <div style={{
-                background: 'rgba(15, 23, 42, 0.6)',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
                 borderRadius: '8px',
-                padding: '0.75rem',
+                padding: '0.85rem',
                 display: 'flex',
                 alignItems: 'flex-start',
-                gap: '0.6rem'
+                gap: '0.65rem',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
               }}>
-                <Smartphone size={16} color="var(--accent-emerald)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+                  <Smartphone size={16} color="#059669" />
+                </div>
                 <div>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
                     Presencia "Escribiendo..."
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    Emite el evento <code>composing</code> en WhatsApp antes de responder, evitando banderas de bot.
+                  <div style={{ fontSize: '0.74rem', color: '#334155', marginTop: '3px', lineHeight: '1.35' }}>
+                    Emite el evento <code style={{ background: '#f1f5f9', color: '#0f172a', padding: '1px 5px', borderRadius: '4px', border: '1px solid #cbd5e1', fontWeight: 700 }}>composing</code> en WhatsApp antes de responder, evitando banderas de bot.
                   </div>
                 </div>
               </div>
 
               <div style={{
-                background: 'rgba(15, 23, 42, 0.6)',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
                 borderRadius: '8px',
-                padding: '0.75rem',
+                padding: '0.85rem',
                 display: 'flex',
                 alignItems: 'flex-start',
-                gap: '0.6rem'
+                gap: '0.65rem',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
               }}>
-                <CheckCircle2 size={16} color="var(--accent-blue)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(37, 99, 235, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+                  <CheckCircle2 size={16} color="#2563eb" />
+                </div>
                 <div>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
                     Lectura Natural (Doble Tilde)
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.74rem', color: '#334155', marginTop: '3px', lineHeight: '1.35' }}>
                     Simula el ciclo orgánico de lectura (350-700ms) antes de marcar mensajes leídos.
                   </div>
                 </div>
               </div>
 
               <div style={{
-                background: 'rgba(15, 23, 42, 0.6)',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
                 borderRadius: '8px',
-                padding: '0.75rem',
+                padding: '0.85rem',
                 display: 'flex',
                 alignItems: 'flex-start',
-                gap: '0.6rem'
+                gap: '0.65rem',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
               }}>
-                <UserCheck size={16} color="var(--accent-purple)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(124, 58, 237, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+                  <UserCheck size={16} color="#7c3aed" />
+                </div>
                 <div>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
                     Modo Humano Automático
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.74rem', color: '#334155', marginTop: '3px', lineHeight: '1.35' }}>
                     Si respondes en el celular físico, el bot se duerme 25 min para no entrometerse en la charla.
                   </div>
                 </div>
               </div>
 
               <div style={{
-                background: 'rgba(15, 23, 42, 0.6)',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
                 borderRadius: '8px',
-                padding: '0.75rem',
+                padding: '0.85rem',
                 display: 'flex',
                 alignItems: 'flex-start',
-                gap: '0.6rem'
+                gap: '0.65rem',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
               }}>
-                <MessageSquare size={16} color="var(--accent-amber)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(245, 158, 11, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+                  <MessageSquare size={16} color="#d97706" />
+                </div>
                 <div>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
                     Filtro Anti-Bucle de Cortesía
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.74rem', color: '#334155', marginTop: '3px', lineHeight: '1.35' }}>
                     Responde con calidez humana ante "gracias", "joya" o "chau" sin spamear el menú de 5 opciones.
                   </div>
                 </div>
               </div>
 
               <div style={{
-                background: 'rgba(15, 23, 42, 0.6)',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
                 borderRadius: '8px',
-                padding: '0.75rem',
+                padding: '0.85rem',
                 display: 'flex',
                 alignItems: 'flex-start',
-                gap: '0.6rem'
+                gap: '0.65rem',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
               }}>
-                <Zap size={16} color="var(--accent-emerald)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+                  <Zap size={16} color="#059669" />
+                </div>
                 <div>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
                     Cola Anti-Flooding
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.74rem', color: '#334155', marginTop: '3px', lineHeight: '1.35' }}>
                     Encola ráfagas de mensajes del mismo cliente para procesarlos en fila india sin colisiones.
                   </div>
                 </div>
@@ -1046,33 +1049,35 @@ call npm run dev
 
             {/* SECCIÓN MODO HUMANO EN VIVO */}
             <div style={{
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border-subtle)',
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
               borderRadius: '8px',
-              padding: '0.9rem',
+              padding: '0.95rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.65rem'
+              gap: '0.65rem',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <UserCheck size={16} color="var(--accent-purple)" />
+                <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <UserCheck size={16} color="#7c3aed" />
                   <span>Chats en Modo Humano Activo ({pausedChats.length})</span>
                 </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '0.74rem', color: '#475569' }}>
                   Auto-pausa de 25 min al enviar un mensaje desde el WhatsApp físico
                 </div>
               </div>
 
               {pausedChats.length === 0 ? (
                 <div style={{
-                  padding: '0.75rem',
+                  padding: '0.85rem',
                   borderRadius: '6px',
-                  background: 'rgba(255, 255, 255, 0.02)',
-                  border: '1px dashed var(--border-subtle)',
-                  fontSize: '0.75rem',
-                  color: 'var(--text-muted)',
-                  textAlign: 'center'
+                  background: '#f8fafc',
+                  border: '1px dashed #cbd5e1',
+                  fontSize: '0.76rem',
+                  color: '#475569',
+                  textAlign: 'center',
+                  lineHeight: '1.4'
                 }}>
                   Ningún chat pausado actualmente. Cuando escribas a un cliente desde el teléfono celular físico de tu local, el bot se pausará automáticamente para ese cliente permitiéndote hablar libremente.
                 </div>
@@ -1112,29 +1117,30 @@ call npm run dev
           </div>
 
           <div>
-            <h4 style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>
+            <h4 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', margin: 0 }}>
               Filtro de Palabras Clave Gastronómicas (Opcional)
             </h4>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+            <div style={{ fontSize: '0.78rem', color: '#475569', marginTop: '2px' }}>
               Evita que el bot responda mensajes personales o interrupciones en conversaciones con amigos o familiares en el mismo WhatsApp si compartes el número.
             </div>
           </div>
 
           {/* TOGGLE: REQUIRE KEYWORDS */}
           <div style={{
-            background: 'var(--bg-main)',
-            border: '1px solid var(--border-subtle)',
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
             borderRadius: 'var(--radius-md)',
-            padding: '0.85rem 1rem',
+            padding: '0.9rem 1.1rem',
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'center'
+            alignItems: 'center',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
           }}>
             <div>
-              <div style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+              <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
                 Activar Filtro Anti-Spam de ComandaFast
               </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '2px' }}>
                 El bot solo responderá si el mensaje contiene alguna de las palabras clave gastronómicas de la lista.
               </div>
             </div>
@@ -1152,7 +1158,7 @@ call npm run dev
 
           {/* KEYWORDS TAG LIST */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-secondary)' }}>
+            <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
               Palabras Clave Autorizadas ({settings.chatbot_keywords?.length || 0})
             </div>
 
@@ -1164,12 +1170,12 @@ call npm run dev
                 value={newKeyword}
                 onChange={(e) => setNewKeyword(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddKeyword()}
-                style={{ width: '260px', height: '32px', fontSize: '0.8rem' }}
+                style={{ width: '260px', height: '34px', fontSize: '0.82rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1' }}
               />
               <button
                 type="button"
                 className="cat-pill-btn active"
-                style={{ height: '32px', padding: '0 0.85rem', fontSize: '0.78rem' }}
+                style={{ height: '34px', padding: '0 0.95rem', fontSize: '0.78rem' }}
                 onClick={handleAddKeyword}
               >
                 <Plus size={14} />
@@ -1178,26 +1184,27 @@ call npm run dev
             </div>
 
             <div style={{
-              background: 'var(--bg-main)',
-              border: '1px solid var(--border-subtle)',
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
               borderRadius: 'var(--radius-md)',
-              padding: '0.75rem',
+              padding: '0.85rem',
               display: 'flex',
               flexWrap: 'wrap',
-              gap: '0.4rem',
+              gap: '0.45rem',
               maxHeight: '160px',
-              overflowY: 'auto'
+              overflowY: 'auto',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
             }}>
               {(settings.chatbot_keywords || []).map(kw => (
                 <span
                   key={kw}
                   style={{
-                    background: 'var(--bg-card)',
-                    border: '1px solid var(--border-subtle)',
-                    color: 'var(--text-primary)',
+                    background: '#f8fafc',
+                    border: '1px solid #cbd5e1',
+                    color: '#0f172a',
                     borderRadius: 'var(--radius-full)',
-                    padding: '2px 10px',
-                    fontSize: '0.75rem',
+                    padding: '3px 10px',
+                    fontSize: '0.76rem',
                     fontWeight: 700,
                     display: 'flex',
                     alignItems: 'center',
@@ -1207,7 +1214,7 @@ call npm run dev
                   {kw}
                   <Trash2
                     size={12}
-                    style={{ color: 'var(--accent-rose)', cursor: 'pointer' }}
+                    style={{ color: '#ef4444', cursor: 'pointer' }}
                     onClick={() => handleRemoveKeyword(kw)}
                   />
                 </span>
@@ -1217,7 +1224,7 @@ call npm run dev
 
           {/* IGNORED NUMBERS */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-secondary)' }}>
+            <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
               Números Ignorados (Lista Negra Personal)
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -1227,7 +1234,7 @@ call npm run dev
                 placeholder="Número de teléfono (ej: 3826507711)..."
                 value={newIgnoredPhone}
                 onChange={(e) => setNewIgnoredPhone(e.target.value)}
-                style={{ width: '220px', height: '32px', fontSize: '0.8rem' }}
+                style={{ width: '220px', height: '34px', fontSize: '0.82rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1' }}
               />
               <input
                 type="text"
@@ -1235,12 +1242,12 @@ call npm run dev
                 placeholder="Etiqueta (ej: Juan Hermano)..."
                 value={newIgnoredLabel}
                 onChange={(e) => setNewIgnoredLabel(e.target.value)}
-                style={{ width: '200px', height: '32px', fontSize: '0.8rem' }}
+                style={{ width: '200px', height: '34px', fontSize: '0.82rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1' }}
               />
               <button
                 type="button"
                 className="cat-pill-btn active"
-                style={{ height: '32px', padding: '0 0.85rem', fontSize: '0.78rem' }}
+                style={{ height: '34px', padding: '0 0.95rem', fontSize: '0.78rem' }}
                 onClick={handleAddIgnoredNumber}
               >
                 <Plus size={14} />
@@ -1254,14 +1261,15 @@ call npm run dev
                   <div
                     key={n.id}
                     style={{
-                      background: 'var(--bg-main)',
-                      border: '1px solid var(--border-subtle)',
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
                       borderRadius: 'var(--radius-md)',
-                      padding: '0.45rem 0.75rem',
+                      padding: '0.55rem 0.85rem',
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      fontSize: '0.8rem'
+                      fontSize: '0.82rem',
+                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)'
                     }}
                   >
                     <div>

@@ -8,7 +8,7 @@ import {
   GitBranch, Plus, Search, Tag, Edit3, Copy, Trash2, CheckCircle2, 
   RotateCcw, Sparkles, Utensils, PartyPopper, Truck, UserCheck, 
   MessageSquare, Layers, Image as ImageIcon, Eye, X, Check, 
-  AlertCircle, Play, FlaskConical, CheckCheck, Upload, Link
+  AlertCircle, Play, CheckCheck, Upload, Link
 } from 'lucide-react';
 import { 
   FLOW_CATEGORIES, 
@@ -18,7 +18,7 @@ import {
 } from '../../../services/whatsappBotConstants';
 import { chatbotService } from '../../../services/chatbotService';
 
-export default function AdminBotFlowsTab({ flows = [], onSaveFlows, onTestInLab }) {
+export default function AdminBotFlowsTab({ flows = [], onSaveFlows }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [editingFlow, setEditingFlow] = useState(null); // null o flow object
@@ -675,28 +675,6 @@ export default function AdminBotFlowsTab({ flows = [], onSaveFlows, onTestInLab 
                         <Trash2 size={13} style={{ color: 'var(--accent-rose)' }} />
                       </button>
                     )}
-
-                    <button
-                      type="button"
-                      onClick={() => onTestInLab?.(flow)}
-                      style={{
-                        background: 'rgba(16, 185, 129, 0.15)',
-                        color: 'var(--accent-emerald)',
-                        border: '1px solid rgba(16, 185, 129, 0.3)',
-                        borderRadius: 'var(--radius-sm)',
-                        padding: '0.35rem 0.65rem',
-                        fontSize: '0.74rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                      title="Probar en el simulador de chat"
-                    >
-                      <FlaskConical size={13} />
-                      <span>Probar</span>
-                    </button>
                   </div>
                 </div>
               </div>

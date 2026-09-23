@@ -514,13 +514,13 @@ export default function App() {
     // Push status + timestamps directamente a Supabase
     supabaseSync.updateOrderStatus(orderId, newStatus, updatedOrder?.statusTimestamps || {});
 
-    // Sync status to Local Server (puerto 3002) para reflejar cambios en celulares conectados
+    // Sync status to Local Server (puerto 3002) para reflejar cambios en celulares conectados y notificar por WhatsApp
     try {
       const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
       fetch(`http://${botHost}:3002/api/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify({ status: newStatus, order: updatedOrder })
       }).catch(() => {});
     } catch (_) {}
 

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChefHat, Clock, CheckCircle2, Play, AlertCircle, Printer, MessageSquare, ShoppingBag, Utensils, RefreshCw, XCircle, ArrowLeftRight, ChevronUp, ChevronDown, RotateCcw } from 'lucide-react';
 
 export default function KitchenDisplay({ 
@@ -9,12 +9,36 @@ export default function KitchenDisplay({
 }) {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [channelFilter, setChannelFilter] = useState('all');
+  const [notifyingId, setNotifyingId] = useState(null);
 
   // Update timer tick every 10 seconds
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(Date.now()), 10000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleNotifyWhatsApp = async (order) => {
+    if (notifyingId) return;
+    setNotifyingId(order.id);
+    try {
+      const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+      const res = await fetch(`http://${botHost}:3002/api/orders/${order.id}/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: order.status, order, force: true })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`✅ Notificación de WhatsApp enviada a ${data.jid}`);
+      } else {
+        alert(`ℹ️ Resultado WhatsApp: ${data.reason === 'bot_disconnected' ? 'Bot desconectado (inicie el bot en el panel Admin)' : data.reason || 'Sin número'}`);
+      }
+    } catch (_) {
+      alert('⚠️ No se pudo conectar al servidor local de WhatsApp (puerto 3002).');
+    } finally {
+      setNotifyingId(null);
+    }
+  };
 
   const getElapsedMinutes = (dateString) => {
     if (!dateString) return 0;
@@ -103,9 +127,36 @@ export default function KitchenDisplay({
         </div>
 
         {(order.customer?.name || typeof order.customer === 'string') && (
-          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
-            👤 Cliente: {typeof order.customer === 'object' ? order.customer.name : order.customer}
-            {typeof order.customer === 'object' && order.customer.phone ? ` (${order.customer.phone})` : ''}
+          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+            <span>
+              👤 {typeof order.customer === 'object' ? order.customer.name : order.customer}
+              {typeof order.customer === 'object' && order.customer.phone ? ` (${order.customer.phone})` : ''}
+            </span>
+            {(order.channel === 'whatsapp' || (order.customer && order.customer.phone)) && (
+              <span 
+                title={
+                  order.notifiedStatuses?.includes(order.status)
+                    ? `Notificación de WhatsApp enviada para estado: ${order.status}`
+                    : 'Cliente con número de WhatsApp registrado'
+                }
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                  fontSize: '0.68rem',
+                  padding: '1px 6px',
+                  borderRadius: '10px',
+                  background: order.notifiedStatuses?.includes(order.status) ? 'rgba(16, 185, 129, 0.18)' : 'rgba(37, 211, 102, 0.1)',
+                  color: order.notifiedStatuses?.includes(order.status) ? '#10b981' : '#25d366',
+                  fontWeight: 600,
+                  border: '1px solid rgba(37, 211, 102, 0.25)',
+                  flexShrink: 0
+                }}
+              >
+                <MessageSquare size={10} />
+                {order.notifiedStatuses?.includes(order.status) ? 'WA Notificado' : 'WhatsApp'}
+              </span>
+            )}
           </div>
         )}
 
@@ -220,6 +271,26 @@ export default function KitchenDisplay({
                 <span>Despachar / Entregado</span>
               </button>
             </>
+          )}
+
+          {(order.channel === 'whatsapp' || (order.customer && order.customer.phone)) && (
+            <button 
+              type="button"
+              className="qty-btn"
+              disabled={notifyingId === order.id}
+              style={{ 
+                width: '36px', 
+                height: '36px', 
+                color: '#25d366', 
+                borderColor: 'rgba(37, 211, 102, 0.4)', 
+                background: notifyingId === order.id ? 'rgba(37, 211, 102, 0.25)' : 'rgba(37, 211, 102, 0.08)',
+                cursor: notifyingId === order.id ? 'wait' : 'pointer'
+              }}
+              title="Avisar / Reenviar estado por WhatsApp al cliente"
+              onClick={() => handleNotifyWhatsApp(order)}
+            >
+              <MessageSquare size={16} />
+            </button>
           )}
 
           <button 
