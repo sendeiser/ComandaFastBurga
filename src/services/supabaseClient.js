@@ -1,4 +1,4 @@
-﻿// =========================================================
+// =========================================================
 // SUPABASE CLIENT - CLOUD CRUD SERVICE (FUENTE DE VERDAD)
 // =========================================================
 
@@ -201,7 +201,12 @@ export const supabaseSync = {
       if (res.ok) {
         const rows = await res.json();
         if (Array.isArray(rows)) {
-          return rows.map(mapOrderFromDB).filter(o => o && !storageService.isOrderDeleted(o.id));
+          const mapped = rows.map(mapOrderFromDB).filter(o => o && !storageService.isOrderDeleted(o.id));
+          const maxOrderNum = mapped.reduce((max, o) => Math.max(max, Number(o.orderNumber) || 0), 0);
+          if (maxOrderNum > 0) {
+            storageService.updateOrderCounterIfHigher(maxOrderNum);
+          }
+          return mapped;
         }
       }
     } catch (_) {}
@@ -227,6 +232,33 @@ export const supabaseSync = {
       }
     } catch (e) {
       console.warn('[Supabase] createOrder error:', e);
+    }
+    return null;
+  },
+
+  
+  async fetchLatestOrderNumber() {
+    if (!this.isConfigured()) return null;
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      const res = await fetch(this._url('orders', 'select=order_number,created_at&order=order_number.desc&limit=1'), {
+        headers: this._headers(),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        const rows = await res.json();
+        if (Array.isArray(rows) && rows.length > 0) {
+          const maxNum = Number(rows[0].order_number) || 0;
+          if (maxNum > 0) {
+            storageService.updateOrderCounterIfHigher(maxNum);
+            return maxNum;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Supabase] fetchLatestOrderNumber error:', e);
     }
     return null;
   },
@@ -835,3 +867,8 @@ export const supabaseSync = {
     return () => clearInterval(interval);
   }
 };
+
+// Sincronizar automáticamente el proveedor de número correlativo en la nube
+if (typeof storageService?.setCloudOrderNumberFetcher === 'function') {
+  storageService.setCloudOrderNumberFetcher(() => supabaseSync.fetchLatestOrderNumber());
+}

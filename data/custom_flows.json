@@ -1,0 +1,14 @@
+[
+  {
+    "id": "flow-welcome-test",
+    "name": "Flujo de Bienvenida Test",
+    "actions": [
+      {
+        "text": "Hola! Test flow 1790139697016",
+        "type": "send_text"
+      }
+    ],
+    "enabled": true,
+    "trigger": "hola"
+  }
+]

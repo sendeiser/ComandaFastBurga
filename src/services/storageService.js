@@ -265,20 +265,78 @@ export const storageService = {
     }
   },
 
+  _cloudOrderNumberFetcher: null,
+
+  setCloudOrderNumberFetcher(fn) {
+    this._cloudOrderNumberFetcher = fn;
+  },
+
   getNextOrderNumber() {
     const settings = this.getSettings();
     const today = new Date().toLocaleDateString('en-CA');
     const lastDate = localStorage.getItem(KEYS.ORDER_COUNTER_DATE);
 
-    if (settings.resetDailyOrderNumber !== false && lastDate !== today) {
-      localStorage.setItem(KEYS.ORDER_COUNTER_DATE, today);
-      localStorage.setItem(KEYS.ORDER_COUNTER, '0');
+    let current = parseInt(localStorage.getItem(KEYS.ORDER_COUNTER) || '0', 10);
+    const existingOrders = this.getOrders();
+    const maxExisting = existingOrders.reduce((max, o) => Math.max(max, Number(o.orderNumber) || 0), 0);
+    if (maxExisting > current) {
+      current = maxExisting;
     }
 
-    let current = parseInt(localStorage.getItem(KEYS.ORDER_COUNTER) || '0', 10);
+    if (settings.resetDailyOrderNumber !== false && lastDate && lastDate !== today) {
+      if (current === 0 && maxExisting === 0) {
+        current = 0;
+        localStorage.setItem(KEYS.ORDER_COUNTER_DATE, today);
+        localStorage.setItem(KEYS.ORDER_COUNTER, '0');
+      }
+    }
+
     current += 1;
     localStorage.setItem(KEYS.ORDER_COUNTER, current.toString());
+    localStorage.setItem(KEYS.ORDER_COUNTER_DATE, today);
     return current;
+  },
+
+  async getNextOrderNumberAsync() {
+    // 1. Intentar consultar el último número registrado en Supabase Cloud
+    if (typeof this._cloudOrderNumberFetcher === 'function') {
+      try {
+        const cloudMax = await this._cloudOrderNumberFetcher();
+        if (cloudMax && Number(cloudMax) > 0) {
+          this.updateOrderCounterIfHigher(cloudMax);
+        }
+      } catch (_) {}
+    }
+
+    // 2. Intentar consultar al servidor local LAN (puerto 3002) por si hubo pedidos locales
+    try {
+      if (typeof window !== 'undefined' && window.location) {
+        const botHost = window.location.hostname || 'localhost';
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1200);
+        const res = await fetch(`http://${botHost}:3002/api/latest-order-number`, { signal: controller.signal }).catch(() => null);
+        clearTimeout(timeoutId);
+        if (res && res.ok) {
+          const data = await res.json().catch(() => null);
+          if (data && data.latestOrderNumber) {
+            this.updateOrderCounterIfHigher(data.latestOrderNumber);
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 3. Generar el siguiente correlativo garantizado
+    return this.getNextOrderNumber();
+  },
+
+  updateOrderCounterIfHigher(val) {
+    const num = Number(val) || 0;
+    if (num <= 0) return;
+    const current = parseInt(localStorage.getItem(KEYS.ORDER_COUNTER) || '0', 10);
+    if (num > current) {
+      localStorage.setItem(KEYS.ORDER_COUNTER, num.toString());
+      localStorage.setItem(KEYS.ORDER_COUNTER_DATE, new Date().toLocaleDateString('en-CA'));
+    }
   },
 
   resetOrderCounter(val = 0) {
@@ -323,6 +381,9 @@ export const storageService = {
     if (this.isOrderDeleted(id)) {
       return null;
     }
+    if (order.orderNumber) {
+      this.updateOrderCounterIfHigher(order.orderNumber);
+    }
     const orders = this.getOrders();
     const idx = orders.findIndex(o => o.id === id);
     if (idx !== -1) {
@@ -331,14 +392,20 @@ export const storageService = {
         ...order,
         updatedAt: order.updatedAt || Date.now()
       };
+      if (orders[idx].orderNumber) {
+        this.updateOrderCounterIfHigher(orders[idx].orderNumber);
+      }
       localStorage.setItem(KEYS.ORDERS, JSON.stringify(orders));
       return orders[idx];
     }
 
+    const assignedNumber = order.orderNumber || this.getNextOrderNumber();
+    this.updateOrderCounterIfHigher(assignedNumber);
+
     const newOrder = {
       ...order,
       id,
-      orderNumber: order.orderNumber || this.getNextOrderNumber(),
+      orderNumber: assignedNumber,
       createdAt: order.createdAt || new Date().toISOString(),
       updatedAt: order.updatedAt || Date.now(),
       status: order.status || 'pendiente',
@@ -358,9 +425,15 @@ export const storageService = {
     if (!Array.isArray(batch) || batch.length === 0) return this.getOrders();
     const deleted = this.getDeletedOrderIds();
     let orders = this.getOrders();
+    let highestOrderNum = 0;
+
     for (const ord of batch) {
       if (!ord || !ord.id) continue;
       if (deleted.has(String(ord.id))) continue;
+      if (ord.orderNumber) {
+        const num = Number(ord.orderNumber) || 0;
+        if (num > highestOrderNum) highestOrderNum = num;
+      }
       const idx = orders.findIndex(o => o.id === ord.id);
       if (idx !== -1) {
         orders[idx] = {
@@ -369,9 +442,11 @@ export const storageService = {
           updatedAt: ord.updatedAt || Date.now()
         };
       } else {
+        const assignedOrderNum = ord.orderNumber || (highestOrderNum > 0 ? highestOrderNum + 1 : this.getNextOrderNumber());
+        if (assignedOrderNum > highestOrderNum) highestOrderNum = assignedOrderNum;
         orders.unshift({
           ...ord,
-          orderNumber: ord.orderNumber || (Math.floor(Date.now() % 1000) + 1),
+          orderNumber: assignedOrderNum,
           createdAt: ord.createdAt || new Date().toISOString(),
           updatedAt: ord.updatedAt || Date.now(),
           status: ord.status || 'pendiente',
@@ -383,6 +458,9 @@ export const storageService = {
           }
         });
       }
+    }
+    if (highestOrderNum > 0) {
+      this.updateOrderCounterIfHigher(highestOrderNum);
     }
     localStorage.setItem(KEYS.ORDERS, JSON.stringify(orders));
     return orders;

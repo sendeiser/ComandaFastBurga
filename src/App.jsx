@@ -114,14 +114,19 @@ export default function App() {
     (async () => {
       if (!supabaseSync.isConfigured()) return;
 
-      const [cloudProds, cloudOrders, cloudShift, cloudSettings, cloudCashiers, cloudBotVars] = await Promise.all([
+      const [cloudProds, cloudOrders, cloudShift, cloudSettings, cloudCashiers, cloudBotVars, latestOrderNum] = await Promise.all([
         supabaseSync.fetchProducts(),
         supabaseSync.fetchOrders(300),
         supabaseSync.fetchLatestCashShift(),
         supabaseSync.fetchSettings(),
         supabaseSync.fetchCashiers(),
-        supabaseSync.fetchBotVariables()
+        supabaseSync.fetchBotVariables(),
+        supabaseSync.fetchLatestOrderNumber()
       ]);
+
+      if (latestOrderNum && latestOrderNum > 0) {
+        storageService.updateOrderCounterIfHigher(latestOrderNum);
+      }
 
       if (cloudProds && cloudProds.length > 0) {
         // Enriquecer con fotos locales o por defecto si la nube aÃºn no las tiene
@@ -292,6 +297,9 @@ export default function App() {
           let hasChanges = false;
 
           for (const ord of mergedMap.values()) {
+            if (ord && ord.orderNumber) {
+              storageService.updateOrderCounterIfHigher(ord.orderNumber);
+            }
             const existing = currentOrders.find(o => o.id === ord.id);
             if (!existing) {
               // NUEVO PEDIDO DETECTADO
@@ -456,11 +464,16 @@ export default function App() {
   const pendingKitchenCount = orders.filter(o => o.status === 'pendiente' || o.status === 'cocina').length;
 
   // Handlers
-  const handleSaveOrder = (orderData) => {
+  const handleSaveOrder = async (orderData) => {
     if (!cashShift || cashShift.isClosed) {
       alert('⚠️ La caja está cerrada. Debes abrir el turno de caja antes de registrar un pedido.');
       setIsCashModalOpen(true);
       return;
+    }
+
+    // Sincronizar número correlativo con la DB para continuar desde el último pedido realizado
+    if (!orderData.orderNumber) {
+      orderData.orderNumber = await storageService.getNextOrderNumberAsync();
     }
 
     const savedOrder = storageService.saveOrder(orderData);

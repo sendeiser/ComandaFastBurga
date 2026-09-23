@@ -611,6 +611,40 @@ function saveStoredOrder(order) {
   }
 }
 
+// Obtener el número de orden más alto entre almacenamiento local y Supabase
+async function getLatestOrderNumber() {
+  let highest = 0;
+  // 1. Revisar orders.json local
+  const localOrders = getStoredOrders();
+  if (Array.isArray(localOrders)) {
+    for (const o of localOrders) {
+      const num = Number(o.orderNumber || o.order_number) || 0;
+      if (num > highest) highest = num;
+    }
+  }
+  // 2. Consultar Supabase
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=order_number&order=order_number.desc&limit=1`, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      },
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (res.ok) {
+      const rows = await res.json();
+      if (Array.isArray(rows) && rows.length > 0) {
+        const cloudNum = Number(rows[0].order_number) || 0;
+        if (cloudNum > highest) highest = cloudNum;
+      }
+    }
+  } catch (_) {}
+  return highest;
+}
+
 // Cola de pedidos pendientes de ser consumidos por el sistema POS / Cocina
 let pendingOrdersForPos = [];
 
@@ -1131,14 +1165,16 @@ class WhatsAppBotServer {
           // ESTADO: CONFIRMING (Esperando SI / CANCELAR)
           if (session.step === 'CONFIRMING') {
             if (lower === 'si' || lower === 'sí' || lower === 'confirmar' || lower === 'dale' || lower === 'ok' || lower === 's') {
-              // Generar código de comanda
-              const orderId = 'CMD-' + Math.floor(1000 + Math.random() * 9000);
+              // Generar número de comanda correlativo sincronizado
+              const latestOrderNum = await getLatestOrderNumber();
+              const nextOrderNum = latestOrderNum + 1;
+              const orderId = 'CMD-' + nextOrderNum;
               const cleanPhone = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '');
               
               const newOrder = {
                 id: orderId,
                 code: orderId,
-                orderNumber: orderId.replace('CMD-', ''),
+                orderNumber: nextOrderNum,
                 customer: {
                   name: session.customerName || 'Cliente WhatsApp',
                   phone: cleanPhone,
@@ -1734,15 +1770,21 @@ app.post('/api/orders/ack', (req, res) => {
 });
 
 // Endpoint para que la App Android o cualquier terminal inyecte pedidos en tiempo real
-app.post('/api/orders', (req, res) => {
+app.post('/api/orders', async (req, res) => {
   const order = req.body;
   if (!order || !order.id) {
     return res.status(400).json({ success: false, error: 'Pedido inválido o sin id' });
   }
 
+  let assignedNumber = Number(order.orderNumber || order.order_number) || 0;
+  if (assignedNumber <= 0) {
+    const latest = await getLatestOrderNumber();
+    assignedNumber = latest + 1;
+  }
+
   const normalizedOrder = {
     id: order.id,
-    orderNumber: order.orderNumber || order.order_number || (Math.floor(Date.now() % 1000) + 1),
+    orderNumber: assignedNumber,
     channel: order.channel || 'mostrador',
     tableNumber: order.tableNumber || order.table_number || '',
     customer: typeof order.customer === 'object' ? order.customer : {
@@ -1772,6 +1814,16 @@ app.post('/api/orders', (req, res) => {
 
   console.log(`🛎️ [SYNC LOCAL] Pedido #${normalizedOrder.orderNumber} (${normalizedOrder.channel}) inyectado desde App Móvil/POS -> Sincronizado a cocina.`);
   res.json({ success: true, order: normalizedOrder });
+});
+
+// Endpoint para consultar el último número de comanda registrado
+app.get('/api/latest-order-number', async (req, res) => {
+  try {
+    const latest = await getLatestOrderNumber();
+    res.json({ success: true, latestOrderNumber: latest });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 // Endpoint para actualizar estado de un pedido desde cualquier dispositivo (Android, POS, etc.)
