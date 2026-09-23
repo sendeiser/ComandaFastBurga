@@ -2,6 +2,15 @@
 // STORAGE SERVICE — LOCAL DATA & PERSISTENCE
 // =========================================================
 
+
+const DEFAULT_CATEGORIES = [
+  { id: 'cat-hamburguesas', name: 'Hamburguesas', emoji: '🍔' },
+  { id: 'cat-agregados', name: 'Agregados', emoji: '🍟' },
+  { id: 'cat-bebidas', name: 'Bebidas', emoji: '🥤' },
+  { id: 'cat-combos', name: 'Combos', emoji: '🔥' },
+  { id: 'cat-postres', name: 'Postres', emoji: '🍦' }
+];
+
 const DEFAULT_PRODUCTS = [
   {
     id: 'prod-1',
@@ -147,6 +156,7 @@ const DEFAULT_SETTINGS = {
 };
 
 const KEYS = {
+  CATEGORIES: 'comandafast_categories',
   CASHIERS: 'comandafast_cashiers',
   CURRENT_CASHIER: 'comandafast_current_cashier',
   PRODUCTS: 'comandafast_products',
@@ -432,6 +442,138 @@ export const storageService = {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('comandafast:orders_updated', { detail: { orders } }));
     }
+  },
+
+
+  // ==========================================
+  // GESTIÓN DE CATEGORÍAS
+  // ==========================================
+  getCategories() {
+    let cats = [];
+    const raw = localStorage.getItem(KEYS.CATEGORIES);
+    if (raw) {
+      try {
+        cats = JSON.parse(raw);
+      } catch (_) {}
+    }
+    if (!Array.isArray(cats) || cats.length === 0) {
+      cats = [...DEFAULT_CATEGORIES];
+    }
+    // Asegurar que categorías existentes en productos estén contempladas
+    const prods = this.getProducts();
+    const existingNames = new Set(cats.map(c => typeof c === 'string' ? c.toLowerCase() : c.name.toLowerCase()));
+    let hasNew = false;
+    for (const p of prods) {
+      if (p.category && !existingNames.has(p.category.toLowerCase())) {
+        cats.push({
+          id: 'cat-' + p.category.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+          name: p.category,
+          emoji: '📁'
+        });
+        existingNames.add(p.category.toLowerCase());
+        hasNew = true;
+      }
+    }
+    if (hasNew || !raw) {
+      localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(cats));
+    }
+    return cats.map(c => typeof c === 'string' ? { id: 'cat-' + c.toLowerCase(), name: c, emoji: '📁' } : c);
+  },
+
+  saveCategories(categories) {
+    if (!Array.isArray(categories)) return;
+    localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(categories));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('comandafast:categories_updated', { detail: { categories } }));
+    }
+  },
+
+  addCategory(name, emoji = '📁') {
+    const trimmed = String(name || '').trim();
+    if (!trimmed) return { success: false, error: 'El nombre de la categoría no puede estar vacío.' };
+    const current = this.getCategories();
+    if (current.some(c => c.name.toLowerCase() === trimmed.toLowerCase())) {
+      return { success: false, error: `La categoría "${trimmed}" ya existe.` };
+    }
+    const newCat = {
+      id: 'cat-' + Date.now(),
+      name: trimmed,
+      emoji: emoji || '📁'
+    };
+    const updated = [...current, newCat];
+    this.saveCategories(updated);
+    return { success: true, category: newCat, categories: updated };
+  },
+
+  updateCategory(oldName, newName, newEmoji) {
+    const oldTrimmed = String(oldName || '').trim();
+    const newTrimmed = String(newName || '').trim();
+    if (!oldTrimmed || !newTrimmed) return { success: false, error: 'Nombres inválidos.' };
+
+    const current = this.getCategories();
+    const idx = current.findIndex(c => c.name.toLowerCase() === oldTrimmed.toLowerCase());
+    if (idx === -1) return { success: false, error: 'Categoría no encontrada.' };
+
+    if (oldTrimmed.toLowerCase() !== newTrimmed.toLowerCase()) {
+      if (current.some((c, i) => i !== idx && c.name.toLowerCase() === newTrimmed.toLowerCase())) {
+        return { success: false, error: `Ya existe otra categoría con el nombre "${newTrimmed}".` };
+      }
+    }
+
+    current[idx] = {
+      ...current[idx],
+      name: newTrimmed,
+      emoji: newEmoji !== undefined ? newEmoji : (current[idx].emoji || '📁')
+    };
+    this.saveCategories(current);
+
+    // Actualizar en cascada todos los productos que pertenecían a la categoría vieja
+    const prods = this.getProducts();
+    let prodsChanged = false;
+    const updatedProds = prods.map(p => {
+      if (p.category && p.category.toLowerCase() === oldTrimmed.toLowerCase()) {
+        prodsChanged = true;
+        return { ...p, category: newTrimmed };
+      }
+      return p;
+    });
+
+    if (prodsChanged) {
+      this.saveProducts(updatedProds);
+    }
+
+    return { success: true, category: current[idx], categories: current, updatedProducts: updatedProds, prodsChanged };
+  },
+
+  deleteCategory(categoryName, fallbackCategory = 'General') {
+    const targetName = String(categoryName || '').trim();
+    if (!targetName) return { success: false, error: 'Nombre inválido.' };
+
+    let current = this.getCategories();
+    current = current.filter(c => c.name.toLowerCase() !== targetName.toLowerCase());
+
+    if (current.length === 0) {
+      current.push({ id: 'cat-general', name: 'General', emoji: '📁' });
+    }
+    this.saveCategories(current);
+
+    // Reasignar productos huérfanos a la categoría de respaldo
+    const prods = this.getProducts();
+    let prodsChanged = false;
+    const fallback = fallbackCategory || 'General';
+    const updatedProds = prods.map(p => {
+      if (p.category && p.category.toLowerCase() === targetName.toLowerCase()) {
+        prodsChanged = true;
+        return { ...p, category: fallback };
+      }
+      return p;
+    });
+
+    if (prodsChanged) {
+      this.saveProducts(updatedProds);
+    }
+
+    return { success: true, categories: current, updatedProducts: updatedProds, prodsChanged };
   },
 
   // CASH SHIFTS (Control de Caja)

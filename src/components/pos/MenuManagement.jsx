@@ -1,8 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import CategoryManagementModal from './CategoryManagementModal';
+import { storageService } from '../../services/storageService';
 import { 
   Plus, Edit2, Trash2, Check, UtensilsCrossed, 
   Upload, Image as ImageIcon, Link as LinkIcon, X, 
-  Sparkles, Camera, RefreshCw
+  Sparkles, Camera, RefreshCw, Layers
 } from 'lucide-react';
 
 export default function MenuManagement({ products, onSaveProducts }) {
@@ -16,6 +18,15 @@ export default function MenuManagement({ products, onSaveProducts }) {
   const [description, setDescription] = useState('');
   const [modifiersStr, setModifiersStr] = useState('');
   const [compressing, setCompressing] = useState(false);
+  const [isCategoriesModalOpen, setIsCategoriesModalOpen] = useState(false);
+  const [availableCategories, setAvailableCategories] = useState(() => storageService.getCategories());
+  const [selectedFilterCategory, setSelectedFilterCategory] = useState('Todas');
+
+  useEffect(() => {
+    const handleCatsUpdated = () => setAvailableCategories(storageService.getCategories());
+    window.addEventListener('comandafast:categories_updated', handleCatsUpdated);
+    return () => window.removeEventListener('comandafast:categories_updated', handleCatsUpdated);
+  }, []);
 
   const fileInputRef = useRef(null);
 
@@ -156,10 +167,22 @@ export default function MenuManagement({ products, onSaveProducts }) {
           </div>
         </div>
 
-        <button className="btn-confirm-order" style={{ width: 'auto', padding: '0.5rem 1.15rem', fontSize: '0.85rem', gap: '6px' }} onClick={openNew}>
-          <Plus size={18} />
-          <span>Nuevo Producto</span>
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button 
+            type="button"
+            className="btn-action-outline" 
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.5rem 1rem', fontSize: '0.85rem', cursor: 'pointer', borderRadius: '8px' }}
+            onClick={() => setIsCategoriesModalOpen(true)}
+          >
+            <Layers size={17} style={{ color: 'var(--accent-amber)' }} />
+            <span style={{ fontWeight: 700 }}>Categorías ({availableCategories.length})</span>
+          </button>
+
+          <button className="btn-confirm-order" style={{ width: 'auto', padding: '0.5rem 1.15rem', fontSize: '0.85rem', gap: '6px' }} onClick={openNew}>
+            <Plus size={18} />
+            <span>Nuevo Producto</span>
+          </button>
+        </div>
       </div>
 
       {/* Products Grid Manager */}
@@ -458,12 +481,23 @@ export default function MenuManagement({ products, onSaveProducts }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                 <div>
                   <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>Categoría:</label>
-                  <select className="custom-input-sm" value={category} onChange={e => setCategory(e.target.value)}>
-                    <option value="Hamburguesas">Hamburguesas</option>
-                    <option value="Agregados">Agregados / Papas</option>
-                    <option value="Bebidas">Bebidas</option>
-                    <option value="Combos">Combos</option>
-                    <option value="Postres">Postres</option>
+                  <select 
+                    className="custom-input-sm" 
+                    value={category} 
+                    onChange={e => {
+                      if (e.target.value === '__NEW__') {
+                        setIsCategoriesModalOpen(true);
+                      } else {
+                        setCategory(e.target.value);
+                      }
+                    }}
+                  >
+                    {availableCategories.map(cat => (
+                      <option key={cat.id || cat.name} value={cat.name}>
+                        {cat.emoji || '📁'} {cat.name}
+                      </option>
+                    ))}
+                    <option value="__NEW__">➕ + Crear nueva categoría...</option>
                   </select>
                 </div>
                 <div>
@@ -513,6 +547,12 @@ export default function MenuManagement({ products, onSaveProducts }) {
           </div>
         </div>
       )}
+
+      {/* MODAL GESTIÓN DE CATEGORÍAS */}
+      <CategoryManagementModal
+        isOpen={isCategoriesModalOpen}
+        onClose={() => setIsCategoriesModalOpen(false)}
+      />
     </div>
   );
 }

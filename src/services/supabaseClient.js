@@ -584,6 +584,41 @@ export const supabaseSync = {
     }
   },
 
+
+  // ===================== CATEGORIES =====================
+
+  async fetchCategories() {
+    if (!this.isConfigured()) return [];
+    try {
+      const res = await fetch(this._url('system_settings', 'id=eq.categories&limit=1'), { headers: this._headers() });
+      if (res.ok) {
+        const rows = await res.json();
+        if (Array.isArray(rows) && rows.length > 0 && rows[0].data && Array.isArray(rows[0].data.categories)) {
+          return rows[0].data.categories;
+        }
+      }
+    } catch (_) {}
+    return [];
+  },
+
+  async saveCategories(categories) {
+    if (!this.isConfigured() || !Array.isArray(categories)) return;
+    try {
+      await fetch(this._url('system_settings'), {
+        method: 'POST',
+        headers: this._headers({ 'Prefer': 'resolution=merge-duplicates' }),
+        body: JSON.stringify({
+          id: 'categories',
+          data: { categories },
+          updated_at: new Date().toISOString()
+        })
+      });
+      console.log('[Supabase] Categorías sincronizadas en la nube.');
+    } catch (e) {
+      console.warn('[Supabase] saveCategories error:', e);
+    }
+  },
+
   // ===================== BOT & AI CONFIG =====================
 
   async fetchBotConfig(key) {

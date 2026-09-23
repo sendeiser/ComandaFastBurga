@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { storageService } from '../../services/storageService';
 import { Search, ShoppingBag, Plus, Trash2, Send, MessageSquare, Utensils, DollarSign, Sparkles } from 'lucide-react';
 import ItemModifierModal from './ItemModifierModal';
 import PaymentModal from './PaymentModal';
@@ -31,10 +32,20 @@ export default function FastOrderPad({
   });
   const [deliveryFee, setDeliveryFee] = useState(settings?.deliveryDefaultFee || 1000);
 
-  // Categories list
+  // System & Dynamic Categories list
+  const [systemCategories, setSystemCategories] = useState(() => storageService.getCategories());
+
+  useEffect(() => {
+    const handleUpdate = () => setSystemCategories(storageService.getCategories());
+    window.addEventListener('comandafast:categories_updated', handleUpdate);
+    return () => window.removeEventListener('comandafast:categories_updated', handleUpdate);
+  }, []);
+
   const categories = useMemo(() => {
-    return ['Todas', ...new Set(products.map(p => p.category))];
-  }, [products]);
+    const fromProds = products.map(p => p.category).filter(Boolean);
+    const fromSystem = systemCategories.map(c => c.name);
+    return ['Todas', ...new Set([...fromSystem, ...fromProds])];
+  }, [products, systemCategories]);
 
   // Filtered Products
   const filteredProducts = useMemo(() => {
@@ -188,16 +199,20 @@ export default function FastOrderPad({
 
           {/* Category Filter Pills */}
           <div className="category-scroll-pills">
-            {categories.map(cat => (
-              <button
-                key={cat}
-                type="button"
-                className={`cat-pill-btn ${selectedCategory === cat ? 'active' : ''}`}
-                onClick={() => setSelectedCategory(cat)}
-              >
-                <span>{cat}</span>
-              </button>
-            ))}
+            {categories.map(cat => {
+              const matched = systemCategories.find(c => c.name === cat);
+              const label = cat === 'Todas' ? '✨ Todas' : `${matched?.emoji || '📁'} ${cat}`;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  className={`cat-pill-btn ${selectedCategory === cat ? 'active' : ''}`}
+                  onClick={() => setSelectedCategory(cat)}
+                >
+                  <span>{label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 

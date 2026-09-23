@@ -6,6 +6,7 @@ import {
   Smartphone, MapPin, Tag, FileText, UserCheck, ShieldAlert
 } from 'lucide-react';
 import { storageService } from '../../../services/storageService';
+import CategoryManagementModal from '../../pos/CategoryManagementModal';
 import { supabaseSync } from '../../../services/supabaseClient';
 import { chatbotService } from '../../../services/chatbotService';
 
@@ -43,6 +44,8 @@ export default function AdminDatabaseTablesTab() {
   const [orders, setOrders] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [settings, setSettings] = useState({});
+  const [categoryList, setCategoryList] = useState(() => storageService.getCategories());
+  const [isCatModalOpen, setIsCatModalOpen] = useState(false);
 
   // 3. Modales y Operaciones
   const [editingItem, setEditingItem] = useState(null);
@@ -85,12 +88,17 @@ export default function AdminDatabaseTablesTab() {
   useEffect(() => {
     loadAllData();
 
-    const handleDataUpdate = () => loadAllData();
+    const handleDataUpdate = () => {
+      loadAllData();
+      setCategoryList(storageService.getCategories());
+    };
+    window.addEventListener('comandafast:categories_updated', handleDataUpdate);
     window.addEventListener('comandafast:products_updated', handleDataUpdate);
     window.addEventListener('comandafast:orders_updated', handleDataUpdate);
     window.addEventListener('comandafast:shifts_updated', handleDataUpdate);
 
     return () => {
+      window.removeEventListener('comandafast:categories_updated', handleDataUpdate);
       window.removeEventListener('comandafast:products_updated', handleDataUpdate);
       window.removeEventListener('comandafast:orders_updated', handleDataUpdate);
       window.removeEventListener('comandafast:shifts_updated', handleDataUpdate);
@@ -157,6 +165,19 @@ export default function AdminDatabaseTablesTab() {
     return list;
   }, [shifts, searchQuery]);
 
+    const filteredCategories = useMemo(() => {
+    if (!searchQuery) return categoryList;
+    const q = searchQuery.toLowerCase();
+    return categoryList.filter(c => 
+      (c.name || '').toLowerCase().includes(q) || 
+      (c.id || '').toLowerCase().includes(q)
+    );
+  }, [categoryList, searchQuery]);
+
+  const getProductCountForCat = useCallback((catName) => {
+    return products.filter(p => (p.category || '').toLowerCase() === (catName || '').toLowerCase()).length;
+  }, [products]);
+
   const categories = useMemo(() => {
     const set = new Set(products.map(p => p.category).filter(Boolean));
     return ['all', ...Array.from(set)];
@@ -168,7 +189,10 @@ export default function AdminDatabaseTablesTab() {
   const handleOpenEdit = (item) => {
     setEditingItem(item);
     setIsCreating(false);
-    if (activeTable === 'products') {
+    if (activeTable === 'categories') {
+      setIsCatModalOpen(true);
+      return;
+    } else if (activeTable === 'products') {
       setFormData({
         id: item.id,
         name: item.name || '',
@@ -366,7 +390,7 @@ export default function AdminDatabaseTablesTab() {
   // EXPORTACIONES JSON / CSV
   // -------------------------------------------------------------
   const handleExportJSON = () => {
-    const tableData = activeTable === 'products' ? products : activeTable === 'orders' ? orders : activeTable === 'shifts' ? shifts : settings;
+    const tableData = activeTable === 'products' ? products : activeTable === 'categories' ? categoryList : activeTable === 'orders' ? orders : activeTable === 'shifts' ? shifts : settings;
     const blob = new Blob([JSON.stringify(tableData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -430,12 +454,12 @@ export default function AdminDatabaseTablesTab() {
             {activeTable !== 'settings' && (
               <button
                 type="button"
-                onClick={handleOpenCreate}
+                onClick={activeTable === 'categories' ? () => setIsCatModalOpen(true) : handleOpenCreate}
                 className="btn-confirm-order"
                 style={{ height: '36px', padding: '0 14px', fontSize: '0.8rem', gap: '6px' }}
               >
                 <Plus size={16} />
-                <span>Nuevo Registro</span>
+                <span>{activeTable === 'categories' ? 'Gestionar / Crear Categoría' : 'Nuevo Registro'}</span>
               </button>
             )}
 
@@ -479,6 +503,24 @@ export default function AdminDatabaseTablesTab() {
               fontWeight: 800 
             }}>
               {products.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className={`cat-pill-btn ${activeTable === 'categories' ? 'active' : ''}`}
+            onClick={() => { setActiveTable('categories'); setSearchQuery(''); }}
+            style={{ gap: '6px', fontSize: '0.82rem', padding: '6px 14px', flexShrink: 0, whiteSpace: 'nowrap' }}
+          >
+            <span>📁 Categorías</span>
+            <span style={{ 
+              background: activeTable === 'categories' ? 'rgba(0,0,0,0.2)' : 'var(--bg-main)', 
+              padding: '1px 7px', 
+              borderRadius: '10px', 
+              fontSize: '0.72rem',
+              fontWeight: 800 
+            }}>
+              {categoryList.length}
             </span>
           </button>
 
@@ -566,7 +608,73 @@ export default function AdminDatabaseTablesTab() {
               </select>
             )}
 
-            {activeTable === 'orders' && (
+            {activeTable === 'categories' && (
+          <div style={{ overflowX: 'auto', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ background: 'var(--bg-main)', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+                  <th style={{ padding: '12px 14px' }}>Categoría</th>
+                  <th style={{ padding: '12px 14px' }}>Identificador</th>
+                  <th style={{ padding: '12px 14px' }}>Productos Asociados</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'right' }}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCategories.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No se encontraron categorías coincidentes.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredCategories.map(cat => {
+                    const count = getProductCountForCat(cat.name);
+                    return (
+                      <tr key={cat.id || cat.name} style={{ borderBottom: '1px solid var(--border-subtle)', transition: 'background 0.15s' }}>
+                        <td style={{ padding: '12px 14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '1.4rem' }}>{cat.emoji || '📁'}</span>
+                            <span style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.9rem' }}>{cat.name}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px 14px', color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                          {cat.id || '-'}
+                        </td>
+                        <td style={{ padding: '12px 14px' }}>
+                          <span style={{
+                            padding: '3px 9px',
+                            borderRadius: '12px',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            background: count > 0 ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-main)',
+                            color: count > 0 ? 'var(--accent-blue, #3b82f6)' : 'var(--text-muted)',
+                            border: '1px solid var(--border-subtle)'
+                          }}>
+                            {count} {count === 1 ? 'producto' : 'productos'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                          <button
+                            type="button"
+                            onClick={() => setIsCatModalOpen(true)}
+                            className="qty-btn"
+                            style={{ height: '30px', padding: '0 12px', fontSize: '0.75rem', gap: '5px' }}
+                            title="Gestionar Categorías"
+                          >
+                            <Edit2 size={13} />
+                            <span>Gestionar</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {activeTable === 'orders' && (
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
@@ -1094,17 +1202,33 @@ export default function AdminDatabaseTablesTab() {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                      Categoría:
-                    </label>
-                    <input
-                      type="text"
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block' }}>
+                        Categoría:
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setIsCatModalOpen(true)}
+                        style={{ background: 'none', border: 'none', color: 'var(--accent-amber)', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 700, padding: 0 }}
+                      >
+                        + Gestionar
+                      </button>
+                    </div>
+                    <select
                       value={formData.category || ''}
                       onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                      placeholder="Hamburguesas, Bebidas..."
                       className="search-input"
                       style={{ width: '100%', height: '36px', fontSize: '0.85rem' }}
-                    />
+                    >
+                      {categoryList.map(c => (
+                        <option key={c.id || c.name} value={c.name}>
+                          {c.emoji ? `${c.emoji} ` : ''}{c.name}
+                        </option>
+                      ))}
+                      {formData.category && !categoryList.some(c => c.name.toLowerCase() === formData.category.toLowerCase()) && (
+                        <option value={formData.category}>{formData.category}</option>
+                      )}
+                    </select>
                   </div>
 
                   <div>
