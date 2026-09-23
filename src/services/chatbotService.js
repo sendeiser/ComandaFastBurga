@@ -111,16 +111,33 @@ export const chatbotService = {
     return DEFAULT_CUSTOM_FLOWS;
   },
 
-  saveCustomFlows(flows) {
+  async saveCustomFlows(flows) {
     try {
       localStorage.setItem('comandafast_custom_flows', JSON.stringify(flows));
       this.syncFlowsWithBotServer(flows);
-      supabaseSync.saveBotFlows(flows);
+      if (supabaseSync.isConfigured()) {
+        await supabaseSync.saveBotFlows(flows);
+      }
       return true;
     } catch (e) {
       console.error('[chatbotService] Error al guardar custom_flows:', e);
       return false;
     }
+  },
+
+  async fetchCloudFlows() {
+    try {
+      if (supabaseSync.isConfigured()) {
+        const cloudFlows = await supabaseSync.fetchBotFlows();
+        if (Array.isArray(cloudFlows) && cloudFlows.length > 0) {
+          localStorage.setItem('comandafast_custom_flows', JSON.stringify(cloudFlows));
+          return cloudFlows;
+        }
+      }
+    } catch (e) {
+      console.warn('[chatbotService] Error al cargar flujos desde Supabase:', e);
+    }
+    return this.getCustomFlows();
   },
 
   resetCustomFlows() {
@@ -180,15 +197,35 @@ export const chatbotService = {
     };
   },
 
-  // 2. Guardar ajustes del bot
-  saveSettings(newSettings) {
+  // 2. Guardar ajustes del bot (Local + Supabase Cloud)
+  async saveSettings(newSettings) {
     try {
       localStorage.setItem(BOT_SETTINGS_KEY, JSON.stringify(newSettings));
+      if (supabaseSync.isConfigured()) {
+        await supabaseSync.saveBotTemplates(newSettings);
+      }
       return true;
     } catch (e) {
       console.error('[chatbotService] Error al guardar ajustes:', e);
       return false;
     }
+  },
+
+  async fetchCloudTemplates() {
+    try {
+      if (supabaseSync.isConfigured()) {
+        const cloudData = await supabaseSync.fetchBotTemplates();
+        if (cloudData && typeof cloudData === 'object' && Object.keys(cloudData).length > 0) {
+          const current = this.getSettings();
+          const merged = { ...current, ...cloudData };
+          localStorage.setItem(BOT_SETTINGS_KEY, JSON.stringify(merged));
+          return merged;
+        }
+      }
+    } catch (e) {
+      console.warn('[chatbotService] Error al cargar plantillas desde Supabase:', e);
+    }
+    return this.getSettings();
   },
 
   // 3. Obtener productos frescos directamente de la base de datos (Supabase + Local)

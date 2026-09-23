@@ -1254,6 +1254,16 @@ app.patch('/api/orders/:id/status', (req, res) => {
   res.json({ success: true, id, status });
 });
 
+// Endpoint para vaciar todas las órdenes
+app.delete('/api/orders', (req, res) => {
+  try {
+    fs.writeFileSync(ORDERS_FILE, JSON.stringify([], null, 2), 'utf-8');
+  } catch (_) {}
+  pendingOrdersForPos = [];
+  console.log('🗑️ [SYNC CLEAR] Todas las órdenes vaciadas en servidor local.');
+  res.json({ success: true, count: 0 });
+});
+
 // Endpoint para eliminar un pedido desde cualquier dispositivo (Android, POS, etc.)
 app.delete('/api/orders/:id', (req, res) => {
   const { id } = req.params;

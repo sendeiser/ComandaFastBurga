@@ -1,13 +1,17 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import CategoryManagementModal from './CategoryManagementModal';
 import { storageService } from '../../services/storageService';
 import { 
   Plus, Edit2, Trash2, Check, UtensilsCrossed, 
   Upload, Image as ImageIcon, Link as LinkIcon, X, 
-  Sparkles, Camera, RefreshCw, Layers
+  Sparkles, Camera, RefreshCw, Layers, Search, Filter
 } from 'lucide-react';
 
-export default function MenuManagement({ products, onSaveProducts }) {
+export default function MenuManagement({ products = [], onSaveProducts }) {
+  // Sub-pestaña activa dentro del módulo de Menú
+  const [activeSubTab, setActiveSubTab] = useState('products'); // 'products' | 'categories'
+
+  // Estados de edición de producto
   const [editingProduct, setEditingProduct] = useState(null);
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Hamburguesas');
@@ -18,9 +22,11 @@ export default function MenuManagement({ products, onSaveProducts }) {
   const [description, setDescription] = useState('');
   const [modifiersStr, setModifiersStr] = useState('');
   const [compressing, setCompressing] = useState(false);
-  const [isCategoriesModalOpen, setIsCategoriesModalOpen] = useState(false);
+
+  // Estados de filtrado y categorías
   const [availableCategories, setAvailableCategories] = useState(() => storageService.getCategories());
   const [selectedFilterCategory, setSelectedFilterCategory] = useState('Todas');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const handleCatsUpdated = () => setAvailableCategories(storageService.getCategories());
@@ -33,9 +39,11 @@ export default function MenuManagement({ products, onSaveProducts }) {
   const openNew = () => {
     setEditingProduct({ id: null });
     setName('');
-    setCategory('Hamburguesas');
+    const defaultCat = availableCategories[0]?.name || 'Hamburguesas';
+    const defaultEmoji = availableCategories[0]?.emoji || '🍔';
+    setCategory(defaultCat);
     setPrice('');
-    setEmoji('🍔');
+    setEmoji(defaultEmoji);
     setImage('https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format&fit=crop&q=80');
     setDescription('');
     setModifiersStr('Sin cebolla, Extra Cheddar (+$800), Extra Bacon (+$900)');
@@ -101,25 +109,32 @@ export default function MenuManagement({ products, onSaveProducts }) {
           setCompressing(false);
         }
       };
+      img.onerror = () => {
+        setCompressing(false);
+        alert('No se pudo procesar la imagen seleccionada.');
+      };
       img.src = event.target.result;
     };
-
     reader.readAsDataURL(file);
   };
 
   const handleSave = (e) => {
     e.preventDefault();
     if (!name.trim() || !price) {
-      alert('Completa el nombre y precio del producto.');
+      alert('Por favor completa el nombre y el precio.');
       return;
     }
 
-    const modsArray = modifiersStr.split(',').map(m => m.trim()).filter(Boolean);
+    const modsArray = modifiersStr
+      .split(',')
+      .map(m => m.trim())
+      .filter(Boolean);
+
     const itemData = {
       id: editingProduct.id || 'prod-' + Date.now(),
       name: name.trim(),
       category,
-      price: Number(price),
+      price: parseFloat(price) || 0,
       emoji: emoji || '🍔',
       image: image.trim(),
       description: description.trim(),
@@ -140,153 +155,368 @@ export default function MenuManagement({ products, onSaveProducts }) {
     }
   };
 
+  // Filtrado de productos
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => {
+      const matchesCat = selectedFilterCategory === 'Todas' || (p.category || '').toLowerCase() === selectedFilterCategory.toLowerCase();
+      const matchesQuery = !searchQuery.trim() || 
+        (p.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.description || '').toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesCat && matchesQuery;
+    });
+  }, [products, selectedFilterCategory, searchQuery]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
-      {/* Top Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', padding: '1rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+      {/* BARRA SUPERIOR CON SUB-PESTAÑAS */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        background: 'var(--bg-card)',
+        padding: '1rem 1.25rem',
+        borderRadius: 'var(--radius-lg)',
+        border: '1px solid var(--border-subtle)',
+        flexWrap: 'wrap',
+        gap: '1rem'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <div style={{
-            width: '38px',
-            height: '38px',
-            borderRadius: '10px',
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
             background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.35))',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             border: '1px solid var(--accent-amber)'
           }}>
-            <UtensilsCrossed size={20} style={{ color: 'var(--accent-amber)' }} />
+            <UtensilsCrossed size={22} style={{ color: 'var(--accent-amber)' }} />
           </div>
           <div>
-            <div style={{ fontWeight: 900, fontSize: '1.1rem', color: 'var(--text-primary)' }}>
-              ADMINISTRACIÓN DEL MENÚ & FOTOS ({products.length} productos)
+            <div style={{ fontWeight: 900, fontSize: '1.15rem', color: 'var(--text-primary)' }}>
+              MÓDULO DE MENÚ & CATEGORÍAS
             </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              Sube fotos reales para que el Chatbot y WhatsApp muestren las imágenes a los clientes
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              Gestiona los productos, fotos, modificadores y categorías disponibles en la plataforma
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <button 
+        {/* SELECTOR DE SUB-PESTAÑAS: PRODUCTOS / CATEGORÍAS */}
+        <div style={{
+          display: 'flex',
+          gap: '6px',
+          background: 'var(--bg-main)',
+          padding: '4px',
+          borderRadius: '12px',
+          border: '1px solid var(--border-subtle)'
+        }}>
+          <button
             type="button"
-            className="btn-action-outline" 
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.5rem 1rem', fontSize: '0.85rem', cursor: 'pointer', borderRadius: '8px' }}
-            onClick={() => setIsCategoriesModalOpen(true)}
+            onClick={() => setActiveSubTab('products')}
+            style={{
+              padding: '7px 16px',
+              borderRadius: '9px',
+              border: 'none',
+              background: activeSubTab === 'products' ? 'var(--accent-amber)' : 'transparent',
+              color: activeSubTab === 'products' ? '#000' : 'var(--text-secondary)',
+              fontWeight: 800,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease'
+            }}
           >
-            <Layers size={17} style={{ color: 'var(--accent-amber)' }} />
-            <span style={{ fontWeight: 700 }}>Categorías ({availableCategories.length})</span>
+            <span>🍔 Productos</span>
+            <span style={{
+              background: activeSubTab === 'products' ? 'rgba(0,0,0,0.18)' : 'var(--bg-card)',
+              color: activeSubTab === 'products' ? '#000' : 'var(--text-muted)',
+              padding: '2px 7px',
+              borderRadius: '10px',
+              fontSize: '0.72rem',
+              fontWeight: 900
+            }}>
+              {products.length}
+            </span>
           </button>
 
-          <button className="btn-confirm-order" style={{ width: 'auto', padding: '0.5rem 1.15rem', fontSize: '0.85rem', gap: '6px' }} onClick={openNew}>
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('categories')}
+            style={{
+              padding: '7px 16px',
+              borderRadius: '9px',
+              border: 'none',
+              background: activeSubTab === 'categories' ? 'var(--accent-amber)' : 'transparent',
+              color: activeSubTab === 'categories' ? '#000' : 'var(--text-secondary)',
+              fontWeight: 800,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Layers size={16} />
+            <span>📁 Categorías</span>
+            <span style={{
+              background: activeSubTab === 'categories' ? 'rgba(0,0,0,0.18)' : 'var(--bg-card)',
+              color: activeSubTab === 'categories' ? '#000' : 'var(--text-muted)',
+              padding: '2px 7px',
+              borderRadius: '10px',
+              fontSize: '0.72rem',
+              fontWeight: 900
+            }}>
+              {availableCategories.length}
+            </span>
+          </button>
+        </div>
+
+        {/* BOTÓN NUEVO PRODUCTO (SOLO EN SUB-PESTAÑA PRODUCTOS) */}
+        {activeSubTab === 'products' && (
+          <button
+            className="btn-confirm-order"
+            style={{ width: 'auto', padding: '0.55rem 1.25rem', fontSize: '0.85rem', gap: '6px' }}
+            onClick={openNew}
+          >
             <Plus size={18} />
             <span>Nuevo Producto</span>
           </button>
-        </div>
+        )}
       </div>
 
-      {/* Products Grid Manager */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem', overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
-        {products.map(prod => (
-          <div key={prod.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', padding: '1rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '0.75rem', boxShadow: 'var(--shadow-sm)' }}>
-            <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
-              {/* Product Thumbnail (Photo or Emoji) */}
-              <div style={{ position: 'relative', flexShrink: 0 }}>
-                {prod.image ? (
-                  <img
-                    src={prod.image}
-                    alt={prod.name}
-                    style={{
-                      width: '64px',
-                      height: '64px',
-                      borderRadius: '12px',
-                      objectFit: 'cover',
-                      border: '1.5px solid var(--border-subtle)',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
-                    }}
-                  />
-                ) : (
-                  <div style={{
-                    width: '64px',
-                    height: '64px',
-                    borderRadius: '12px',
-                    background: 'var(--bg-main)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '2rem',
-                    border: '1px solid var(--border-subtle)'
-                  }}>
-                    {prod.emoji}
-                  </div>
-                )}
-                {prod.image && (
-                  <span style={{
-                    position: 'absolute',
-                    bottom: '-4px',
-                    right: '-4px',
-                    background: 'var(--bg-card)',
-                    borderRadius: '50%',
-                    padding: '2px',
-                    fontSize: '0.7rem',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                  }}>
-                    {prod.emoji}
-                  </span>
-                )}
-              </div>
-
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 900, color: 'var(--text-primary)', fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {prod.name}
-                </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--accent-amber)', fontWeight: 800, marginTop: '1px' }}>
-                  {prod.category}
-                </div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', lineHeight: '1.3', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                  {prod.description || 'Sin descripción'}
-                </div>
-              </div>
+      {/* ========================================================= */}
+      {/* VISTA 1: GESTIÓN DE PRODUCTOS                             */}
+      {/* ========================================================= */}
+      {activeSubTab === 'products' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1, minHeight: 0 }}>
+          
+          {/* BARRA DE BÚSQUEDA Y FILTRO DE CATEGORÍAS */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            flexWrap: 'wrap',
+            background: 'var(--bg-card)',
+            padding: '0.75rem 1rem',
+            borderRadius: 'var(--radius-lg)',
+            border: '1px solid var(--border-subtle)'
+          }}>
+            <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: '340px' }}>
+              <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                placeholder="Buscar por nombre o ingredientes..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="search-input"
+                style={{ width: '100%', height: '36px', paddingLeft: '32px', fontSize: '0.82rem' }}
+              />
             </div>
 
-            {prod.modifiers && prod.modifiers.length > 0 && (
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', background: 'var(--bg-main)', padding: '6px 8px', borderRadius: '6px', lineHeight: '1.3' }}>
-                <strong style={{ color: 'var(--text-primary)' }}>Modificadores:</strong> {prod.modifiers.join(', ')}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: '0.65rem' }}>
-              <span style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--accent-amber)' }}>
-                ${prod.price.toLocaleString('es-AR')}
-              </span>
-
-              <div style={{ display: 'flex', gap: '0.4rem' }}>
-                <button
-                  type="button"
-                  className="qty-btn"
-                  onClick={() => openEdit(prod)}
-                  title="Editar producto y foto"
-                  style={{ width: 'auto', padding: '0 8px', height: '30px', fontSize: '0.75rem', gap: '4px' }}
-                >
-                  <Edit2 size={13} />
-                  <span>Editar</span>
-                </button>
-                <button
-                  type="button"
-                  className="qty-btn"
-                  style={{ width: '30px', height: '30px', padding: 0, color: 'var(--accent-rose)' }}
-                  onClick={() => handleDelete(prod.id)}
-                  title="Eliminar producto"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
+            {/* PÍLDORAS DE FILTRADO POR CATEGORÍA */}
+            <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', flex: '2 1 300px', paddingBottom: '2px' }}>
+              <button
+                type="button"
+                className={`cat-pill-btn ${selectedFilterCategory === 'Todas' ? 'active' : ''}`}
+                onClick={() => setSelectedFilterCategory('Todas')}
+                style={{ fontSize: '0.78rem', height: '32px', padding: '0 12px', flexShrink: 0 }}
+              >
+                Todas ({products.length})
+              </button>
+              {availableCategories.map(cat => {
+                const count = products.filter(p => (p.category || '').toLowerCase() === (cat.name || '').toLowerCase()).length;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    className={`cat-pill-btn ${selectedFilterCategory.toLowerCase() === (cat.name || '').toLowerCase() ? 'active' : ''}`}
+                    onClick={() => setSelectedFilterCategory(cat.name)}
+                    style={{ fontSize: '0.78rem', height: '32px', padding: '0 12px', flexShrink: 0, gap: '4px' }}
+                  >
+                    <span>{cat.emoji}</span>
+                    <span>{cat.name}</span>
+                    <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>({count})</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
-        ))}
-      </div>
 
-      {/* Edit/New Modal with Photo Upload */}
+          {/* GRILLA DE PRODUCTOS */}
+          {filteredProducts.length === 0 ? (
+            <div style={{
+              background: 'var(--bg-card)',
+              border: '1px dashed var(--border-subtle)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '3rem 1.5rem',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '0.75rem',
+              margin: 'auto 0'
+            }}>
+              <UtensilsCrossed size={36} style={{ color: 'var(--text-muted)' }} />
+              <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)' }}>
+                No se encontraron productos
+              </div>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                {searchQuery || selectedFilterCategory !== 'Todas' 
+                  ? 'Intenta restablecer la búsqueda o el filtro de categoría.'
+                  : 'Aún no hay productos en el menú. ¡Crea el primero!'}
+              </p>
+              {(searchQuery || selectedFilterCategory !== 'Todas') && (
+                <button
+                  type="button"
+                  onClick={() => { setSearchQuery(''); setSelectedFilterCategory('Todas'); }}
+                  className="cat-pill-btn"
+                  style={{ height: '32px', padding: '0 12px', fontSize: '0.8rem' }}
+                >
+                  Ver Todos los Productos
+                </button>
+              )}
+            </div>
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+              gap: '1rem',
+              overflowY: 'auto',
+              flex: 1,
+              paddingRight: '4px'
+            }}>
+              {filteredProducts.map(prod => (
+                <div
+                  key={prod.id}
+                  style={{
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-lg)',
+                    padding: '1rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '0.75rem',
+                    boxShadow: 'var(--shadow-sm)'
+                  }}
+                >
+                  <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
+                    {/* Thumbnail del Producto (Foto o Emoji) */}
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      {prod.image ? (
+                        <img
+                          src={prod.image}
+                          alt={prod.name}
+                          style={{
+                            width: '64px',
+                            height: '64px',
+                            borderRadius: '12px',
+                            objectFit: 'cover',
+                            border: '1.5px solid var(--border-subtle)',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+                          }}
+                        />
+                      ) : (
+                        <div style={{
+                          width: '64px',
+                          height: '64px',
+                          borderRadius: '12px',
+                          background: 'var(--bg-main)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '2rem',
+                          border: '1px solid var(--border-subtle)'
+                        }}>
+                          {prod.emoji}
+                        </div>
+                      )}
+                      {prod.image && (
+                        <span style={{
+                          position: 'absolute',
+                          bottom: '-4px',
+                          right: '-4px',
+                          background: 'var(--bg-card)',
+                          borderRadius: '50%',
+                          padding: '2px',
+                          fontSize: '0.7rem',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                        }}>
+                          {prod.emoji}
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 900, color: 'var(--text-primary)', fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {prod.name}
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--accent-amber)', fontWeight: 800, marginTop: '1px' }}>
+                        {prod.category}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', lineHeight: '1.3', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {prod.description || 'Sin descripción'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {prod.modifiers && prod.modifiers.length > 0 && (
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', background: 'var(--bg-main)', padding: '6px 8px', borderRadius: '6px', lineHeight: '1.3' }}>
+                      <strong style={{ color: 'var(--text-primary)' }}>Modificadores:</strong> {prod.modifiers.join(', ')}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: '0.65rem' }}>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--accent-amber)' }}>
+                      ${prod.price.toLocaleString('es-AR')}
+                    </span>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        className="btn-edit-item"
+                        onClick={() => openEdit(prod)}
+                        title="Editar Producto & Foto"
+                        style={{ height: '32px', width: '32px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button
+                        className="btn-delete-item"
+                        onClick={() => handleDelete(prod.id)}
+                        title="Eliminar Producto"
+                        style={{ height: '32px', width: '32px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* VISTA 2: GESTIÓN DE CATEGORÍAS (INLINE)                   */}
+      {/* ========================================================= */}
+      {activeSubTab === 'categories' && (
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <CategoryManagementModal
+            isInline={true}
+            products={products}
+            onProductsUpdated={onSaveProducts}
+          />
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL CREAR / EDITAR PRODUCTO & FOTO                     */}
+      {/* ========================================================= */}
       {editingProduct && (
         <div className="modal-overlay" onClick={() => setEditingProduct(null)}>
           <div className="modal-card" style={{ maxWidth: '520px', width: '95%' }} onClick={e => e.stopPropagation()}>
@@ -299,7 +529,7 @@ export default function MenuManagement({ products, onSaveProducts }) {
             </div>
 
             <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              {/* PHOTO UPLOAD & PREVIEW SECTION */}
+              {/* SECCIÓN FOTO DEL PRODUCTO */}
               <div style={{
                 background: 'var(--bg-main)',
                 border: '1.5px dashed var(--border-subtle)',
@@ -351,7 +581,7 @@ export default function MenuManagement({ products, onSaveProducts }) {
                   </div>
                 </div>
 
-                {/* IMAGE PREVIEW OR UPLOADER */}
+                {/* PREVISUALIZACIÓN O SUBIDA */}
                 {image ? (
                   <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', maxHeight: '160px', border: '1px solid var(--border-subtle)' }}>
                     <img
@@ -418,97 +648,85 @@ export default function MenuManagement({ products, onSaveProducts }) {
                       gap: '6px'
                     }}
                   >
-                    <Upload size={28} style={{ color: 'var(--accent-amber)' }} />
-                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                      {compressing ? 'Comprimiendo y optimizando foto...' : 'Haz clic para subir foto desde tu PC o celular'}
-                    </div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                      Formatos compatibles: JPG, PNG, WEBP (Se optimiza automáticamente)
-                    </div>
+                    <Upload size={24} style={{ color: 'var(--text-muted)' }} />
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700 }}>
+                      {compressing ? 'Procesando y optimizando imagen...' : 'Haz clic para subir foto desde tu dispositivo'}
+                    </span>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                      JPG, PNG o WEBP (se optimiza automáticamente)
+                    </span>
                   </div>
                 )}
 
-                {/* Hidden File Input */}
                 <input
-                  type="file"
                   ref={fileInputRef}
+                  type="file"
                   accept="image/*"
                   onChange={handleFileUpload}
                   style={{ display: 'none' }}
                 />
 
-                {/* URL Input Mode */}
                 {imageMode === 'url' && (
-                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
                     <input
                       type="url"
-                      className="custom-input-sm"
-                      placeholder="Pega enlace de imagen (https://...)"
+                      placeholder="https://ejemplo.com/hamburguesa.jpg"
                       value={image}
                       onChange={e => setImage(e.target.value)}
-                      style={{ fontSize: '0.78rem', flex: 1 }}
+                      className="custom-input-sm"
+                      style={{ flex: 1 }}
                     />
                   </div>
                 )}
               </div>
 
-              {/* NAME & EMOJI */}
-              <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr', gap: '0.5rem' }}>
+              {/* CAMPOS DEL PRODUCTO */}
+              <div>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>Nombre del Producto:</label>
+                <input
+                  type="text"
+                  required
+                  className="custom-input-sm"
+                  placeholder="Ej: Hamburguesa Doble Cheddar"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 1fr', gap: '8px' }}>
                 <div>
                   <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>Emoji:</label>
                   <input
                     type="text"
                     className="custom-input-sm"
-                    style={{ fontSize: '1.2rem', textAlign: 'center' }}
                     value={emoji}
                     onChange={e => setEmoji(e.target.value)}
+                    style={{ textAlign: 'center', fontSize: '1.2rem' }}
                   />
                 </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>Nombre del Producto:</label>
-                  <input
-                    type="text"
-                    className="custom-input-sm"
-                    placeholder="Ej: Burger Doble Bacon"
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
 
-              {/* CATEGORY & PRICE */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                 <div>
                   <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>Categoría:</label>
-                  <select 
-                    className="custom-input-sm" 
-                    value={category} 
-                    onChange={e => {
-                      if (e.target.value === '__NEW__') {
-                        setIsCategoriesModalOpen(true);
-                      } else {
-                        setCategory(e.target.value);
-                      }
-                    }}
+                  <select
+                    className="custom-input-sm"
+                    value={category}
+                    onChange={e => setCategory(e.target.value)}
                   >
-                    {availableCategories.map(cat => (
-                      <option key={cat.id || cat.name} value={cat.name}>
-                        {cat.emoji || '📁'} {cat.name}
-                      </option>
+                    {availableCategories.map(c => (
+                      <option key={c.id} value={c.name}>{c.emoji} {c.name}</option>
                     ))}
-                    <option value="__NEW__">➕ + Crear nueva categoría...</option>
                   </select>
                 </div>
+
                 <div>
                   <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>Precio ($):</label>
                   <input
                     type="number"
+                    required
                     className="custom-input-sm"
-                    placeholder="Ej: 7500"
+                    placeholder="8000"
                     value={price}
                     onChange={e => setPrice(e.target.value)}
-                    required
                   />
                 </div>
               </div>
@@ -547,12 +765,6 @@ export default function MenuManagement({ products, onSaveProducts }) {
           </div>
         </div>
       )}
-
-      {/* MODAL GESTIÓN DE CATEGORÍAS */}
-      <CategoryManagementModal
-        isOpen={isCategoriesModalOpen}
-        onClose={() => setIsCategoriesModalOpen(false)}
-      />
     </div>
   );
 }

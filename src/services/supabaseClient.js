@@ -283,13 +283,32 @@ export const supabaseSync = {
   async deleteOrder(orderId) {
     if (!this.isConfigured() || !orderId) return false;
     try {
-      const res = await fetch(this._url('orders', `id=eq.${orderId}`), {
+      const cleanId = String(orderId).trim();
+      const res = await fetch(this._url('orders', `id=eq.${encodeURIComponent(cleanId)}`), {
+        method: 'DELETE',
+        headers: this._headers({ 'Prefer': 'return=representation' })
+      });
+      if (res.ok) {
+        console.log(`[Supabase] Orden ${cleanId} eliminada permanentemente de la nube.`);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.warn('[Supabase] deleteOrder error:', e);
+      return false;
+    }
+  },
+
+  async clearAllOrders() {
+    if (!this.isConfigured()) return false;
+    try {
+      const res = await fetch(this._url('orders', 'id=neq.dummy_never_matches'), {
         method: 'DELETE',
         headers: this._headers({ 'Prefer': 'return=representation' })
       });
       return res.ok;
     } catch (e) {
-      console.warn('[Supabase] deleteOrder error:', e);
+      console.warn('[Supabase] clearAllOrders error:', e);
       return false;
     }
   },
@@ -675,6 +694,14 @@ export const supabaseSync = {
 
   async saveBotFlows(flows) {
     return this.saveBotConfig('flows', flows);
+  },
+
+  async fetchBotTemplates() {
+    return this.fetchBotConfig('templates');
+  },
+
+  async saveBotTemplates(templates) {
+    return this.saveBotConfig('templates', templates);
   },
 
 // ===================== REALTIME POLLING INIT =====================

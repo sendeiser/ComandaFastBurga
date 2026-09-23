@@ -9,7 +9,7 @@ const QUICK_EMOJIS = [
   '🌭', '🍣', '🥟', '🍩', '🍗', '🍷'
 ];
 
-export default function CategoryManagementModal({ products = [], onProductsUpdated, onClose }) {
+export default function CategoryManagementModal({ products = [], onProductsUpdated, onClose, isInline = false }) {
   const [categories, setCategories] = useState(() => storageService.getCategories());
   const [newName, setNewName] = useState('');
   const [newEmoji, setNewEmoji] = useState('🍔');
@@ -117,33 +117,19 @@ export default function CategoryManagementModal({ products = [], onProductsUpdat
     setDeletingCat(null);
   };
 
-  return (
+  const cardContent = (
     <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0, 0, 0, 0.7)',
-      backdropFilter: 'blur(4px)',
+      background: 'var(--bg-card, #1e293b)',
+      border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))',
+      borderRadius: '16px',
+      width: '100%',
+      maxWidth: isInline ? '100%' : '680px',
+      maxHeight: isInline ? 'none' : '90vh',
       display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 9999,
-      padding: '1rem'
+      flexDirection: 'column',
+      boxShadow: isInline ? 'var(--shadow-sm)' : '0 20px 40px rgba(0,0,0,0.5)',
+      overflow: 'hidden'
     }}>
-      <div style={{
-        background: 'var(--bg-card, #1e293b)',
-        border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))',
-        borderRadius: '16px',
-        width: '100%',
-        maxWidth: '680px',
-        maxHeight: '90vh',
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
-        overflow: 'hidden'
-      }}>
         {/* MODAL HEADER */}
         <div style={{
           padding: '1.25rem 1.5rem',
@@ -176,22 +162,24 @@ export default function CategoryManagementModal({ products = [], onProductsUpdat
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--text-secondary, #94a3b8)',
-              cursor: 'pointer',
-              padding: '6px',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <X size={20} />
-          </button>
+          {!isInline && onClose && (
+            <button
+              onClick={onClose}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-secondary, #94a3b8)',
+                cursor: 'pointer',
+                padding: '6px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <X size={20} />
+            </button>
+          )}
         </div>
 
         {/* FEEDBACK TOAST */}
@@ -605,29 +593,53 @@ export default function CategoryManagementModal({ products = [], onProductsUpdat
         )}
 
         {/* MODAL FOOTER */}
-        <div style={{
-          padding: '1rem 1.5rem',
-          borderTop: '1px solid var(--border-subtle, rgba(255,255,255,0.1))',
-          display: 'flex',
-          justifyContent: 'flex-end'
-        }}>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '8px 20px',
-              borderRadius: '8px',
-              background: 'rgba(255,255,255,0.1)',
-              color: '#fff',
-              border: 'none',
-              fontWeight: 800,
-              fontSize: '0.85rem',
-              cursor: 'pointer'
-            }}
-          >
-            Cerrar
-          </button>
-        </div>
+        {!isInline && onClose && (
+          <div style={{
+            padding: '1rem 1.5rem',
+            borderTop: '1px solid var(--border-subtle, rgba(255,255,255,0.1))',
+            display: 'flex',
+            justifyContent: 'flex-end'
+          }}>
+            <button
+              onClick={onClose}
+              style={{
+                padding: '8px 20px',
+                borderRadius: '8px',
+                background: 'rgba(255,255,255,0.1)',
+                color: '#fff',
+                border: 'none',
+                fontWeight: 800,
+                fontSize: '0.85rem',
+                cursor: 'pointer'
+              }}
+            >
+              Cerrar
+            </button>
+          </div>
+        )}
       </div>
+  );
+
+  if (isInline) {
+    return cardContent;
+  }
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0, 0, 0, 0.7)',
+      backdropFilter: 'blur(4px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 9999,
+      padding: '1rem'
+    }}>
+      {cardContent}
     </div>
   );
 }

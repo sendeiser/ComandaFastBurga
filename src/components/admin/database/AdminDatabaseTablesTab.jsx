@@ -367,13 +367,14 @@ export default function AdminDatabaseTablesTab() {
         chatbotService.syncWithBaileysServer().catch(() => {});
         showToast(`🗑️ Producto eliminado de la base de datos y Supabase.`);
       } else if (activeTable === 'orders') {
-        storageService.deleteOrder(itemToDelete.id);
-        setOrders(storageService.getOrders());
+        const idToDelete = itemToDelete.id;
+        storageService.deleteOrder(idToDelete);
+        setOrders(prev => prev.filter(o => o.id !== idToDelete));
         await Promise.allSettled([
-          supabaseSync.deleteOrder(itemToDelete.id),
-          fetch(`http://${botHost}:3002/api/orders/${itemToDelete.id}`, { method: 'DELETE' }).catch(() => {})
+          supabaseSync.deleteOrder(idToDelete),
+          fetch(`http://${botHost}:3002/api/orders/${idToDelete}`, { method: 'DELETE' }).catch(() => {})
         ]);
-        showToast(`🗑️ Comanda eliminada permanentemente de BD, Supabase y servidor.`);
+        showToast(`🗑️ Comanda eliminada permanentemente de la Base de Datos.`);
       } else if (activeTable === 'shifts') {
         storageService.deleteCashShiftHistoryItem(itemToDelete.id);
         await supabaseSync.deleteCashShift(itemToDelete.id);
@@ -383,6 +384,29 @@ export default function AdminDatabaseTablesTab() {
       await loadAllData();
     } catch (err) {
       showToast('❌ Error al eliminar el registro.', 'error');
+    }
+  };
+
+  const [isClearingOrders, setIsClearingOrders] = useState(false);
+
+  const handleClearAllOrders = async () => {
+    if (!window.confirm('⚠️ ¿Estás seguro de que deseas VACIAR TODAS LAS COMANDAS de la base de datos y de la aplicación? Esta acción no se puede deshacer.')) {
+      return;
+    }
+    setIsClearingOrders(true);
+    try {
+      const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+      localStorage.setItem('comandafast_orders', JSON.stringify([]));
+      setOrders([]);
+      await Promise.allSettled([
+        supabaseSync.clearAllOrders(),
+        fetch(`http://${botHost}:3002/api/orders`, { method: 'DELETE' }).catch(() => {})
+      ]);
+      showToast('🗑️ Todas las comandas han sido eliminadas permanentemente de la Base de Datos.');
+    } catch (e) {
+      showToast('❌ Error al vaciar comandas.', 'error');
+    } finally {
+      setIsClearingOrders(false);
     }
   };
 
@@ -460,6 +484,20 @@ export default function AdminDatabaseTablesTab() {
               >
                 <Plus size={16} />
                 <span>{activeTable === 'categories' ? 'Gestionar / Crear Categoría' : 'Nuevo Registro'}</span>
+              </button>
+            )}
+
+            {activeTable === 'orders' && orders.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearAllOrders}
+                disabled={isClearingOrders}
+                className="cat-pill-btn"
+                style={{ height: '36px', padding: '0 12px', fontSize: '0.8rem', gap: '6px', borderColor: 'var(--accent-rose, #ef4444)', color: '#ef4444' }}
+                title="Vaciar todas las comandas de la base de datos"
+              >
+                <Trash2 size={15} />
+                <span>{isClearingOrders ? 'Vaciando...' : 'Vaciar Comandas'}</span>
               </button>
             )}
 

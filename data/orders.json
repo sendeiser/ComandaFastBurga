@@ -845,40 +845,6 @@
     "updatedAt": 1790111601934
   },
   {
-    "id": "test-app-sync-1790110720175",
-    "orderNumber": 999,
-    "channel": "mostrador",
-    "tableNumber": "",
-    "customer": {
-      "name": "Cliente Test",
-      "phone": "",
-      "address": ""
-    },
-    "items": [
-      {
-        "id": "item-0.35224372366538237",
-        "qty": 1,
-        "name": "Burger Test",
-        "unitPrice": 5000,
-        "notes": "",
-        "modifiers": []
-      }
-    ],
-    "subtotal": 5000,
-    "deliveryFee": 0,
-    "total": 5000,
-    "paymentMethod": "efectivo",
-    "status": "entregado",
-    "statusTimestamps": {
-      "createdAt": "2026-09-22T21:13:21.889Z",
-      "cookingAt": null,
-      "readyAt": null,
-      "deliveredAt": null
-    },
-    "createdAt": "2026-09-22T20:58:40.175+00:00",
-    "updatedAt": 1790113804658
-  },
-  {
     "id": "test-postgrest-check-1",
     "orderNumber": 777,
     "channel": "mostrador",
@@ -1096,37 +1062,5 @@
     },
     "createdAt": "2026-09-22T17:19:22Z",
     "updatedAt": 1790113801355
-  },
-  {
-    "id": "test-order-live",
-    "orderNumber": 99,
-    "channel": "mostrador",
-    "tableNumber": "",
-    "customer": {
-      "name": "Cliente",
-      "phone": "",
-      "address": ""
-    },
-    "items": [
-      {
-        "productId": "1",
-        "name": "Hamburguesa Doble",
-        "price": 6000,
-        "qty": 1
-      }
-    ],
-    "subtotal": 6000,
-    "deliveryFee": 0,
-    "total": 6000,
-    "paymentMethod": "efectivo",
-    "status": "entregado",
-    "statusTimestamps": {
-      "createdAt": "2026-09-22T21:13:21.888Z",
-      "cookingAt": null,
-      "readyAt": null,
-      "deliveredAt": null
-    },
-    "createdAt": "2026-09-22T20:14:39.337Z",
-    "updatedAt": 1790113800076
   }
 ]

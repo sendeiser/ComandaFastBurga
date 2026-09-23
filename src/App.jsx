@@ -341,13 +341,29 @@ export default function App() {
             setOrders(storageService.getOrders());
           }
 
-          // D. Sincronizar historial faltante hacia Supabase Cloud
+          // D. Sincronización de borrado: Si Supabase es la fuente de verdad y devolvió órdenes activas,
+          // podar del almacenamiento local las órdenes que ya fueron eliminadas permanentemente en la nube.
           if (supabaseSync.isConfigured() && cloudOrders.length > 0) {
             const cloudIds = new Set(cloudOrders.map(c => c.id));
             const localList = storageService.getOrders();
-            const missingInCloud = localList.filter(o => o && o.id && !cloudIds.has(o.id) && !storageService.isOrderDeleted(o.id));
-            if (missingInCloud.length > 0) {
-              supabaseSync.pushOrdersBatch(missingInCloud.slice(0, 30)).catch(() => {});
+            const now = Date.now();
+            let localPruned = false;
+
+            const remainingLocal = localList.filter(o => {
+              if (!o || !o.id) return false;
+              if (cloudIds.has(o.id)) return true;
+              const age = now - (o.createdAt ? new Date(o.createdAt).getTime() : now);
+              if (age < 40000) return true;
+              storageService.markOrderDeleted(o.id);
+              localPruned = true;
+              return false;
+            });
+
+            if (localPruned) {
+              try {
+                localStorage.setItem('comandafast_orders', JSON.stringify(remainingLocal));
+                setOrders(remainingLocal);
+              } catch (_) {}
             }
           }
 

@@ -21,9 +21,29 @@ export default function AdminWhatsAppBot() {
   const [flows, setFlows] = useState(() => chatbotService.getCustomFlows());
 
   useEffect(() => {
-    chatbotService.fetchServerFlows().then(serverFlows => {
-      if (Array.isArray(serverFlows) && serverFlows.length > 0) {
-        setFlows(serverFlows);
+    // 1. Cargar plantillas actualizadas desde Supabase Cloud
+    chatbotService.fetchCloudTemplates().then(cloudTpls => {
+      if (cloudTpls) {
+        setSettings(prev => {
+          const merged = { ...prev, ...cloudTpls };
+          if (merged[selectedNodeId]) {
+            setCurrentNodeText(merged[selectedNodeId]);
+          }
+          return merged;
+        });
+      }
+    });
+
+    // 2. Cargar flujos desde Supabase Cloud y servidor local
+    chatbotService.fetchCloudFlows().then(cloudFlows => {
+      if (Array.isArray(cloudFlows) && cloudFlows.length > 0) {
+        setFlows(cloudFlows);
+      } else {
+        chatbotService.fetchServerFlows().then(serverFlows => {
+          if (Array.isArray(serverFlows) && serverFlows.length > 0) {
+            setFlows(serverFlows);
+          }
+        });
       }
     });
   }, []);
@@ -172,13 +192,13 @@ export default function AdminWhatsAppBot() {
     setCurrentNodeText(settings[selectedNodeId] || DEFAULT_TEMPLATES[selectedNodeId] || '');
   }, [selectedNodeId, settings]);
 
-  const handleSaveSettings = () => {
+  const handleSaveSettings = async () => {
     const updated = {
       ...settings,
       [selectedNodeId]: currentNodeText
     };
     setSettings(updated);
-    chatbotService.saveSettings(updated);
+    await chatbotService.saveSettings(updated);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
   };
@@ -598,9 +618,9 @@ call npm run dev
       {activeTab === 'flows' && (
         <AdminBotFlowsTab
           flows={flows}
-          onSaveFlows={(updatedFlows) => {
+          onSaveFlows={async (updatedFlows) => {
             setFlows(updatedFlows);
-            chatbotService.saveCustomFlows(updatedFlows);
+            await chatbotService.saveCustomFlows(updatedFlows);
             setSaveSuccess(true);
             setTimeout(() => setSaveSuccess(false), 3000);
           }}

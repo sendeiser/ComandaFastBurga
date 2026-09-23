@@ -318,12 +318,12 @@ export const storageService = {
   },
 
   saveOrder(order) {
-    if (!order || !order.id) return null;
-    if (this.isOrderDeleted(order.id)) {
+    if (!order) return null;
+    const id = order.id || ('ord-' + Date.now());
+    if (this.isOrderDeleted(id)) {
       return null;
     }
     const orders = this.getOrders();
-    const id = order.id || 'ord-' + Date.now();
     const idx = orders.findIndex(o => o.id === id);
     if (idx !== -1) {
       orders[idx] = { 
