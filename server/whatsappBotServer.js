@@ -1,4 +1,4 @@
-﻿// =========================================================
+// =========================================================
 // WHATSAPP BOT SERVER (Node.js & Baileys Multi-Device)
 // Conexión real 24/7 con WhatsApp Web oficial (Cero Costos de API)
 // Sincronización de Base de Datos y Envío de Fotos Reales de Productos
@@ -35,6 +35,7 @@ const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
 const CASH_SHIFT_FILE = path.join(DATA_DIR, 'cash_shift.json');
 const FLOWS_FILE = path.join(DATA_DIR, 'custom_flows.json');
 const VARIABLES_FILE = path.join(DATA_DIR, 'bot_variables.json');
+const TEMPLATES_FILE = path.join(DATA_DIR, 'bot_templates.json');
 
 // =========================================================
 // SUPABASE CLOUD INTEGRATION (Push directo a la nube)
@@ -147,6 +148,63 @@ async function fetchBotConfigFromSupabase(key) {
     console.warn(`[SUPABASE] fetchBotConfigFromSupabase '${key}' error:`, e.message);
   }
   return null;
+}
+
+// Sincronización completa desde Supabase Cloud al arrancar el bot
+async function syncAllFromSupabaseCloud() {
+  console.log('☁️ [SUPABASE CLOUD SYNC] Sincronizando datos frescos del Bot desde Supabase...');
+  try {
+    // 1. Variables del Bot
+    const cloudVars = await fetchBotConfigFromSupabase('variables');
+    if (Array.isArray(cloudVars) && cloudVars.length > 0) {
+      saveBotVariables(cloudVars);
+      console.log(`✅ [SUPABASE] Variables del bot sincronizadas: ${cloudVars.length} variables.`);
+    }
+
+    // 2. Flujos Conversacionales
+    const cloudFlows = await fetchBotConfigFromSupabase('flows');
+    if (Array.isArray(cloudFlows) && cloudFlows.length > 0) {
+      saveStoredFlows(cloudFlows);
+      console.log(`✅ [SUPABASE] Flujos conversacionales sincronizados: ${cloudFlows.length} flujos.`);
+    }
+
+    // 3. Plantillas y Datos Bancarios / Ubicación
+    const cloudTemplates = await fetchBotConfigFromSupabase('templates');
+    if (cloudTemplates && typeof cloudTemplates === 'object') {
+      saveBotTemplates(cloudTemplates);
+      console.log(`✅ [SUPABASE] Plantillas y datos del negocio sincronizados (Alias: ${cloudTemplates.bank_alias || 'no configurado'}).`);
+    }
+
+    // 4. Configuración de IA Gemini
+    const cloudAiConfig = await fetchBotConfigFromSupabase('ai_config');
+    if (cloudAiConfig && typeof cloudAiConfig === 'object') {
+      geminiBotService.saveConfig(cloudAiConfig);
+      console.log(`✅ [SUPABASE] Configuración de IA Gemini sincronizada.`);
+    }
+
+    // 5. Productos
+    if (!fs.existsSync(PRODUCTS_FILE) || getStoredProducts().length === 0) {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/products?select=*`, {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          }
+        });
+        if (res.ok) {
+          const prods = await res.json();
+          if (Array.isArray(prods) && prods.length > 0) {
+            fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(prods, null, 2), 'utf-8');
+            console.log(`✅ [SUPABASE] Catálogo de productos sincronizado: ${prods.length} productos.`);
+          }
+        }
+      } catch (prodErr) {
+        console.warn('[SUPABASE] Error descargando productos:', prodErr.message);
+      }
+    }
+  } catch (err) {
+    console.warn('⚠️ [SUPABASE] No se pudo completar la sincronización en la nube, usando almacenamiento local:', err.message);
+  }
 }
 
 async function deleteOrderFromSupabase(orderId) {
@@ -355,6 +413,44 @@ function getBotVariablesMap() {
     }
   }
   return map;
+}
+
+function getBotTemplates() {
+  try {
+    if (fs.existsSync(TEMPLATES_FILE)) {
+      const raw = fs.readFileSync(TEMPLATES_FILE, 'utf-8');
+      return JSON.parse(raw);
+    }
+  } catch (e) {
+    console.error('[WHATSAPP BOT] Error al leer bot_templates.json:', e);
+  }
+  return {};
+}
+
+function saveBotTemplates(tpls) {
+  try {
+    fs.writeFileSync(TEMPLATES_FILE, JSON.stringify(tpls, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('[WHATSAPP BOT] Error al guardar en bot_templates.json:', e);
+  }
+}
+
+// Obtener contexto unificado del negocio (Supabase Cloud + Variables Locales)
+function getBusinessContext() {
+  const vars = getBotVariablesMap();
+  const tpls = getBotTemplates();
+  return {
+    alias_banco: vars.alias_banco || tpls.bank_alias || 'burga.chamical.nx',
+    banco: vars.banco || tpls.bank_name || 'Mercado Pago / Banco Galicia',
+    titular: vars.titular || tpls.bank_holder || 'Burga Chamical',
+    cbu: vars.cbu || tpls.bank_cbu || '0000003100092138928374',
+    direccion: vars.direccion_local || tpls.pickup_address || 'Av. Belgrano 1234, Centro',
+    horarios: vars.horarios || tpls.opening_hours || 'Miércoles a Domingos de 19:30 a 00:30 hs',
+    costo_envio: vars.costo_envio || '$1.500',
+    envio_gratis_desde: vars.envio_gratis_desde || '$18.000',
+    sitio_web: tpls.store_website_url || vars.sitio_web || '',
+    mensaje_bienvenida: vars.mensaje_bienvenida || tpls.template_welcome || ''
+  };
 }
 
 function interpolateTemplate(template, vars = {}) {
@@ -683,14 +779,10 @@ class WhatsAppBotServer {
             console.log(`🎯 [WHATSAPP BOT FLUJO]: Activado flujo "${matchedFlow.name}" por mensaje de ${remoteJid}`);
             const action = matchedFlow.action || {};
             let flowReply = action.response || '';
+            const biz = getBusinessContext();
             flowReply = interpolateTemplate(flowReply, {
               cliente: msg.pushName || 'Cliente',
-              direccion: 'Av. Belgrano 1234, Centro',
-              horarios: 'Miércoles a Domingos de 19:30 a 00:30 hs',
-              alias_banco: 'comandafast.mp',
-              banco: 'Mercado Pago',
-              titular: 'ComandaFast Burgers S.R.L.',
-              cbu: '0000003100092138928374'
+              ...biz
             });
 
             if (action.imageUrl) {
@@ -798,7 +890,8 @@ class WhatsAppBotServer {
               let confirmMsg = `🎉 *¡PEDIDO #${orderId} CONFIRMADO Y ENVIADO A LA COCINA!* 🔥🍔\n\n¡Muchas gracias *${newOrder.customer.name}*, tu comanda ya ingresó al sistema de la plancha!\n\n📋 *Detalle:*\n${itemsList}\n\n💵 *Total:* $${newOrder.total.toLocaleString('es-AR')}\n🛵 *Modo:* ${session.shippingMethod === 'delivery' ? '🛵 Envío a Domicilio' : '🛍️ Retiro por el Local'}\n📍 *Dirección:* ${newOrder.customer.address}\n`;
 
               if (session.paymentMethod === 'transferencia') {
-                confirmMsg += `\n💳 *Datos para Transferencia:*\n• *Alias:* \`comandafast.mp\`\n• *Banco:* Mercado Pago\n• *Titular:* ComandaFast Burgers\n\n📸 *Enviá la captura o foto del comprobante por aquí para validar tu pago.* 🔥`;
+                const biz = getBusinessContext();
+                confirmMsg += `\n💳 *Datos para Transferencia:*\n• *Alias:* \`${biz.alias_banco}\`\n• *Banco:* ${biz.banco}\n• *Titular:* ${biz.titular}${biz.cbu ? `\n• *CBU:* \`${biz.cbu}\`` : ''}\n\n📸 *Enviá la captura o foto del comprobante por aquí para validar tu pago.* 🔥`;
               } else {
                 confirmMsg += `\n💵 *Pago en Efectivo:* Abonás al recibir tu comida. ¡La cocina ya está marchando tu pedido! 🔥`;
               }
@@ -992,15 +1085,17 @@ class WhatsAppBotServer {
           }
 
           if (lower === '2') {
+            const biz = getBusinessContext();
             await this.sock.sendMessage(remoteJid, {
-              text: '💳 *Datos para Transferencia:* 🏦\n• *Alias:* `comandafast.mp`\n• *Banco:* Mercado Pago\n• *Titular:* ComandaFast Burgers\n\n📸 *Enviá la captura o comprobante por aquí para verificar tu pago.*'
+              text: `💳 *Datos para Transferencia:* 🏦\n• *Alias:* \`${biz.alias_banco}\`\n• *Banco:* ${biz.banco}\n• *Titular:* ${biz.titular}${biz.cbu ? `\n• *CBU:* \`${biz.cbu}\`` : ''}\n\n📸 *Enviá la captura o comprobante por aquí para verificar tu pago.*`
             });
             continue;
           }
 
           if (lower === '3') {
+            const biz = getBusinessContext();
             await this.sock.sendMessage(remoteJid, {
-              text: '📍 *Ubicación y Horarios:* 🕒\n🍔 Av. Belgrano 1234, Centro\n⏰ Miércoles a Domingos de 19:30 a 00:30 hs.'
+              text: `📍 *Ubicación y Horarios:* 🕒\n🍔 ${biz.direccion}\n⏰ ${biz.horarios}`
             });
             continue;
           }
@@ -1063,10 +1158,12 @@ class WhatsAppBotServer {
 
           // CONSULTA INTELIGENTE CON GOOGLE GEMINI AI (Patrón Candy Shop)
           try {
+            const biz = getBusinessContext();
             const aiReply = await geminiBotService.generateReply(text, {
               customerName: msg.pushName || '',
               customerPhone: remoteJid,
-              availableProducts: prods
+              availableProducts: prods,
+              businessInfo: biz
             });
 
             if (aiReply) {
@@ -1079,7 +1176,11 @@ class WhatsAppBotServer {
           }
 
           // SALUDO POR DEFECTO
-          const reply = `🍔 *¡Hola! Bienvenido a ComandaFast Burgers* 🔥\n\n¿En qué podemos ayudarte hoy?\n\n1️⃣ *Consultar estado de pedido*\n2️⃣ *Datos de transferencia / Alias*\n3️⃣ *Horarios y ubicación*\n4️⃣ *Ver carta completa y fotos (${prods.length} burgers)*\n5️⃣ *Hacer un pedido ahora* 🍔\n\n_Respondé con el número de opción o escribí tu pedido directo._`;
+          const biz = getBusinessContext();
+          const welcomeHeader = biz.mensaje_bienvenida 
+            ? interpolateTemplate(biz.mensaje_bienvenida, { cliente: msg.pushName || '' })
+            : '🍔 *¡Hola! Bienvenido a ComandaFast Burgers* 🔥';
+          const reply = `${welcomeHeader}\n\n¿En qué podemos ayudarte hoy?\n\n1️⃣ *Consultar estado de pedido*\n2️⃣ *Datos de transferencia / Alias*\n3️⃣ *Horarios y ubicación*\n4️⃣ *Ver carta completa y fotos (${prods.length} burgers)*\n5️⃣ *Hacer un pedido ahora* 🍔\n\n_Respondé con el número de opción o escribí tu pedido directo._`;
           await this.sock.sendMessage(remoteJid, { text: reply });
         }
       });
@@ -1404,11 +1505,12 @@ app.get('/api/orders', (req, res) => {
   res.json({ success: true, orders, timestamp: Date.now() });
 });
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
   console.log(`\n=========================================================`);
   console.log(`🍔 SERVIDOR WHATSAPP BOT COMANDAFAST (BAILEYS MULTI-DEVICE)`);
   console.log(`👉 Puerto: ${PORT} | Endpoint: http://localhost:${PORT}/status`);
   console.log(`=========================================================\n`);
+  await syncAllFromSupabaseCloud();
 });
 
 server.on('error', (err) => {

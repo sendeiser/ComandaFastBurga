@@ -145,6 +145,14 @@ export class GeminiBotService {
       `${idx + 1}. ${p.name} ($${Number(p.price).toLocaleString('es-AR')}) - ${p.description || 'Artesanal'}`
     ).join('\n');
 
+    const bInfo = context.businessInfo || {};
+    const address = bInfo.direccion || 'Av. Belgrano 1234, Centro';
+    const hours = bInfo.horarios || 'Miércoles a Domingos de 19:30 a 00:30 hs.';
+    const alias = bInfo.alias_banco || 'comandafast.mp';
+    const bank = bInfo.banco ? ` (${bInfo.banco})` : '';
+    const cbu = bInfo.cbu ? ` | CBU: ${bInfo.cbu}` : '';
+    const shipping = bInfo.costo_envio ? ` | Costo de envío estimado: $${bInfo.costo_envio}` : '';
+
     const promptText = `
 Eres el Asistente Virtual Inteligente de "ComandaFast Burgers" (una hamburguesería artesanal premium).
 Tu objetivo es responder consultas de clientes con calidez, entusiasmo gastronómico y brevedad (estilo WhatsApp, usando emojis pertinentes 🍔🔥).
@@ -152,10 +160,10 @@ Tu objetivo es responder consultas de clientes con calidez, entusiasmo gastronó
 ${this.config.systemPrompt ? `Instrucciones del dueño:\n${this.config.systemPrompt}\n` : ''}
 
 INFORMACIÓN DEL LOCAL:
-- Dirección: Av. Belgrano 1234, Centro
-- Horarios: Miércoles a Domingos de 19:30 a 00:30 hs.
-- Pago: Transferencias bancarias (Alias: comandafast.mp), Efectivo al recibir, Mercado Pago.
-- Delivery: Propio en moto y Retiro en Mostrador (Take Away).
+- Dirección / Retiro: ${address}
+- Horarios de atención: ${hours}
+- Pago: Transferencias bancarias (Alias: ${alias}${bank}${cbu}), Efectivo al recibir, Mercado Pago.
+- Modalidades: Delivery propio en moto y Retiro en Mostrador (Take Away)${shipping}.
 
 CARTA ACTUAL DE HAMBURGUESAS:
 ${prodsSummary || 'Hamburguesas clásicas, dobles, triples, smash, crispy y opciones veggie.'}
