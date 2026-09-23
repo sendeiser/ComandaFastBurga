@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { storageService } from '../../services/storageService';
-import { Search, ShoppingBag, Plus, Trash2, Send, MessageSquare, Utensils, DollarSign, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { Search, ShoppingBag, Plus, Trash2, Send, MessageSquare, Utensils, DollarSign, Sparkles, Image as ImageIcon, Lock, AlertCircle } from 'lucide-react';
 import ItemModifierModal from './ItemModifierModal';
 import PaymentModal from './PaymentModal';
 import WhatsAppImportModal from './WhatsAppImportModal';
@@ -9,8 +9,11 @@ import { printerService } from '../../services/printerService';
 export default function FastOrderPad({ 
   products, 
   settings, 
-  onSaveOrder 
+  onSaveOrder,
+  cashShift,
+  onOpenCashModal
 }) {
+  const isCashOpen = Boolean(cashShift && !cashShift.isClosed);
   const [selectedCategory, setSelectedCategory] = useState('Todas');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProductForModal, setSelectedProductForModal] = useState(null);
@@ -88,6 +91,10 @@ export default function FastOrderPad({
 
   // Handlers
   const handleAddDirect = (product) => {
+    if (!isCashOpen) {
+      onOpenCashModal?.();
+      return;
+    }
     setSelectedProductForModal(product);
   };
 
@@ -129,6 +136,10 @@ export default function FastOrderPad({
   };
 
   const handleOpenPayment = () => {
+    if (!isCashOpen) {
+      onOpenCashModal?.();
+      return;
+    }
     if (cartItems.length === 0) {
       alert('El pedido está vacío. Agrega productos primero.');
       return;
@@ -228,7 +239,13 @@ export default function FastOrderPad({
               type="button" 
               className="cat-pill-btn"
               style={{ background: 'linear-gradient(135deg, #15803d, #16a34a)', color: '#fff', border: 'none', gap: '6px' }}
-              onClick={() => setIsWhatsAppImportOpen(true)}
+              onClick={() => {
+                if (!isCashOpen) {
+                  onOpenCashModal?.();
+                  return;
+                }
+                setIsWhatsAppImportOpen(true);
+              }}
               title="Pegar y parsear texto de WhatsApp"
             >
               <Sparkles size={16} />
@@ -255,6 +272,34 @@ export default function FastOrderPad({
           </div>
         </div>
 
+        {/* AVISO VISUAL CUANDO LA CAJA ESTÁ CERRADA */}
+        {!isCashOpen && (
+          <div className="pos-cash-closed-banner">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div className="pos-cash-closed-icon-box">
+                <Lock size={20} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 800, color: '#f87171', fontSize: '0.95rem' }}>
+                  Caja Cerrada — Abre el turno para comenzar a tomar pedidos
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  Para registrar ventas en mostrador, delivery o mesas, abre la caja con el monto inicial.
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="btn-open-cash-action"
+              onClick={onOpenCashModal}
+            >
+              <DollarSign size={16} />
+              <span>Abrir Turno de Caja</span>
+            </button>
+          </div>
+        )}
+
         {/* Products Grid */}
         <div className="product-grid">
           {filteredProducts.map(prod => (
@@ -262,6 +307,7 @@ export default function FastOrderPad({
               key={prod.id} 
               className={`product-card ${!showPhotos ? 'compact' : ''}`}
               onClick={() => handleAddDirect(prod)}
+              title={!isCashOpen ? 'Caja cerrada — Haz clic para abrir el turno de caja' : 'Haz clic para agregar al pedido'}
             >
               <div>
                 {showPhotos ? (
@@ -522,11 +568,27 @@ export default function FastOrderPad({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 48px', gap: '0.5rem' }}>
             <button 
               className="btn-confirm-order"
-              disabled={cartItems.length === 0}
-              onClick={handleOpenPayment}
+              style={!isCashOpen ? {
+                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.16), rgba(220, 38, 38, 0.28))',
+                color: '#fca5a5',
+                border: '1.5px solid rgba(239, 68, 68, 0.45)',
+                boxShadow: 'none',
+                cursor: 'pointer'
+              } : undefined}
+              disabled={isCashOpen && cartItems.length === 0}
+              onClick={!isCashOpen ? onOpenCashModal : handleOpenPayment}
             >
-              <Send size={20} />
-              <span>Confirmar Pedido & Cobrar</span>
+              {!isCashOpen ? (
+                <>
+                  <Lock size={18} />
+                  <span>Abre la Caja para Cobrar</span>
+                </>
+              ) : (
+                <>
+                  <Send size={20} />
+                  <span>Confirmar Pedido & Cobrar</span>
+                </>
+              )}
             </button>
 
             <button 

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import Header from './components/common/Header';
 import FastOrderPad from './components/pos/FastOrderPad';
@@ -457,6 +457,12 @@ export default function App() {
 
   // Handlers
   const handleSaveOrder = (orderData) => {
+    if (!cashShift || cashShift.isClosed) {
+      alert('⚠️ La caja está cerrada. Debes abrir el turno de caja antes de registrar un pedido.');
+      setIsCashModalOpen(true);
+      return;
+    }
+
     const savedOrder = storageService.saveOrder(orderData);
     setOrders(storageService.getOrders());
     
@@ -672,6 +678,8 @@ export default function App() {
             products={products}
             settings={settings}
             onSaveOrder={handleSaveOrder}
+            cashShift={cashShift}
+            onOpenCashModal={() => setIsCashModalOpen(true)}
           />
         )}
 
