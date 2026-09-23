@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
-import { X, DollarSign, ArrowDownRight, CheckCircle2, AlertTriangle, Printer, Lock, Unlock } from 'lucide-react';
+import { X, DollarSign, ArrowDownRight, CheckCircle2, AlertTriangle, Printer, Lock, Unlock, User } from 'lucide-react';
+import { authService } from '../../services/authService';
 
 export default function CashControlModal({ 
   cashShift, 
   orders, 
+  currentCashier,
   onOpenShift, 
   onAddExpense, 
   onCloseShift, 
   onClose 
 }) {
+  const activeCashier = currentCashier || authService.getCurrentCashier();
   const [initialCashInput, setInitialCashInput] = useState('');
-  const [cashierNameInput, setCashierNameInput] = useState('Cajero 1');
+  const [cashierNameInput, setCashierNameInput] = useState(activeCashier?.name || 'Cajero 1');
   
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseReason, setExpenseReason] = useState('');
@@ -50,7 +53,8 @@ export default function CashControlModal({
       alert('Ingresa el monto de fondo de caja inicial.');
       return;
     }
-    onOpenShift(initialCashInput, cashierNameInput);
+    const resolvedName = activeCashier?.name || cashierNameInput.trim() || 'Cajero 1';
+    onOpenShift(initialCashInput, resolvedName);
   };
 
   const handleAddExpense = (e) => {
@@ -95,6 +99,52 @@ export default function CashControlModal({
               </div>
             </div>
 
+            {/* Si ya hay un cajero logueado con su cuenta, se asigna automáticamente y se muestra solo como referencia */}
+            {activeCashier ? (
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.75rem', 
+                background: 'var(--bg-main)', 
+                padding: '0.75rem 1rem', 
+                borderRadius: 'var(--radius-md)', 
+                border: '1px solid var(--border-subtle)' 
+              }}>
+                <div style={{ 
+                  width: '36px', 
+                  height: '36px', 
+                  borderRadius: '50%', 
+                  background: 'rgba(245, 158, 11, 0.15)', 
+                  color: 'var(--accent-amber)', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <User size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Cajero Responsable (Automático)
+                  </div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    {activeCashier.name} {activeCashier.username ? <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>(@{activeCashier.username})</span> : ''}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Nombre de Cajero / Turno:</label>
+                <input
+                  type="text"
+                  className="custom-input-sm"
+                  placeholder="Ej: Turno Noche - Martín"
+                  value={cashierNameInput}
+                  onChange={e => setCashierNameInput(e.target.value)}
+                />
+              </div>
+            )}
+
             <div>
               <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Fondo Inicial de Caja ($ Efectivo):</label>
               <input
@@ -104,18 +154,13 @@ export default function CashControlModal({
                 placeholder="Ej: 5000"
                 value={initialCashInput}
                 onChange={e => setInitialCashInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleOpen();
+                  }
+                }}
                 autoFocus
-              />
-            </div>
-
-            <div>
-              <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Nombre de Cajero / Turno:</label>
-              <input
-                type="text"
-                className="custom-input-sm"
-                placeholder="Ej: Turno Noche - Martín"
-                value={cashierNameInput}
-                onChange={e => setCashierNameInput(e.target.value)}
               />
             </div>
 

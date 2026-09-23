@@ -714,6 +714,7 @@ export default function App() {
         <CashControlModal 
           cashShift={cashShift}
           orders={orders}
+          currentCashier={currentCashier}
           onOpenShift={handleOpenShift}
           onAddExpense={handleAddExpense}
           onCloseShift={handleCloseShift}
