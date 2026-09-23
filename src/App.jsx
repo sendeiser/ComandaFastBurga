@@ -10,6 +10,8 @@ import MenuManagement from './components/pos/MenuManagement';
 import SettingsModal from './components/pos/SettingsModal';
 import OwnerAuditPortal from './components/admin/OwnerAuditPortal';
 import OwnerLogin from './components/admin/OwnerLogin';
+import CashierLogin from './components/pos/CashierLogin';
+import { chatbotService } from './services/chatbotService';
 import { authService } from './services/authService';
 import { storageService } from './services/storageService';
 import { audioService } from './services/audioService';
@@ -22,6 +24,7 @@ export default function App() {
   const [orders, setOrders] = useState([]);
   const [cashShift, setCashShift] = useState(null);
   const [settings, setSettings] = useState(null);
+  const [currentCashier, setCurrentCashier] = useState(() => authService.getCurrentCashier());
 
   // Owner authentication & secret portal state
   const [isOwnerAuthenticated, setIsOwnerAuthenticated] = useState(() => authService.isAuthenticated());
@@ -99,22 +102,53 @@ export default function App() {
     setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  // Load initial data (Local first, then try Cloud)
+  // CARGA INICIAL CLOUD-FIRST: La nube es la fuente de verdad
   useEffect(() => {
-    const localProds = storageService.getProducts();
-    setProducts(localProds);
+    // Mostrar cache local inmediatamente para UI responsiva
+    setProducts(storageService.getProducts());
     setOrders(storageService.getOrders());
     setCashShift(storageService.getCashShift());
     setSettings(storageService.getSettings());
 
-    // Try fetching from Supabase if configured
+    // Luego reemplazar con datos reales de la nube
     (async () => {
-      if (supabaseSync.isConfigured()) {
-        const cloudProds = await supabaseSync.fetchProducts();
-        if (cloudProds && cloudProds.length > 0) {
-          setProducts(cloudProds);
-          storageService.saveProducts(cloudProds);
-        }
+      if (!supabaseSync.isConfigured()) return;
+
+      const [cloudProds, cloudOrders, cloudShift, cloudSettings, cloudCashiers, cloudBotVars] = await Promise.all([
+        supabaseSync.fetchProducts(),
+        supabaseSync.fetchOrders(300),
+        supabaseSync.fetchLatestCashShift(),
+        supabaseSync.fetchSettings(),
+        supabaseSync.fetchCashiers(),
+        supabaseSync.fetchBotVariables()
+      ]);
+
+      if (cloudProds && cloudProds.length > 0) {
+        setProducts(cloudProds);
+        storageService.saveProducts(cloudProds);
+      }
+
+      if (cloudOrders && cloudOrders.length > 0) {
+        storageService.saveOrdersBatch(cloudOrders);
+        setOrders(storageService.getOrders());
+      }
+
+      if (cloudShift) {
+        storageService.saveCashShift(cloudShift);
+        setCashShift(cloudShift);
+      }
+
+      if (cloudSettings) {
+        storageService.saveSettings(cloudSettings);
+        setSettings(cloudSettings);
+      }
+
+      if (Array.isArray(cloudCashiers) && cloudCashiers.length > 0) {
+        authService.syncCashiersFromCloud(cloudCashiers);
+      }
+
+      if (cloudBotVars) {
+        chatbotService.saveBotVariables(cloudBotVars);
       }
     })();
   }, []);
@@ -304,6 +338,11 @@ export default function App() {
             }
           }
 
+          // D2. Actualizar vista React con estado actual de localStorage (merge)
+          if (hasChanges) {
+            setOrders([...storageService.getOrders()]);
+          }
+
           if (hasNewPending) {
             audioService.playOrderChime();
             try {
@@ -381,8 +420,8 @@ export default function App() {
     const savedOrder = storageService.saveOrder(orderData);
     setOrders(storageService.getOrders());
     
-    // Sync to Supabase in background
-    supabaseSync.pushOrder(savedOrder);
+    // Sync to Supabase CLOUD (fuente de verdad)
+    supabaseSync.createOrder(savedOrder);
 
     // Sync to Local WhatsApp Bot / LAN Microservice (puerto 3002) para replicaciÃ³n instantÃ¡nea a celulares Android
     try {
@@ -424,9 +463,10 @@ export default function App() {
   };
 
   const handleUpdateOrderStatus = (orderId, newStatus) => {
-    storageService.updateOrderStatus(orderId, newStatus);
+    const updatedOrder = storageService.updateOrderStatus(orderId, newStatus);
     setOrders(storageService.getOrders());
-    supabaseSync.updateOrderStatus(orderId, newStatus);
+    // Push status + timestamps directamente a Supabase
+    supabaseSync.updateOrderStatus(orderId, newStatus, updatedOrder?.statusTimestamps || {});
 
     // Sync status to Local Server (puerto 3002) para reflejar cambios en celulares conectados
     try {
@@ -446,9 +486,8 @@ export default function App() {
   const handleDeleteOrder = (orderId) => {
     storageService.deleteOrder(orderId);
     setOrders(storageService.getOrders());
-    if (supabaseSync.isConfigured()) {
-      supabaseSync.deleteOrder(orderId);
-    }
+    // Eliminar permanentemente de Supabase Cloud
+    supabaseSync.deleteOrder(orderId);
     try {
       const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
       fetch(`http://${botHost}:3002/api/orders/${orderId}`, { method: 'DELETE' }).catch(() => {});
@@ -458,20 +497,32 @@ export default function App() {
   const handleSaveProducts = (newProducts) => {
     storageService.saveProducts(newProducts);
     setProducts(newProducts);
-    // Sync to Supabase
+    // Upsert completo a Supabase Cloud (fuente de verdad de productos)
     supabaseSync.pushProducts(newProducts);
   };
 
   const handleSaveSettings = (newSettings) => {
     storageService.saveSettings(newSettings);
     setSettings(newSettings);
+    supabaseSync.saveSettings(newSettings);
+  };
+
+  const handleCashierLoginSuccess = (cashier) => {
+    setCurrentCashier(cashier);
+  };
+
+  const handleLogoutCashier = () => {
+    authService.logoutCashier();
+    setCurrentCashier(null);
   };
 
   // Cash Handlers (Sincronización Total con Supabase y Red Local)
   const handleOpenShift = (initialAmount, cashierName) => {
-    const shift = storageService.openCashShift(initialAmount, cashierName);
+    const activeCashierName = currentCashier?.name || cashierName || 'Cajero 1';
+    const shift = storageService.openCashShift(initialAmount, activeCashierName);
     setCashShift(shift);
-    supabaseSync.pushCashShift(shift);
+    // Crear turno directamente en Supabase Cloud
+    supabaseSync.createCashShift(shift);
     try {
       const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
       fetch(`http://${botHost}:3002/api/cash-shift`, {
@@ -485,7 +536,10 @@ export default function App() {
   const handleAddExpense = (amount, reason) => {
     const shift = storageService.addCashExpense(amount, reason);
     setCashShift(shift);
-    supabaseSync.pushCashShift(shift);
+    // Sincronizar gastos directamente en Supabase Cloud
+    if (shift && shift.id) {
+      supabaseSync.updateCashShift(shift.id, { expenses: shift.expenses });
+    }
     try {
       const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
       fetch(`http://${botHost}:3002/api/cash-shift`, {
@@ -499,7 +553,18 @@ export default function App() {
   const handleCloseShift = (countedCash, notes) => {
     const shift = storageService.closeCashShift(countedCash, notes);
     setCashShift(shift);
-    supabaseSync.pushCashShift(shift);
+    // Cerrar turno directamente en Supabase Cloud (arqueo ciego)
+    if (shift && shift.id) {
+      supabaseSync.updateCashShift(shift.id, {
+        closedAt: shift.closedAt,
+        countedCash: shift.countedCash,
+        isClosed: true,
+        notes: shift.notes,
+        cashSales: shift.cashSales,
+        expectedCash: shift.expectedCash,
+        difference: shift.difference
+      });
+    }
     try {
       const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
       fetch(`http://${botHost}:3002/api/cash-shift`, {
@@ -532,9 +597,24 @@ export default function App() {
     );
   }
 
+  // CASHIER LOGIN GATE: Solo pueden entrar los cajeros con credenciales válidas
+  if (!currentCashier) {
+    return (
+      <CashierLogin 
+        onLoginSuccess={handleCashierLoginSuccess}
+        onOpenOwner={() => {
+          window.location.hash = '#dueno';
+          setIsOwnerPortalRoute(true);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="app-layout">
       <Header 
+        currentCashier={currentCashier}
+        onLogoutCashier={handleLogoutCashier}
         currentTab={currentTab}
         setCurrentTab={setCurrentTab}
         pendingKitchenCount={pendingKitchenCount}
@@ -612,3 +692,7 @@ export default function App() {
     </div>
   );
 }
+
+
+
+

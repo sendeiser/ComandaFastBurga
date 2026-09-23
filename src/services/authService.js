@@ -1,3 +1,4 @@
+import { storageService } from './storageService.js';
 // =========================================================
 // AUTH SERVICE — AUTENTICACIÓN Y SEGURIDAD DEL DUEÑO
 // =========================================================
@@ -101,5 +102,113 @@ export const authService = {
 
     localStorage.setItem(KEYS.CREDENTIALS, JSON.stringify(updated));
     return { success: true, credentials: updated };
-  }
+  },
+
+  // =========================================================
+  // GESTIÓN Y AUTENTICACIÓN DE CAJEROS (Acceso POS / Mostrador)
+  // =========================================================
+  getCashiers() {
+    return storageService.getCashiers();
+  },
+
+  syncCashiersFromCloud(cloudCashiers) {
+    if (Array.isArray(cloudCashiers) && cloudCashiers.length > 0) {
+      storageService.saveCashiers(cloudCashiers);
+    }
+  },
+
+  createCashier({ name, username, pin, role = 'cajero' }) {
+    const cleanName = (name || '').trim();
+    const cleanUser = (username || '').trim().toLowerCase();
+    const cleanPin = (pin || '').trim();
+
+    if (!cleanName) {
+      return { success: false, error: 'El nombre del cajero es obligatorio.' };
+    }
+    if (!cleanUser || cleanUser.length < 3) {
+      return { success: false, error: 'El usuario debe tener al menos 3 caracteres.' };
+    }
+    if (!cleanPin || cleanPin.length < 3) {
+      return { success: false, error: 'El PIN o contraseña debe tener al menos 3 caracteres.' };
+    }
+
+    const cashiers = storageService.getCashiers();
+    if (cashiers.some(c => c.username === cleanUser)) {
+      return { success: false, error: `El usuario '${cleanUser}' ya está registrado.` };
+    }
+
+    const newCashier = {
+      id: 'csh-' + Date.now(),
+      name: cleanName,
+      username: cleanUser,
+      pin: cleanPin,
+      role,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    storageService.addCashier(newCashier);
+    storageService.setCurrentCashier(newCashier);
+
+    return { success: true, cashier: newCashier };
+  },
+
+  loginCashier(userInput, pinInput) {
+    const cleanUser = (userInput || '').trim().toLowerCase();
+    const cleanPin = (pinInput || '').trim();
+
+    if (!cleanUser || !cleanPin) {
+      return { success: false, error: 'Por favor ingresa usuario y PIN.' };
+    }
+
+    const cashiers = storageService.getCashiers();
+    
+    // Si no hay cajeros registrados todavía, permitir login con usuario admin o cajero por defecto
+    if (cashiers.length === 0) {
+      if ((cleanUser === 'cajero' || cleanUser === 'admin') && (cleanPin === '1234' || cleanPin === '0000')) {
+        const defaultCashier = {
+          id: 'csh-default',
+          name: cleanUser === 'admin' ? 'Administrador' : 'Cajero Principal',
+          username: cleanUser,
+          pin: cleanPin,
+          role: 'cajero',
+          isActive: true,
+          createdAt: new Date().toISOString()
+        };
+        storageService.addCashier(defaultCashier);
+        storageService.setCurrentCashier(defaultCashier);
+        return { success: true, cashier: defaultCashier };
+      }
+    }
+
+    const matched = cashiers.find(c => 
+      c.username.toLowerCase() === cleanUser || 
+      c.name.toLowerCase() === cleanUser
+    );
+
+    if (!matched) {
+      return { success: false, error: 'Usuario no encontrado. Verifica las credenciales o crea una cuenta.' };
+    }
+
+    if (!matched.isActive && matched.isActive !== undefined) {
+      return { success: false, error: 'Esta cuenta de cajero se encuentra desactivada.' };
+    }
+
+    if (matched.pin !== cleanPin) {
+      return { success: false, error: 'PIN o contraseña incorrecta.' };
+    }
+
+    storageService.setCurrentCashier(matched);
+    return { success: true, cashier: matched };
+  },
+
+  getCurrentCashier() {
+    return storageService.getCurrentCashier();
+  },
+
+  logoutCashier() {
+    storageService.clearCurrentCashier();
+  },
+
 };

@@ -147,6 +147,8 @@ const DEFAULT_SETTINGS = {
 };
 
 const KEYS = {
+  CASHIERS: 'comandafast_cashiers',
+  CURRENT_CASHIER: 'comandafast_current_cashier',
   PRODUCTS: 'comandafast_products',
   ORDERS: 'comandafast_orders',
   CASH_SHIFT: 'comandafast_cash_shift',
@@ -647,6 +649,70 @@ export const storageService = {
       window.dispatchEvent(new CustomEvent('comandafast:shifts_updated', { detail: history }));
     }
     return item;
+  },
+
+
+  // --- CASHIERS (Gestión local y caché de cuentas de cajeros) ---
+  getCashiers() {
+    try {
+      const data = localStorage.getItem(KEYS.CASHIERS);
+      if (!data) return [];
+      return JSON.parse(data);
+    } catch {
+      return [];
+    }
+  },
+
+  saveCashiers(cashiers) {
+    try {
+      localStorage.setItem(KEYS.CASHIERS, JSON.stringify(cashiers || []));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('comandafast:cashiers_updated', { detail: cashiers }));
+      }
+    } catch (e) {
+      console.error('[Storage] Error saving cashiers:', e);
+    }
+  },
+
+  addCashier(cashier) {
+    const list = this.getCashiers();
+    const existingIdx = list.findIndex(c => c.id === cashier.id || c.username === cashier.username);
+    if (existingIdx !== -1) {
+      list[existingIdx] = { ...list[existingIdx], ...cashier, updatedAt: new Date().toISOString() };
+    } else {
+      list.push({ ...cashier, createdAt: cashier.createdAt || new Date().toISOString() });
+    }
+    this.saveCashiers(list);
+    return cashier;
+  },
+
+  getCurrentCashier() {
+    try {
+      const data = localStorage.getItem(KEYS.CURRENT_CASHIER);
+      if (!data) return null;
+      return JSON.parse(data);
+    } catch {
+      return null;
+    }
+  },
+
+  setCurrentCashier(cashier) {
+    try {
+      if (!cashier) {
+        localStorage.removeItem(KEYS.CURRENT_CASHIER);
+      } else {
+        localStorage.setItem(KEYS.CURRENT_CASHIER, JSON.stringify(cashier));
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('comandafast:cashier_changed', { detail: cashier }));
+      }
+    } catch (e) {
+      console.error('[Storage] Error setting current cashier:', e);
+    }
+  },
+
+  clearCurrentCashier() {
+    this.setCurrentCashier(null);
   },
 
 };

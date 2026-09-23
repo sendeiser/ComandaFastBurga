@@ -11,6 +11,7 @@ import AdminBotVariablesTab from './AdminBotVariablesTab';
 import { GitBranch, Variable } from 'lucide-react';
 import { ALL_TEMPLATE_NODES, DEFAULT_TEMPLATES, DEFAULT_CHATBOT_KEYWORDS } from '../../../services/whatsappBotConstants';
 import { chatbotService } from '../../../services/chatbotService';
+import { supabaseSync } from '../../../services/supabaseClient';
 
 const BOT_SERVER_URL = typeof window !== 'undefined' && window.location.hostname ? `http://${window.location.hostname}:3002` : 'http://localhost:3002';
 
@@ -98,6 +99,7 @@ export default function AdminWhatsAppBot() {
         body: JSON.stringify(payload)
       });
       if (res.ok) {
+        supabaseSync.saveAiConfig(payload);
         setAiSavedSuccess(true);
         setTimeout(() => setAiSavedSuccess(false), 3000);
         fetchAiConfig();

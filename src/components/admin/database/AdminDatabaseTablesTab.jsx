@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+﻿import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Database, Table, Search, Plus, Edit2, Trash2, Download, RefreshCw, 
   CheckCircle2, AlertTriangle, X, Save, Eye, DollarSign, ShoppingBag, 
@@ -6,6 +6,7 @@ import {
   Smartphone, MapPin, Tag, FileText, UserCheck, ShieldAlert
 } from 'lucide-react';
 import { storageService } from '../../../services/storageService';
+import { supabaseSync } from '../../../services/supabaseClient';
 import { chatbotService } from '../../../services/chatbotService';
 
 // Funciones seguras para desanidar datos del cliente (string u objeto)
@@ -53,11 +54,31 @@ export default function AdminDatabaseTablesTab() {
   const [formData, setFormData] = useState({});
 
   // Cargar datos
-  const loadAllData = useCallback(() => {
+  const loadAllData = useCallback(async () => {
+    // Cargar cache local inmediatamente
     setProducts(storageService.getProducts());
     setOrders(storageService.getOrders());
     setShifts(storageService.getCashShiftsHistory());
     setSettings(storageService.getSettings());
+    // Luego actualizar desde nube
+    if (supabaseSync.isConfigured()) {
+      const [cloudProds, cloudOrders, cloudShifts] = await Promise.all([
+        supabaseSync.fetchProducts(),
+        supabaseSync.fetchOrders(500),
+        supabaseSync.fetchCashShiftsHistory(100)
+      ]);
+      if (cloudProds && cloudProds.length > 0) {
+        storageService.saveProducts(cloudProds);
+        setProducts(cloudProds);
+      }
+      if (cloudOrders && cloudOrders.length > 0) {
+        storageService.saveOrdersBatch(cloudOrders);
+        setOrders(storageService.getOrders());
+      }
+      if (cloudShifts && cloudShifts.length > 0) {
+        setShifts(cloudShifts);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -238,11 +259,14 @@ export default function AdminDatabaseTablesTab() {
         };
 
         if (isCreating) {
-          storageService.addProduct(prodPayload);
-          showToast(`✅ Producto "${prodPayload.name}" creado con éxito en BD.`);
+          const newProd = { ...prodPayload, id: 'prod-' + Date.now() };
+          storageService.addProduct(newProd);
+          supabaseSync.createProduct(newProd);
+          showToast(`✅ Producto "${prodPayload.name}" creado con éxito en BD y Supabase.`);
         } else {
           storageService.updateProduct(editingItem.id, prodPayload);
-          showToast(`✅ Producto "${prodPayload.name}" actualizado con éxito.`);
+          supabaseSync.updateProduct(editingItem.id, prodPayload);
+          showToast(`✅ Producto "${prodPayload.name}" actualizado con éxito en BD y Supabase.`);
         }
 
         // Sincronización en vivo con el bot de WhatsApp en segundo plano
@@ -259,14 +283,16 @@ export default function AdminDatabaseTablesTab() {
         };
 
         if (isCreating) {
-          storageService.saveOrder({
+          const newOrd = storageService.saveOrder({
             ...orderPayload,
-            items: [{ name: 'Pedido Manual', price: orderPayload.total, quantity: 1 }]
+            items: [{ name: 'Pedido Manual', price: orderPayload.total, qty: 1, unitPrice: orderPayload.total }]
           });
-          showToast(`✅ Comanda registrada en la tabla de pedidos.`);
+          supabaseSync.createOrder(newOrd);
+          showToast(`✅ Comanda registrada en BD y Supabase.`);
         } else {
           storageService.updateOrder(editingItem.id, orderPayload);
-          showToast(`✅ Comanda #${formData.orderNumber || editingItem.id} actualizada.`);
+          supabaseSync.updateOrder(editingItem.id, orderPayload);
+          showToast(`✅ Comanda #${formData.orderNumber || editingItem.id} actualizada en BD y Supabase.`);
         }
       } else if (activeTable === 'shifts') {
         const shiftPayload = {
@@ -278,11 +304,13 @@ export default function AdminDatabaseTablesTab() {
         };
 
         if (isCreating) {
-          storageService.addCashShiftHistoryItem(shiftPayload);
-          showToast(`✅ Turno de caja registrado con éxito.`);
+          const newShiftItem = storageService.addCashShiftHistoryItem(shiftPayload);
+          supabaseSync.createCashShift({ ...shiftPayload, id: newShiftItem.id, openedAt: newShiftItem.openedAt, closedAt: newShiftItem.closedAt, isClosed: true });
+          showToast(`✅ Turno de caja registrado en BD y Supabase.`);
         } else {
           storageService.updateCashShiftHistoryItem(editingItem.id, shiftPayload);
-          showToast(`✅ Turno de caja modificado con éxito.`);
+          supabaseSync.updateCashShift(editingItem.id, { ...shiftPayload, isClosed: Boolean(shiftPayload.isClosed) });
+          showToast(`✅ Turno de caja modificado en BD y Supabase.`);
         }
       }
 
@@ -309,14 +337,17 @@ export default function AdminDatabaseTablesTab() {
     try {
       if (activeTable === 'products') {
         storageService.deleteProduct(itemToDelete.id);
+        supabaseSync.deleteProduct(itemToDelete.id);
         chatbotService.syncWithBaileysServer().catch(() => {});
-        showToast(`🗑️ Producto eliminado de la base de datos.`);
+        showToast(`🗑️ Producto eliminado de la base de datos y Supabase.`);
       } else if (activeTable === 'orders') {
         storageService.deleteOrder(itemToDelete.id);
-        showToast(`🗑️ Comanda eliminada.`);
+        supabaseSync.deleteOrder(itemToDelete.id);
+        showToast(`🗑️ Comanda eliminada de BD y Supabase.`);
       } else if (activeTable === 'shifts') {
         storageService.deleteCashShiftHistoryItem(itemToDelete.id);
-        showToast(`🗑️ Registro de turno eliminado.`);
+        supabaseSync.deleteCashShift(itemToDelete.id);
+        showToast(`🗑️ Registro de turno eliminado de BD y Supabase.`);
       }
       setItemToDelete(null);
       loadAllData();
@@ -1387,3 +1418,6 @@ export default function AdminDatabaseTablesTab() {
     </div>
   );
 }
+
+
+

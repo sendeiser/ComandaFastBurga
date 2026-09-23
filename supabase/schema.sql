@@ -74,3 +74,50 @@ CREATE POLICY "Permitir lectura y escritura de órdenes" ON public.orders FOR AL
 ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.cash_shifts;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.products;
+
+
+-- =========================================================
+-- 8. TABLA DE CUENTAS DE CAJEROS (Control de Acceso POS)
+-- =========================================================
+CREATE TABLE IF NOT EXISTS public.cashiers (
+    id TEXT PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    pin TEXT NOT NULL,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'cajero',
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- =========================================================
+-- 9. TABLA DE CONFIGURACIONES GENERALES DEL SISTEMA
+-- =========================================================
+CREATE TABLE IF NOT EXISTS public.system_settings (
+    id TEXT PRIMARY KEY, -- 'general'
+    data JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- =========================================================
+-- 10. TABLA DE CONFIGURACIONES DEL BOT DE WHATSAPP E IA
+-- =========================================================
+CREATE TABLE IF NOT EXISTS public.bot_config (
+    id TEXT PRIMARY KEY, -- 'variables', 'ai_config', 'flows'
+    data JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Habilitar Row Level Security (RLS)
+ALTER TABLE public.cashiers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bot_config ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Permitir lectura y escritura de cajeros" ON public.cashiers FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir lectura y escritura de system_settings" ON public.system_settings FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir lectura y escritura de bot_config" ON public.bot_config FOR ALL USING (true) WITH CHECK (true);
+
+-- Habilitar publicación Realtime
+ALTER PUBLICATION supabase_realtime ADD TABLE public.cashiers;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.system_settings;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.bot_config;

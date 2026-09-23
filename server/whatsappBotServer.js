@@ -1,4 +1,4 @@
-// =========================================================
+﻿// =========================================================
 // WHATSAPP BOT SERVER (Node.js & Baileys Multi-Device)
 // Conexión real 24/7 con WhatsApp Web oficial (Cero Costos de API)
 // Sincronización de Base de Datos y Envío de Fotos Reales de Productos
@@ -35,6 +35,133 @@ const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
 const CASH_SHIFT_FILE = path.join(DATA_DIR, 'cash_shift.json');
 const FLOWS_FILE = path.join(DATA_DIR, 'custom_flows.json');
 const VARIABLES_FILE = path.join(DATA_DIR, 'bot_variables.json');
+
+// =========================================================
+// SUPABASE CLOUD INTEGRATION (Push directo a la nube)
+// =========================================================
+const SUPABASE_URL = 'https://yqynuvjpipmvurualgtg.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxeW51dmpwaXBtdnVydWFsZ3RnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5MzMyOTgsImV4cCI6MjEwNTUwOTI5OH0.mLO52rFPD384yQHdGlBasrx4QvqXiHYH3zRmJ9Bq2go';
+
+async function pushOrderToSupabase(order) {
+  try {
+    const customerObj = typeof order.customer === 'object' && order.customer
+      ? order.customer
+      : { name: order.customer || 'Cliente' };
+
+    const body = JSON.stringify({
+      id: order.id,
+      order_number: Number(order.orderNumber) || 1,
+      channel: order.channel || 'mostrador',
+      table_number: order.tableNumber || '',
+      customer: customerObj,
+      items: Array.isArray(order.items) ? order.items : [],
+      subtotal: Number(order.subtotal || order.total) || 0,
+      delivery_fee: Number(order.deliveryFee) || 0,
+      total: Number(order.total) || 0,
+      payment_method: order.paymentMethod || 'efectivo',
+      cash_paid: order.cashPaid || null,
+      cash_change: order.cashChange || null,
+      transfer_proof: order.transferProof || null,
+      transfer_confirmed: Boolean(order.transferConfirmed),
+      status: order.status || 'pendiente',
+      status_timestamps: order.statusTimestamps || {},
+      created_at: order.createdAt || new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
+
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body
+    });
+    if (res.ok || res.status === 201) {
+      console.log(`[SUPABASE] Pedido ${order.id} sincronizado a la nube.`);
+    } else {
+      const err = await res.text();
+      console.warn(`[SUPABASE] Error al subir pedido ${order.id}:`, err);
+    }
+  } catch (e) {
+    console.warn('[SUPABASE] pushOrderToSupabase error:', e.message);
+  }
+}
+
+async function updateOrderStatusInSupabase(orderId, status) {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ status, updated_at: new Date().toISOString() })
+    });
+  } catch (e) {
+    console.warn('[SUPABASE] updateOrderStatusInSupabase error:', e.message);
+  }
+}
+
+
+async function pushBotConfigToSupabase(key, data) {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/bot_config`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({
+        id: key,
+        data,
+        updated_at: new Date().toISOString()
+      })
+    });
+    console.log(`[SUPABASE] Bot config '${key}' sincronizado a la nube.`);
+  } catch (e) {
+    console.warn(`[SUPABASE] pushBotConfigToSupabase '${key}' error:`, e.message);
+  }
+}
+
+async function fetchBotConfigFromSupabase(key) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/bot_config?id=eq.${key}&limit=1`, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      }
+    });
+    if (res.ok) {
+      const rows = await res.json();
+      if (Array.isArray(rows) && rows.length > 0 && rows[0].data) {
+        return rows[0].data;
+      }
+    }
+  } catch (e) {
+    console.warn(`[SUPABASE] fetchBotConfigFromSupabase '${key}' error:`, e.message);
+  }
+  return null;
+}
+
+async function deleteOrderFromSupabase(orderId) {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}`, {
+      method: 'DELETE',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      }
+    });
+  } catch (e) {
+    console.warn('[SUPABASE] deleteOrderFromSupabase error:', e.message);
+  }
+}
 
 const DEFAULT_SERVER_FLOWS = [
   {
@@ -662,6 +789,7 @@ class WhatsAppBotServer {
 
               // Guardar pedido localmente y en cola para el POS
               saveStoredOrder(newOrder);
+              pushOrderToSupabase(newOrder).catch(() => {});
               pendingOrdersForPos.push(newOrder);
               console.log(`🔔 [NUEVA COMANDA WHATSAPP]: Pedido #${orderId} de ${newOrder.customer.name} ($${newOrder.total}) inyectado.`);
 
@@ -1088,6 +1216,7 @@ app.post('/api/orders', (req, res) => {
 
   // Guardar en orders.json
   saveStoredOrder(normalizedOrder);
+  pushOrderToSupabase(normalizedOrder).catch(() => {});
 
   // Inyectar en la cola de pedidos pendientes para que cocina web, KDS y POS lo reciban
   if (!pendingOrdersForPos.some(o => o.id === normalizedOrder.id)) {
@@ -1104,20 +1233,6 @@ app.patch('/api/orders/:id/status', (req, res) => {
   const { status } = req.body;
   if (!status) return res.status(400).json({ error: 'Status requerido' });
 
-// Endpoint para eliminar un pedido desde cualquier dispositivo (Android, POS, etc.)
-app.delete('/api/orders/:id', (req, res) => {
-  const { id } = req.params;
-  let orders = getStoredOrders();
-  orders = orders.filter(o => o.id !== id);
-  try {
-    fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf-8');
-  } catch (_) {}
-
-  pendingOrdersForPos = pendingOrdersForPos.filter(o => o.id !== id);
-  console.log(`🗑️ [SYNC DELETE] Pedido ${id} eliminado en servidor local.`);
-  res.json({ success: true, id });
-});
-
   const orders = getStoredOrders();
   const idx = orders.findIndex(o => o.id === id);
   if (idx !== -1) {
@@ -1133,8 +1248,27 @@ app.delete('/api/orders/:id', (req, res) => {
     pendingOrdersForPos[pIdx].status = status;
   }
 
-  console.log(`🔄 [SYNC STATUS] Pedido ${id} actualizado a estado '${status}' en servidor local.`);
+  updateOrderStatusInSupabase(id, status).catch(() => {});
+
+  console.log(`🔄 [SYNC STATUS] Pedido ${id} actualizado a estado '${status}' en servidor local y Supabase.`);
   res.json({ success: true, id, status });
+});
+
+// Endpoint para eliminar un pedido desde cualquier dispositivo (Android, POS, etc.)
+app.delete('/api/orders/:id', (req, res) => {
+  const { id } = req.params;
+  let orders = getStoredOrders();
+  orders = orders.filter(o => o.id !== id);
+  try {
+    fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf-8');
+  } catch (_) {}
+
+  pendingOrdersForPos = pendingOrdersForPos.filter(o => o.id !== id);
+
+  deleteOrderFromSupabase(id).catch(() => {});
+
+  console.log(`🗑️ [SYNC DELETE] Pedido ${id} eliminado en servidor local y Supabase.`);
+  res.json({ success: true, id });
 });
 
 // Endpoint para consultar histórico de pedidos de WhatsApp
@@ -1185,6 +1319,7 @@ app.post('/api/bot-variables', (req, res) => {
     return res.status(400).json({ success: false, error: 'Formato inválido de variables' });
   }
   saveBotVariables(variables);
+  pushBotConfigToSupabase('variables', variables).catch(() => {});
   return res.json({ success: true, count: variables.length });
 });
 
@@ -1196,6 +1331,7 @@ app.post('/api/flows', (req, res) => {
   const { flows } = req.body;
   if (Array.isArray(flows)) {
     saveStoredFlows(flows);
+    pushBotConfigToSupabase('flows', flows).catch(() => {});
     console.log(`🔀 [WHATSAPP BOT] Sincronizados ${flows.length} flujos conversacionales.`);
     return res.json({ success: true, count: flows.length });
   }
@@ -1209,6 +1345,7 @@ app.get('/api/ai/config', (req, res) => {
 app.post('/api/ai/config', (req, res) => {
   const { enabled, model, apiKey, secondaryApiKey, systemPrompt } = req.body;
   const updated = geminiBotService.saveConfig({ enabled, model, apiKey, secondaryApiKey, systemPrompt });
+  pushBotConfigToSupabase('ai_config', updated).catch(() => {});
   res.json({ success: true, config: updated });
 });
 
@@ -1275,3 +1412,4 @@ server.on('error', (err) => {
     process.exit(1);
   }
 });
+

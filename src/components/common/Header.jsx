@@ -1,6 +1,8 @@
 import React from 'react';
 import { 
-  Flame, 
+  Flame,
+  User,
+  LogOut, 
   ShoppingCart, 
   ChefHat, 
   DollarSign, 
@@ -18,6 +20,8 @@ import { printerService } from '../../services/printerService';
 import { supabaseSync } from '../../services/supabaseClient';
 
 export default function Header({ 
+  currentCashier,
+  onLogoutCashier,
   currentTab, 
   setCurrentTab, 
   pendingKitchenCount, 
@@ -109,6 +113,45 @@ export default function Header({
           <DollarSign size={16} />
           <span>Abrir Cajón</span>
         </button>
+
+        {/* Cashier Badge & Logout */}
+        {currentCashier && (
+          <div 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px',
+              background: 'var(--bg-input)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-full)',
+              padding: '2px 8px 2px 10px',
+              height: '34px'
+            }}
+            title={`Cajero conectado: ${currentCashier.name} (@${currentCashier.username})`}
+          >
+            <User size={15} style={{ color: 'var(--accent-amber)' }} />
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {currentCashier.name}
+            </span>
+            <button
+              type="button"
+              onClick={onLogoutCashier}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                padding: '2px 4px',
+                borderRadius: 'var(--radius-sm)',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+              title="Cerrar sesión de cajero"
+            >
+              <LogOut size={14} />
+            </button>
+          </div>
+        )}
 
         {/* Shift status pill */}
         {cashShift && !cashShift.isClosed ? (

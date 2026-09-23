@@ -41,6 +41,7 @@ export const chatbotService = {
         window.dispatchEvent(new CustomEvent('comandafast:bot_variables_updated', { detail: variables }));
       }
       this.syncBotVariablesWithServer(variables);
+      supabaseSync.saveBotVariables(variables);
       return true;
     } catch (e) {
       console.error('[chatbotService] Error al guardar bot_variables:', e);
@@ -114,6 +115,7 @@ export const chatbotService = {
     try {
       localStorage.setItem('comandafast_custom_flows', JSON.stringify(flows));
       this.syncFlowsWithBotServer(flows);
+      supabaseSync.saveBotFlows(flows);
       return true;
     } catch (e) {
       console.error('[chatbotService] Error al guardar custom_flows:', e);

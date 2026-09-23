@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+﻿import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { ShieldCheck, Bot, BarChart3, DollarSign, ShieldAlert, Sparkles, LogOut, ArrowLeft, Download, Calendar, Printer , Database} from 'lucide-react';
 import AuditKpisTab from './AuditKpisTab';
 import AuditCashShiftsTab from './AuditCashShiftsTab';
@@ -9,6 +9,7 @@ import AdminWhatsAppBot from './bot/AdminWhatsAppBot';
 import AdminDatabaseTablesTab from './database/AdminDatabaseTablesTab';
 import { auditService } from '../../services/auditService';
 import { storageService } from '../../services/storageService';
+import { supabaseSync } from '../../services/supabaseClient';
 import { authService } from '../../services/authService';
 
 export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout }) {
@@ -24,7 +25,14 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout })
   }, [activeTab]);  const [rangeType, setRangeType] = useState('today'); // 'today' | 'yesterday' | 'week' | 'month' | 'all'
 
   // Turnos históricos
-  const shifts = useMemo(() => storageService.getCashShiftsHistory(), []);
+  const [shifts, setShifts] = React.useState(() => storageService.getCashShiftsHistory());
+  React.useEffect(() => {
+    if (supabaseSync.isConfigured()) {
+      supabaseSync.fetchCashShiftsHistory(100).then(cloudShifts => {
+        if (cloudShifts && cloudShifts.length > 0) setShifts(cloudShifts);
+      });
+    }
+  }, []);
   // Pedidos cancelados
   const cancelledOrders = useMemo(() => storageService.getCancelledOrders(), []);
 
@@ -255,3 +263,4 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout })
     </div>
   );
 }
+
