@@ -1,6 +1,6 @@
-﻿import React, { useState, useEffect, useMemo, useCallback } from 'react';
+﻿import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
-  Database, Table, Search, Plus, Edit2, Trash2, Download, RefreshCw, 
+  Database, Table, Upload, Search, Plus, Edit2, Trash2, Download, RefreshCw, 
   CheckCircle2, AlertTriangle, X, Save, Eye, DollarSign, ShoppingBag, 
   Clock, Store, ArrowUpDown, Filter, ChevronRight, Check, Sparkles,
   Smartphone, MapPin, Tag, FileText, UserCheck, ShieldAlert
@@ -55,6 +55,65 @@ export default function AdminDatabaseTablesTab() {
 
   // Formulario temporal para edición o creación
   const [formData, setFormData] = useState({});
+  const fileInputRef = useRef(null);
+  const [compressing, setCompressing] = useState(false);
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor selecciona un archivo de imagen válido (JPG, PNG, WEBP).');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    setCompressing(true);
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxDimension = 600;
+
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.80);
+          setFormData(prev => ({ ...prev, image: compressedDataUrl }));
+        } catch (err) {
+          console.error('Error al comprimir imagen:', err);
+          setFormData(prev => ({ ...prev, image: event.target.result }));
+        } finally {
+          setCompressing(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+      };
+      img.onerror = () => {
+        setCompressing(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        alert('No se pudo procesar la imagen seleccionada.');
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Cargar datos
   const loadAllData = useCallback(async () => {
@@ -1298,16 +1357,104 @@ export default function AdminDatabaseTablesTab() {
 
                 <div>
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                    URL de Foto (opcional):
+                    Foto del Producto:
                   </label>
+                  {formData.image ? (
+                    <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', maxHeight: '160px', border: '1px solid var(--border-subtle)', marginBottom: '8px' }}>
+                      <img
+                        src={formData.image}
+                        alt="Previsualización"
+                        style={{ width: '100%', height: '140px', objectFit: 'cover', display: 'block' }}
+                      />
+                      <div style={{ position: 'absolute', top: '6px', right: '6px', display: 'flex', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          style={{
+                            background: 'rgba(0,0,0,0.75)',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '4px 8px',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <RefreshCw size={12} />
+                          <span>Cambiar</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, image: '' }))}
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.9)',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '4px 6px',
+                            fontSize: '0.72rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                          title="Eliminar foto"
+                        >
+                          <X size={12} />
+                          <span>Quitar</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{
+                        background: 'var(--bg-card)',
+                        borderRadius: '8px',
+                        padding: '1rem',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        border: '1px dashed var(--accent-amber)',
+                        marginBottom: '8px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Upload size={22} style={{ color: 'var(--accent-amber)' }} />
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-primary)', fontWeight: 800 }}>
+                        {compressing ? 'Optimizando foto...' : '📷 Subir foto desde el dispositivo / celular'}
+                      </span>
+                      <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                        Haz clic aquí para seleccionar imagen JPG, PNG o WEBP
+                      </span>
+                    </div>
+                  )}
+
                   <input
-                    type="text"
-                    value={formData.image || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, image: e.target.value }))}
-                    placeholder="https://..."
-                    className="search-input"
-                    style={{ width: '100%', height: '36px', fontSize: '0.85rem' }}
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    style={{ display: 'none' }}
                   />
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>O URL web:</span>
+                    <input
+                      type="text"
+                      value={formData.image || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, image: e.target.value }))}
+                      placeholder="https://..."
+                      className="search-input"
+                      style={{ flex: 1, height: '32px', fontSize: '0.8rem' }}
+                    />
+                  </div>
                 </div>
 
                 <div>

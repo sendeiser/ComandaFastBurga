@@ -124,8 +124,19 @@ export default function App() {
       ]);
 
       if (cloudProds && cloudProds.length > 0) {
-        setProducts(cloudProds);
-        storageService.saveProducts(cloudProds);
+        // Enriquecer con fotos locales o por defecto si la nube aÃºn no las tiene
+        const localProds = storageService.getProducts();
+        const mergedProds = cloudProds.map(cp => {
+          if (!cp.image) {
+            const loc = localProds.find(lp => lp.id === cp.id || (lp.name && cp.name && lp.name.toLowerCase() === cp.name.toLowerCase()));
+            if (loc && loc.image) {
+              return { ...cp, image: loc.image };
+            }
+          }
+          return cp;
+        });
+        setProducts(mergedProds);
+        storageService.saveProducts(mergedProds);
       }
 
       if (cloudOrders && cloudOrders.length > 0) {

@@ -44,9 +44,9 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
     setCategory(defaultCat);
     setPrice('');
     setEmoji(defaultEmoji);
-    setImage('https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format&fit=crop&q=80');
+    setImage('');
     setDescription('');
-    setModifiersStr('Sin cebolla, Extra Cheddar (+$800), Extra Bacon (+$900)');
+    setModifiersStr('');
     setImageMode('upload');
   };
 
@@ -69,6 +69,7 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
 
     if (!file.type.startsWith('image/')) {
       alert('Por favor selecciona un archivo de imagen válido (JPG, PNG, WEBP).');
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
@@ -82,7 +83,7 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
-          const maxDimension = 800; // Máximo 800px para nitidez perfecta y tamaño ultraligero
+          const maxDimension = 600; // Máximo 600px para tamaño liviano y carga ultra rápida
 
           if (width > maxDimension || height > maxDimension) {
             if (width > height) {
@@ -100,17 +101,19 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
           ctx.drawImage(img, 0, 0, width, height);
 
           // Compresión optimizada en JPEG
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.80);
           setImage(compressedDataUrl);
         } catch (err) {
           console.error('Error al comprimir imagen:', err);
           setImage(event.target.result);
         } finally {
           setCompressing(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
         }
       };
       img.onerror = () => {
         setCompressing(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
         alert('No se pudo procesar la imagen seleccionada.');
       };
       img.src = event.target.result;
@@ -594,66 +597,87 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
                       top: '6px',
                       right: '6px',
                       display: 'flex',
-                      gap: '4px'
+                      gap: '6px'
                     }}>
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
                         style={{
-                          background: 'rgba(0,0,0,0.7)',
+                          background: 'rgba(0,0,0,0.75)',
                           color: '#fff',
                           border: 'none',
                           borderRadius: '6px',
-                          padding: '4px 8px',
-                          fontSize: '0.7rem',
+                          padding: '5px 9px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '4px'
+                          gap: '5px'
                         }}
                       >
-                        <RefreshCw size={12} />
-                        <span>Cambiar</span>
+                        <RefreshCw size={13} />
+                        <span>Cambiar Foto</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setImage('')}
                         style={{
-                          background: 'rgba(239, 68, 68, 0.85)',
+                          background: 'rgba(239, 68, 68, 0.9)',
                           color: '#fff',
                           border: 'none',
                           borderRadius: '6px',
-                          padding: '4px 6px',
-                          fontSize: '0.7rem',
-                          cursor: 'pointer'
+                          padding: '5px 8px',
+                          fontSize: '0.72rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
                         }}
                         title="Eliminar foto"
                       >
-                        <X size={12} />
+                        <X size={13} />
+                        <span>Quitar</span>
                       </button>
                     </div>
                   </div>
-                ) : (
+                ) : imageMode === 'upload' ? (
                   <div
-                    onClick={() => imageMode === 'upload' && fileInputRef.current?.click()}
+                    onClick={() => fileInputRef.current?.click()}
                     style={{
                       background: 'var(--bg-card)',
                       borderRadius: '8px',
                       padding: '1.25rem',
                       textAlign: 'center',
-                      cursor: imageMode === 'upload' ? 'pointer' : 'default',
+                      cursor: 'pointer',
+                      border: '1px dashed var(--accent-amber)',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
-                      gap: '6px'
+                      gap: '8px',
+                      transition: 'border-color 0.2s'
                     }}
                   >
-                    <Upload size={24} style={{ color: 'var(--text-muted)' }} />
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700 }}>
-                      {compressing ? 'Procesando y optimizando imagen...' : 'Haz clic para subir foto desde tu dispositivo'}
+                    <Upload size={28} style={{ color: 'var(--accent-amber)' }} />
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 800 }}>
+                      {compressing ? 'Procesando y optimizando imagen...' : '📷 Subir foto desde este dispositivo / celular'}
                     </span>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                      JPG, PNG o WEBP (se optimiza automáticamente)
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      Toca o haz clic aquí para seleccionar archivo JPG, PNG o WEBP (se comprime automáticamente)
+                    </span>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <input
+                      type="url"
+                      placeholder="https://ejemplo.com/hamburguesa.jpg"
+                      value={image}
+                      onChange={e => setImage(e.target.value)}
+                      className="custom-input-sm"
+                      style={{ width: '100%', padding: '0.6rem 0.75rem', fontSize: '0.82rem' }}
+                    />
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      Ingresa una URL directa a la imagen en internet.
                     </span>
                   </div>
                 )}
@@ -665,19 +689,6 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
                   onChange={handleFileUpload}
                   style={{ display: 'none' }}
                 />
-
-                {imageMode === 'url' && (
-                  <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
-                    <input
-                      type="url"
-                      placeholder="https://ejemplo.com/hamburguesa.jpg"
-                      value={image}
-                      onChange={e => setImage(e.target.value)}
-                      className="custom-input-sm"
-                      style={{ flex: 1 }}
-                    />
-                  </div>
-                )}
               </div>
 
               {/* CAMPOS DEL PRODUCTO */}

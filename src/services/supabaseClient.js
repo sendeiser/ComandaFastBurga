@@ -327,18 +327,78 @@ export const supabaseSync = {
     }
   },
 
-  // ===================== PRODUCTS =====================
+  // ===================== PRODUCTS & IMAGES =====================
 
-  async fetchProducts() {
-    if (!this.isConfigured()) return null;
+  async fetchProductImages() {
+    if (!this.isConfigured()) return {};
     try {
-      const res = await fetch(this._url('products', 'order=name.asc'), {
+      const res = await fetch(this._url('system_settings', 'id=eq.product_images'), {
         headers: this._headers()
       });
       if (res.ok) {
         const rows = await res.json();
+        if (rows && rows[0]?.data && typeof rows[0].data === 'object') {
+          return rows[0].data;
+        }
+      }
+    } catch (e) {
+      console.warn('[Supabase] fetchProductImages error:', e);
+    }
+    return {};
+  },
+
+  async saveProductImages(imagesMap) {
+    if (!this.isConfigured() || !imagesMap) return false;
+    try {
+      const res = await fetch(this._url('system_settings'), {
+        method: 'POST',
+        headers: this._headers({ 'Prefer': 'resolution=merge-duplicates' }),
+        body: JSON.stringify({
+          id: 'product_images',
+          data: imagesMap,
+          updated_at: new Date().toISOString()
+        })
+      });
+      return res.ok;
+    } catch (e) {
+      console.warn('[Supabase] saveProductImages error:', e);
+      return false;
+    }
+  },
+
+  async saveSingleProductImage(id, imageStr) {
+    if (!this.isConfigured() || !id) return;
+    try {
+      const current = await this.fetchProductImages();
+      if (imageStr && imageStr.trim()) {
+        current[id] = imageStr.trim();
+      } else {
+        delete current[id];
+      }
+      await this.saveProductImages(current);
+    } catch (e) {
+      console.warn('[Supabase] saveSingleProductImage error:', e);
+    }
+  },
+
+  async fetchProducts() {
+    if (!this.isConfigured()) return null;
+    try {
+      const [res, imagesMap] = await Promise.all([
+        fetch(this._url('products', 'order=name.asc'), { headers: this._headers() }),
+        this.fetchProductImages()
+      ]);
+
+      if (res.ok) {
+        const rows = await res.json();
         if (Array.isArray(rows) && rows.length > 0) {
-          return rows.map(mapProductFromDB);
+          return rows.map(r => {
+            const mapped = mapProductFromDB(r);
+            if (imagesMap && imagesMap[mapped.id]) {
+              mapped.image = imagesMap[mapped.id];
+            }
+            return mapped;
+          });
         }
       }
     } catch (e) {
@@ -350,11 +410,17 @@ export const supabaseSync = {
   async createProduct(product) {
     if (!this.isConfigured()) return;
     try {
-      await fetch(this._url('products'), {
-        method: 'POST',
-        headers: this._headers({ 'Prefer': 'resolution=merge-duplicates' }),
-        body: JSON.stringify(mapProductToDB(product))
-      });
+      const promises = [
+        fetch(this._url('products'), {
+          method: 'POST',
+          headers: this._headers({ 'Prefer': 'resolution=merge-duplicates' }),
+          body: JSON.stringify(mapProductToDB(product))
+        })
+      ];
+      if (product.image) {
+        promises.push(this.saveSingleProductImage(product.id, product.image));
+      }
+      await Promise.allSettled(promises);
     } catch (e) {
       console.warn('[Supabase] createProduct error:', e);
     }
@@ -370,14 +436,21 @@ export const supabaseSync = {
       if (patchData.emoji !== undefined) dbPatch.emoji = patchData.emoji;
       if (patchData.description !== undefined) dbPatch.description = patchData.description;
       if (patchData.modifiers !== undefined) dbPatch.modifiers = patchData.modifiers;
-      if (patchData.image !== undefined) dbPatch.image = patchData.image;
       if (patchData.is_active !== undefined) dbPatch.is_active = patchData.is_active;
 
-      await fetch(this._url('products', `id=eq.${id}`), {
-        method: 'PATCH',
-        headers: this._headers(),
-        body: JSON.stringify(dbPatch)
-      });
+      const promises = [
+        fetch(this._url('products', `id=eq.${id}`), {
+          method: 'PATCH',
+          headers: this._headers(),
+          body: JSON.stringify(dbPatch)
+        })
+      ];
+
+      if (patchData.image !== undefined) {
+        promises.push(this.saveSingleProductImage(id, patchData.image));
+      }
+
+      await Promise.allSettled(promises);
     } catch (e) {
       console.warn('[Supabase] updateProduct error:', e);
     }
@@ -386,24 +459,51 @@ export const supabaseSync = {
   async deleteProduct(id) {
     if (!this.isConfigured()) return;
     try {
-      await fetch(this._url('products', `id=eq.${id}`), {
-        method: 'DELETE',
-        headers: this._headers()
-      });
+      const promises = [
+        fetch(this._url('products', `id=eq.${id}`), {
+          method: 'DELETE',
+          headers: this._headers()
+        })
+      ];
+      this.fetchProductImages().then(imgs => {
+        if (imgs && imgs[id]) {
+          delete imgs[id];
+          this.saveProductImages(imgs);
+        }
+      }).catch(() => {});
+      await Promise.allSettled(promises);
     } catch (e) {
       console.warn('[Supabase] deleteProduct error:', e);
     }
   },
 
   async pushProducts(products) {
-    if (!this.isConfigured()) return;
+    if (!this.isConfigured() || !Array.isArray(products)) return;
     try {
       const rows = products.map(mapProductToDB);
-      await fetch(this._url('products'), {
-        method: 'POST',
-        headers: this._headers({ 'Prefer': 'resolution=merge-duplicates' }),
-        body: JSON.stringify(rows)
-      });
+
+      const promises = [
+        fetch(this._url('products'), {
+          method: 'POST',
+          headers: this._headers({ 'Prefer': 'resolution=merge-duplicates' }),
+          body: JSON.stringify(rows)
+        }),
+        this.fetchProductImages().then(existing => {
+          const merged = { ...existing };
+          products.forEach(p => {
+            if (p && p.id) {
+              if (p.image && p.image.trim()) {
+                merged[p.id] = p.image.trim();
+              } else {
+                delete merged[p.id];
+              }
+            }
+          });
+          return this.saveProductImages(merged);
+        })
+      ];
+
+      await Promise.allSettled(promises);
     } catch (e) {
       console.warn('[Supabase] pushProducts error:', e);
     }
