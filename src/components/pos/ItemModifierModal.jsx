@@ -32,43 +32,64 @@ export default function ItemModifierModal({ product, onAddToCart, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <div className="modal-title">
-            <span>{product.emoji}</span>
-            <span>{product.name}</span>
+      <div 
+        className="modal-card" 
+        style={{ 
+          maxWidth: '430px', 
+          padding: '1.1rem', 
+          gap: '0.75rem', 
+          borderRadius: '16px' 
+        }} 
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="modal-header" style={{ paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-subtle)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+            {product.image ? (
+              <img 
+                src={product.image} 
+                alt={product.name} 
+                style={{ 
+                  width: '46px', 
+                  height: '46px', 
+                  borderRadius: '10px', 
+                  objectFit: 'cover', 
+                  border: '1px solid var(--border-subtle)',
+                  flexShrink: 0
+                }}
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              />
+            ) : (
+              <span style={{ fontSize: '1.75rem', lineHeight: 1, flexShrink: 0 }}>{product.emoji || '🍔'}</span>
+            )}
+            <div style={{ minWidth: 0 }}>
+              <div className="modal-title" style={{ fontSize: '1.05rem', fontWeight: 800, lineHeight: 1.2 }}>
+                {product.name}
+              </div>
+              {product.description && (
+                <div style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', marginTop: '2px', lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                  {product.description}
+                </div>
+              )}
+            </div>
           </div>
-          <button className="btn-close-modal" onClick={onClose}><X size={20} /></button>
+          <button className="btn-close-modal" onClick={onClose}><X size={18} /></button>
         </div>
 
-        {product.image && (
-          <img 
-            src={product.image} 
-            alt={product.name} 
-            className="modifier-modal-header-img"
-            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-          />
-        )}
-
-        <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-          {product.description}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-main)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-          <span style={{ fontWeight: 700 }}>Cantidad:</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-main)', padding: '0.45rem 0.8rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+          <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>Cantidad:</span>
           <div className="qty-stepper">
-            <button className="qty-btn" onClick={() => setQty(Math.max(1, qty - 1))}><Minus size={14} /></button>
-            <span style={{ fontSize: '1.2rem', fontWeight: 800, minWidth: '30px', textAlign: 'center' }}>{qty}</span>
-            <button className="qty-btn" onClick={() => setQty(qty + 1)}><Plus size={14} /></button>
+            <button className="qty-btn" style={{ width: '28px', height: '28px' }} onClick={() => setQty(Math.max(1, qty - 1))}><Minus size={13} /></button>
+            <span style={{ fontSize: '1.05rem', fontWeight: 800, minWidth: '26px', textAlign: 'center' }}>{qty}</span>
+            <button className="qty-btn" style={{ width: '28px', height: '28px' }} onClick={() => setQty(qty + 1)}><Plus size={13} /></button>
           </div>
         </div>
 
         {product.modifiers && product.modifiers.length > 0 && (
           <div>
-            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-amber)', marginBottom: '0.5rem' }}>
-              AGREGADOS & MODIFICADORES DE COCINA:
+            <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--accent-amber)', marginBottom: '0.35rem', letterSpacing: '0.02em' }}>
+              AGREGADOS & MODIFICADORES:
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
               {product.modifiers.map(mod => {
                 const active = selectedModifiers.includes(mod);
                 return (
@@ -80,18 +101,18 @@ export default function ItemModifierModal({ product, onAddToCart, onClose }) {
                       background: active ? 'var(--accent-amber)' : 'var(--bg-main)',
                       color: active ? '#000' : 'var(--text-primary)',
                       border: active ? '1px solid var(--accent-amber)' : '1px solid var(--border-active)',
-                      padding: '0.5rem 0.85rem',
+                      padding: '0.35rem 0.7rem',
                       borderRadius: 'var(--radius-full)',
-                      fontSize: '0.85rem',
+                      fontSize: '0.78rem',
                       fontWeight: 700,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.35rem',
+                      gap: '0.3rem',
                       transition: 'all 0.15s'
                     }}
                   >
-                    {active && <Check size={14} />}
+                    {active && <Check size={13} />}
                     <span>{mod}</span>
                   </button>
                 );
@@ -101,12 +122,13 @@ export default function ItemModifierModal({ product, onAddToCart, onClose }) {
         )}
 
         <div>
-          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
-            Aclaraciones o Notas para la Cocina:
+          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>
+            Aclaraciones o Notas para Cocina:
           </div>
           <input
             type="text"
             className="custom-input-sm"
+            style={{ fontSize: '0.82rem', padding: '0.45rem 0.65rem' }}
             placeholder="Ej: Bien cocida, sin mayonesa, salsa aparte..."
             value={notes}
             onChange={e => setNotes(e.target.value)}
@@ -115,6 +137,7 @@ export default function ItemModifierModal({ product, onAddToCart, onClose }) {
 
         <button 
           className="btn-confirm-order"
+          style={{ height: '42px', fontSize: '0.9rem' }}
           onClick={handleConfirm}
         >
           <span>Agregar al Pedido (${(product.price * qty).toLocaleString('es-AR')})</span>
