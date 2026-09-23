@@ -3,7 +3,7 @@ import {
   Bot, Sparkles, Key, Download, Terminal, FlaskConical, Settings, ShieldCheck, QrCode, 
   Smartphone, CheckCircle2, Save, RotateCcw, Plus, 
   Trash2, Copy, Check, Info, Zap, AlertCircle, RefreshCw,
-  Power, Wifi, WifiOff, ExternalLink
+  Power, Wifi, WifiOff, ExternalLink, Clock, UserCheck, MessageSquare
 } from 'lucide-react';
 import AdminChatbotLab from './AdminChatbotLab';
 import AdminBotFlowsTab from './AdminBotFlowsTab';
@@ -101,6 +101,44 @@ export default function AdminWhatsAppBot() {
   useEffect(() => {
     fetchAiConfig();
   }, [fetchAiConfig]);
+
+  // Anti-Ban & Modo Humano (Chats pausados por operador)
+  const [pausedChats, setPausedChats] = useState([]);
+  const [loadingPausedChats, setLoadingPausedChats] = useState(false);
+
+  const fetchHumanModeChats = useCallback(async () => {
+    try {
+      setLoadingPausedChats(true);
+      const res = await fetch(`${BOT_SERVER_URL}/api/human-mode/chats`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.chats)) {
+          setPausedChats(data.chats);
+        }
+      }
+    } catch (_) {} finally {
+      setLoadingPausedChats(false);
+    }
+  }, []);
+
+  const handleResumeChat = async (jid) => {
+    try {
+      await fetch(`${BOT_SERVER_URL}/api/human-mode/resume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jid })
+      });
+      fetchHumanModeChats();
+    } catch (_) {}
+  };
+
+  useEffect(() => {
+    if (activeTab === 'security') {
+      fetchHumanModeChats();
+      const interval = setInterval(fetchHumanModeChats, 8000);
+      return () => clearInterval(interval);
+    }
+  }, [activeTab, fetchHumanModeChats]);
 
   const handleSaveAiConfig = async () => {
     try {
@@ -819,14 +857,266 @@ call npm run dev
           padding: '1.25rem',
           display: 'flex',
           flexDirection: 'column',
-          gap: '1.25rem'
+          gap: '1.5rem'
         }}>
+          {/* BANNER PRINCIPAL: ESCUDO ANTI-BANEO ACTIVO */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(245, 158, 11, 0.05) 100%)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            borderRadius: 'var(--radius-md)',
+            padding: '1.2rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1rem'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '10px',
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  border: '1px solid rgba(16, 185, 129, 0.4)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--accent-emerald)'
+                }}>
+                  <ShieldCheck size={24} />
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    Escudo Anti-Baneo & Simulación Humana
+                    <span style={{
+                      fontSize: '0.68rem',
+                      fontWeight: 900,
+                      background: 'rgba(16, 185, 129, 0.2)',
+                      color: 'var(--accent-emerald)',
+                      border: '1px solid rgba(16, 185, 129, 0.4)',
+                      padding: '2px 8px',
+                      borderRadius: '999px',
+                      letterSpacing: '0.04em'
+                    }}>
+                      BLINDAJE ACTIVO 24/7
+                    </span>
+                  </h4>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                    Protección por telemetría orgánica para WhatsApp Business. El bot nunca responde a 0ms ni envía ráfagas sospechosas.
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="cat-pill-btn"
+                onClick={fetchHumanModeChats}
+                style={{ height: '32px', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+              >
+                <RefreshCw size={13} className={loadingPausedChats ? 'spin' : ''} />
+                <span>Actualizar Estado</span>
+              </button>
+            </div>
+
+            {/* GRILLA DE ESCUDOS ACTIVOS */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: '0.75rem'
+            }}>
+              <div style={{
+                background: 'rgba(15, 23, 42, 0.6)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                borderRadius: '8px',
+                padding: '0.75rem',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.6rem'
+              }}>
+                <Clock size={16} color="var(--accent-amber)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    Retardo de Tipeo Humano
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    Espera dinámica (1.4s - 3.6s) proporcional al tamaño de cada mensaje para imitar escritura real.
+                  </div>
+                </div>
+              </div>
+
+              <div style={{
+                background: 'rgba(15, 23, 42, 0.6)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                borderRadius: '8px',
+                padding: '0.75rem',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.6rem'
+              }}>
+                <Smartphone size={16} color="var(--accent-emerald)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    Presencia "Escribiendo..."
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    Emite el evento <code>composing</code> en WhatsApp antes de responder, evitando banderas de bot.
+                  </div>
+                </div>
+              </div>
+
+              <div style={{
+                background: 'rgba(15, 23, 42, 0.6)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                borderRadius: '8px',
+                padding: '0.75rem',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.6rem'
+              }}>
+                <CheckCircle2 size={16} color="var(--accent-blue)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    Lectura Natural (Doble Tilde)
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    Simula el ciclo orgánico de lectura (350-700ms) antes de marcar mensajes leídos.
+                  </div>
+                </div>
+              </div>
+
+              <div style={{
+                background: 'rgba(15, 23, 42, 0.6)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                borderRadius: '8px',
+                padding: '0.75rem',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.6rem'
+              }}>
+                <UserCheck size={16} color="var(--accent-purple)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    Modo Humano Automático
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    Si respondes en el celular físico, el bot se duerme 25 min para no entrometerse en la charla.
+                  </div>
+                </div>
+              </div>
+
+              <div style={{
+                background: 'rgba(15, 23, 42, 0.6)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                borderRadius: '8px',
+                padding: '0.75rem',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.6rem'
+              }}>
+                <MessageSquare size={16} color="var(--accent-amber)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    Filtro Anti-Bucle de Cortesía
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    Responde con calidez humana ante "gracias", "joya" o "chau" sin spamear el menú de 5 opciones.
+                  </div>
+                </div>
+              </div>
+
+              <div style={{
+                background: 'rgba(15, 23, 42, 0.6)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                borderRadius: '8px',
+                padding: '0.75rem',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.6rem'
+              }}>
+                <Zap size={16} color="var(--accent-emerald)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    Cola Anti-Flooding
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    Encola ráfagas de mensajes del mismo cliente para procesarlos en fila india sin colisiones.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* SECCIÓN MODO HUMANO EN VIVO */}
+            <div style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: '8px',
+              padding: '0.9rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.65rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <UserCheck size={16} color="var(--accent-purple)" />
+                  <span>Chats en Modo Humano Activo ({pausedChats.length})</span>
+                </div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  Auto-pausa de 25 min al enviar un mensaje desde el WhatsApp físico
+                </div>
+              </div>
+
+              {pausedChats.length === 0 ? (
+                <div style={{
+                  padding: '0.75rem',
+                  borderRadius: '6px',
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px dashed var(--border-subtle)',
+                  fontSize: '0.75rem',
+                  color: 'var(--text-muted)',
+                  textAlign: 'center'
+                }}>
+                  Ningún chat pausado actualmente. Cuando escribas a un cliente desde el teléfono celular físico de tu local, el bot se pausará automáticamente para ese cliente permitiéndote hablar libremente.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '160px', overflowY: 'auto' }}>
+                  {pausedChats.map(c => (
+                    <div key={c.jid} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '0.5rem 0.75rem',
+                      background: 'rgba(139, 92, 246, 0.08)',
+                      border: '1px solid rgba(139, 92, 246, 0.25)',
+                      borderRadius: '6px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                          📞 +{c.phone}
+                        </span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          (Pausado por {c.remainingMinutes} min más)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="cat-pill-btn active"
+                        onClick={() => handleResumeChat(c.jid)}
+                        style={{ height: '26px', fontSize: '0.72rem', padding: '0 0.6rem' }}
+                      >
+                        Reanudar Bot Ahora
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
           <div>
             <h4 style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>
-              Filtro Anti-Spam & Detección Inteligente de Palabras Clave
+              Filtro de Palabras Clave Gastronómicas (Opcional)
             </h4>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-              Evita que el bot responda mensajes personales o interrupciones en conversaciones con amigos o familiares en el mismo WhatsApp.
+              Evita que el bot responda mensajes personales o interrupciones en conversaciones con amigos o familiares en el mismo WhatsApp si compartes el número.
             </div>
           </div>
 

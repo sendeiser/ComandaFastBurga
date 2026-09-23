@@ -593,6 +593,52 @@ function resetCustomerSession(jid) {
   customerSessions.delete(jid);
 }
 
+// =========================================================
+// SISTEMA DE PROTECCIÓN ANTIDETECCIÓN & ANTI-BANEO (WhatsApp Business)
+// =========================================================
+
+// 1. Control de atención humana (Modo Humano / Hand-over)
+// Duración de pausa automática cuando el operador escribe desde el teléfono físico
+const HUMAN_PAUSE_DURATION_MS = 25 * 60 * 1000; // 25 minutos
+const humanPausedChats = new Map(); // remoteJid -> { pausedUntil, reason, timestamp }
+
+function pauseBotForCustomer(jid, durationMs = HUMAN_PAUSE_DURATION_MS, reason = 'operador_celular') {
+  const pausedUntil = Date.now() + durationMs;
+  humanPausedChats.set(jid, {
+    pausedUntil,
+    reason,
+    timestamp: Date.now()
+  });
+  console.log(`👤 [MODO HUMANO]: Operador escribió a ${jid}. Bot pausado automáticamente por ${Math.round(durationMs / 60000)} minutos.`);
+}
+
+function resumeBotForCustomer(jid) {
+  if (humanPausedChats.has(jid)) {
+    humanPausedChats.delete(jid);
+    console.log(`🤖 [MODO BOT REANUDADO]: Pausa humana removida para ${jid}.`);
+    return true;
+  }
+  return false;
+}
+
+function getHumanPauseStatus(jid) {
+  if (!humanPausedChats.has(jid)) return { isPaused: false };
+  const info = humanPausedChats.get(jid);
+  const now = Date.now();
+  if (now >= info.pausedUntil) {
+    humanPausedChats.delete(jid);
+    return { isPaused: false };
+  }
+  return {
+    isPaused: true,
+    remainingMs: info.pausedUntil - now,
+    reason: info.reason
+  };
+}
+
+// 2. Colas de procesamiento por usuario (Anti-Flooding y ejecución secuencial)
+const userProcessingQueues = new Map(); // remoteJid -> Promise
+
 class WhatsAppBotServer {
   constructor() {
     this.sock = null;
@@ -600,6 +646,69 @@ class WhatsAppBotServer {
     this.qrCode = null;
     this.connectedUser = null;
     this.isStarting = false;
+  }
+
+  /**
+   * Envío blindado contra detección de bots y spam de WhatsApp.
+   * Simula:
+   *  1. Lectura humana real (300-600ms + readMessages / doble tilde azul)
+   *  2. Evento de presencia "composing" (Escribiendo...)
+   *  3. Retraso proporcional al tamaño del mensaje (1.4s - 3.6s) con variación aleatoria
+   *  4. Evento de presencia "paused"
+   *  5. Despacho real del mensaje
+   */
+  async safeSendMessage(remoteJid, content, originalMsgKey = null, customDelay = null) {
+    if (!this.sock) {
+      console.warn(`[WHATSAPP BOT] Socket no inicializado para enviar a ${remoteJid}`);
+      return null;
+    }
+
+    try {
+      // 1. Simular lectura humana (doble tilde azul tras pausa natural)
+      if (originalMsgKey) {
+        try {
+          const readDelay = Math.floor(Math.random() * 300) + 300; // 300-600ms
+          await new Promise(r => setTimeout(r, readDelay));
+          await this.sock.readMessages([originalMsgKey]);
+        } catch (_) {}
+      }
+
+      // 2. Simular presencia humana "Escribiendo..." (composing)
+      try {
+        await this.sock.sendPresenceUpdate('composing', remoteJid);
+      } catch (_) {}
+
+      // 3. Calcular retardo humano natural
+      let delayMs = 1500;
+      if (typeof customDelay === 'number') {
+        delayMs = customDelay;
+      } else if (content?.image) {
+        // Subida y despacho de fotos: 2.2s a 3.4s
+        delayMs = Math.floor(Math.random() * 1200) + 2200;
+      } else if (typeof content?.text === 'string') {
+        const charCount = content.text.length;
+        // ~12ms por caracter + jitter aleatorio (mínimo 1.4s, máximo 3.6s)
+        delayMs = Math.min(3600, Math.max(1400, Math.floor(charCount * 12) + Math.floor(Math.random() * 600)));
+      }
+
+      await new Promise(r => setTimeout(r, delayMs));
+
+      // 4. Pausar "Escribiendo..." justo antes del despacho
+      try {
+        await this.sock.sendPresenceUpdate('paused', remoteJid);
+      } catch (_) {}
+
+      // 5. Envío efectivo del mensaje
+      return await this.sock.sendMessage(remoteJid, content);
+    } catch (err) {
+      console.error(`[WHATSAPP BOT] safeSendMessage error enviando a ${remoteJid}:`, err?.message || err);
+      try {
+        return await this.sock.sendMessage(remoteJid, content);
+      } catch (fallbackErr) {
+        console.error(`[WHATSAPP BOT] Fallback sendMessage falló:`, fallbackErr?.message || fallbackErr);
+        return null;
+      }
+    }
   }
 
   async start(force = false) {
@@ -700,7 +809,6 @@ class WhatsAppBotServer {
         for (const msg of chatUpdate.messages) {
           const remoteJid = msg.key?.remoteJid;
           if (!remoteJid) continue;
-          if (msg.key?.fromMe) continue;
 
           // Ignorar estados / historias de WhatsApp y broadcasts
           if (remoteJid === 'status@broadcast' || remoteJid.endsWith('@broadcast')) continue;
@@ -708,6 +816,12 @@ class WhatsAppBotServer {
           if (remoteJid.endsWith('@g.us')) continue;
           // Ignorar canales informativos de WhatsApp
           if (remoteJid.includes('@newsletter')) continue;
+
+          // Si el mensaje fue enviado por el operador/dueño desde el propio teléfono físico
+          if (msg.key?.fromMe) {
+            pauseBotForCustomer(remoteJid, HUMAN_PAUSE_DURATION_MS, 'operador_celular');
+            continue;
+          }
 
           // Ignorar mensajes con más de 90 segundos de antigüedad (historial masivo al conectar)
           const msgTimestamp = Number(msg.messageTimestamp || 0);
@@ -720,12 +834,31 @@ class WhatsAppBotServer {
           const isImageMsg = !!msg.message?.imageMessage;
           const lower = text.toLowerCase();
 
+          // -------------------------------------------------------------
+          // CONTROL DE ATENCIÓN HUMANA (MODO HUMANO / HAND-OVER)
+          // Si el operador respondió desde el celular, pausamos el bot para no interrumpir
+          // -------------------------------------------------------------
+          const humanStatus = getHumanPauseStatus(remoteJid);
+          const isExplicitBotReactivation = [
+            '#bot', 'menu', 'bot', 'activar', 'reiniciar', 'volver', 'carta', 'hacer pedido', 'pedir'
+          ].includes(lower);
+
+          if (humanStatus.isPaused) {
+            if (isExplicitBotReactivation) {
+              resumeBotForCustomer(remoteJid);
+              console.log(`🤖 [MODO BOT REANUDADO]: Cliente ${remoteJid} reactivó el bot con comando "${text}".`);
+            } else {
+              console.log(`⏸️ [MODO HUMANO ACTIVO]: Mensaje de ${remoteJid} ("${text}") ignorado por bot (atención humana activa por ${Math.ceil(humanStatus.remainingMs / 60000)} min más).`);
+              continue;
+            }
+          }
+
           // Si envió una imagen (ej: comprobante de pago)
           if (isImageMsg) {
             console.log(`📸 [WHATSAPP]: Imagen/Comprobante recibido de ${remoteJid}`);
-            await this.sock.sendMessage(remoteJid, {
+            await this.safeSendMessage(remoteJid, {
               text: '📸 *¡Comprobante recibido con éxito!* 🔥\n\nMuchas gracias, ya fue notificado a caja y cocina para su validación.'
-            });
+            }, msg.key);
             continue;
           }
 
@@ -739,9 +872,9 @@ class WhatsAppBotServer {
           // -------------------------------------------------------------
           if (lower === 'cancelar' || lower === 'cancel' || lower === 'borrar') {
             resetCustomerSession(remoteJid);
-            await this.sock.sendMessage(remoteJid, {
+            await this.safeSendMessage(remoteJid, {
               text: '❌ *Pedido cancelado.*\n\nEscribí *MENU* en cualquier momento para volver a ver las opciones o hacer un nuevo pedido.'
-            });
+            }, msg.key);
             continue;
           }
 
@@ -790,10 +923,10 @@ class WhatsAppBotServer {
                 if (action.imageUrl.startsWith('data:image')) {
                   const base64Data = action.imageUrl.split(';base64,').pop();
                   const imageBuffer = Buffer.from(base64Data, 'base64');
-                  await this.sock.sendMessage(remoteJid, { image: imageBuffer, caption: flowReply });
+                  await this.safeSendMessage(remoteJid, { image: imageBuffer, caption: flowReply }, msg.key);
                   continue;
                 } else if (action.imageUrl.startsWith('http')) {
-                  await this.sock.sendMessage(remoteJid, { image: { url: action.imageUrl }, caption: flowReply });
+                  await this.safeSendMessage(remoteJid, { image: { url: action.imageUrl }, caption: flowReply }, msg.key);
                   continue;
                 }
               } catch (imgErr) {
@@ -801,7 +934,7 @@ class WhatsAppBotServer {
               }
             }
 
-            await this.sock.sendMessage(remoteJid, { text: flowReply });
+            await this.safeSendMessage(remoteJid, { text: flowReply }, msg.key);
             continue;
           }
 
@@ -825,10 +958,10 @@ class WhatsAppBotServer {
                   if (target.image.startsWith('data:image')) {
                     const base64Data = target.image.split(';base64,').pop();
                     const imageBuffer = Buffer.from(base64Data, 'base64');
-                    await this.sock.sendMessage(remoteJid, { image: imageBuffer, caption });
+                    await this.safeSendMessage(remoteJid, { image: imageBuffer, caption }, msg.key);
                     continue;
                   } else if (target.image.startsWith('http')) {
-                    await this.sock.sendMessage(remoteJid, { image: { url: target.image }, caption });
+                    await this.safeSendMessage(remoteJid, { image: { url: target.image }, caption }, msg.key);
                     continue;
                   }
                 } catch (imgErr) {
@@ -836,7 +969,7 @@ class WhatsAppBotServer {
                 }
               }
 
-              await this.sock.sendMessage(remoteJid, { text: caption });
+              await this.safeSendMessage(remoteJid, { text: caption }, msg.key);
               continue;
             }
           }
@@ -897,11 +1030,11 @@ class WhatsAppBotServer {
               }
 
               resetCustomerSession(remoteJid);
-              await this.sock.sendMessage(remoteJid, { text: confirmMsg });
+              await this.safeSendMessage(remoteJid, { text: confirmMsg }, msg.key);
               continue;
             } else {
               resetCustomerSession(remoteJid);
-              await this.sock.sendMessage(remoteJid, { text: '❌ *Pedido cancelado.* Escribí *MENU* para ver más opciones.' });
+              await this.safeSendMessage(remoteJid, { text: '❌ *Pedido cancelado.* Escribí *MENU* para ver más opciones.' }, msg.key);
               continue;
             }
           }
@@ -913,9 +1046,9 @@ class WhatsAppBotServer {
             } else if (lower === '2' || lower.includes('transferencia') || lower.includes('alias') || lower.includes('mp')) {
               session.paymentMethod = 'transferencia';
             } else {
-              await this.sock.sendMessage(remoteJid, {
+              await this.safeSendMessage(remoteJid, {
                 text: '⚠️ Por favor respondé con *1* para Efectivo o *2* para Transferencia Bancaria:'
-              });
+              }, msg.key);
               continue;
             }
 
@@ -925,7 +1058,7 @@ class WhatsAppBotServer {
 
             const summary = `🍔 *RESUMEN DE TU COMANDA* 🔥\n\n🛒 *Items:*\n${itemsList}\n\n🛵 *Entrega:* ${shippingLabel}\n📍 *Dirección:* ${session.shippingAddress}\n👤 *Cliente:* ${session.customerName}\n💳 *Forma de Pago:* ${session.paymentMethod === 'efectivo' ? 'Efectivo' : 'Transferencia Bancaria'}\n\n💵 *TOTAL A PAGAR:* $${session.total.toLocaleString('es-AR')}\n\n¿Está todo perfecto para mandar a la cocina?\n👉 Respondé *SI* para confirmar o *CANCELAR*.`;
             
-            await this.sock.sendMessage(remoteJid, { text: summary });
+            await this.safeSendMessage(remoteJid, { text: summary }, msg.key);
             continue;
           }
 
@@ -933,9 +1066,9 @@ class WhatsAppBotServer {
           if (session.step === 'ASK_NAME') {
             session.customerName = text.trim();
             session.step = 'ASK_PAYMENT';
-            await this.sock.sendMessage(remoteJid, {
+            await this.safeSendMessage(remoteJid, {
               text: `¡Perfecto *${session.customerName}*! 👍\n\n💳 *¿Cómo preferís abonar?*\n\n1️⃣ *Efectivo* (al recibir o retirar)\n2️⃣ *Transferencia Bancaria / Mercado Pago*\n\n_Respondé con 1 o 2:_`
-            });
+            }, msg.key);
             continue;
           }
 
@@ -943,9 +1076,9 @@ class WhatsAppBotServer {
           if (session.step === 'ASK_ADDRESS') {
             session.shippingAddress = text.trim();
             session.step = 'ASK_NAME';
-            await this.sock.sendMessage(remoteJid, {
+            await this.safeSendMessage(remoteJid, {
               text: '👤 *¿A nombre de quién preparamos el pedido?*\n(Escribí tu nombre y apellido):'
-            });
+            }, msg.key);
             continue;
           }
 
@@ -955,21 +1088,21 @@ class WhatsAppBotServer {
               session.shippingMethod = 'local';
               session.shippingAddress = 'Retiro en Local (Mostrador)';
               session.step = 'ASK_NAME';
-              await this.sock.sendMessage(remoteJid, {
+              await this.safeSendMessage(remoteJid, {
                 text: '🛍️ *Retiro por el local seleccionado.*\n\n👤 *¿A nombre de quién registramos la comanda?*\n(Escribí tu nombre y apellido):'
-              });
+              }, msg.key);
               continue;
             } else if (lower === '2' || lower.includes('envio') || lower.includes('envío') || lower.includes('delivery') || lower.includes('domicilio')) {
               session.shippingMethod = 'delivery';
               session.step = 'ASK_ADDRESS';
-              await this.sock.sendMessage(remoteJid, {
+              await this.safeSendMessage(remoteJid, {
                 text: '🛵 *Envío a domicilio seleccionado.*\n\n📍 *Por favor escribí tu dirección exacta y entrecalles para el cadete:*'
-              });
+              }, msg.key);
               continue;
             } else {
-              await this.sock.sendMessage(remoteJid, {
+              await this.safeSendMessage(remoteJid, {
                 text: '⚠️ Por favor elegí una de las dos opciones:\n\n1️⃣ *Retiro por el local (Take Away)*\n2️⃣ *Envío a domicilio con cadete (Delivery)*'
-              });
+              }, msg.key);
               continue;
             }
           }
@@ -978,15 +1111,15 @@ class WhatsAppBotServer {
           if (session.step === 'SELECTING') {
             if (lower === 'listo' || lower === 'pedir' || lower === 'comprar' || lower === 'terminar' || lower === 'seguir' || lower === 'avanzar') {
               if (session.items.length === 0) {
-                await this.sock.sendMessage(remoteJid, {
+                await this.safeSendMessage(remoteJid, {
                   text: '⚠️ Tu comanda está vacía. Escribí el *NÚMERO* de la burger que querés o escribí *MENU*.'
-                });
+                }, msg.key);
                 continue;
               }
               session.step = 'ASK_SHIPPING_METHOD';
-              await this.sock.sendMessage(remoteJid, {
+              await this.safeSendMessage(remoteJid, {
                 text: `🛵 *¿Cómo querés recibir tu comanda?*\n\nRespondé con el número de opción:\n1️⃣ *Retiro por el local (Take Away)* 🏷️ Sin costo\n2️⃣ *Envío a domicilio con cadete (Delivery)*`
-              });
+              }, msg.key);
               continue;
             }
 
@@ -996,9 +1129,9 @@ class WhatsAppBotServer {
                 const lastItem = session.items[session.items.length - 1];
                 if (!lastItem.modifiers) lastItem.modifiers = [];
                 lastItem.modifiers.push(text);
-                await this.sock.sendMessage(remoteJid, {
+                await this.safeSendMessage(remoteJid, {
                   text: `📝 *Modificador agregado a ${lastItem.name}:* "${text}".\n\n👉 ¿Querés sumar algo más? *(Escribí el número)*\n👉 O escribí *LISTO* para avanzar con la entrega.`
-                });
+                }, msg.key);
                 continue;
               }
             }
@@ -1033,9 +1166,9 @@ class WhatsAppBotServer {
 
               const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
 
-              await this.sock.sendMessage(remoteJid, {
+              await this.safeSendMessage(remoteJid, {
                 text: `✅ *¡Sumaste ${selectedProd.name}!* 🍔 (+$${Number(selectedProd.price).toLocaleString('es-AR')})\n\n🛒 *Tu comanda actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n👉 ¿Querés sumar algo más? *(Escribí otro número)*\n👉 ¿Modificaciones? *(Ej: Sin cebolla, Extra cheddar)*\n👉 O escribí *LISTO* para continuar.`
-              });
+              }, msg.key);
               continue;
             }
           }
@@ -1047,7 +1180,7 @@ class WhatsAppBotServer {
             const totalPages = Math.ceil(prods.length / 8) || 1;
             session.catalogPage = ((session.catalogPage || 1) % totalPages) + 1;
             const reply = buildCatalogMessage(prods, session.catalogPage, 8, false);
-            await this.sock.sendMessage(remoteJid, { text: reply });
+            await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
             continue;
           }
 
@@ -1055,7 +1188,7 @@ class WhatsAppBotServer {
             const totalPages = Math.ceil(prods.length / 8) || 1;
             session.catalogPage = Math.max(1, (session.catalogPage || 1) - 1);
             const reply = buildCatalogMessage(prods, session.catalogPage, 8, false);
-            await this.sock.sendMessage(remoteJid, { text: reply });
+            await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
             continue;
           }
 
@@ -1064,13 +1197,13 @@ class WhatsAppBotServer {
             const pNum = parseInt(pageMatch[0], 10);
             session.catalogPage = pNum;
             const reply = buildCatalogMessage(prods, pNum, 8, false);
-            await this.sock.sendMessage(remoteJid, { text: reply });
+            await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
             continue;
           }
 
           if (lower === 'ver todo' || lower === 'todo' || lower === 'todas' || lower === 'completa' || lower === 'completo') {
             const reply = buildCatalogMessage(prods, 1, 8, true);
-            await this.sock.sendMessage(remoteJid, { text: reply });
+            await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
             continue;
           }
 
@@ -1078,25 +1211,25 @@ class WhatsAppBotServer {
           // OPCIONES DEL MENÚ PRINCIPAL (1, 2, 3, 4, 5)
           // -------------------------------------------------------------
           if (lower === '1') {
-            await this.sock.sendMessage(remoteJid, {
+            await this.safeSendMessage(remoteJid, {
               text: '📋 *Estado de Pedido:*\n\nIngresá tu número de orden (ej: *CMD-1234*) o aguardá un instante que un encargado verifique el estado en la plancha. 🔥'
-            });
+            }, msg.key);
             continue;
           }
 
           if (lower === '2') {
             const biz = getBusinessContext();
-            await this.sock.sendMessage(remoteJid, {
+            await this.safeSendMessage(remoteJid, {
               text: `💳 *Datos para Transferencia:* 🏦\n• *Alias:* \`${biz.alias_banco}\`\n• *Banco:* ${biz.banco}\n• *Titular:* ${biz.titular}${biz.cbu ? `\n• *CBU:* \`${biz.cbu}\`` : ''}\n\n📸 *Enviá la captura o comprobante por aquí para verificar tu pago.*`
-            });
+            }, msg.key);
             continue;
           }
 
           if (lower === '3') {
             const biz = getBusinessContext();
-            await this.sock.sendMessage(remoteJid, {
+            await this.safeSendMessage(remoteJid, {
               text: `📍 *Ubicación y Horarios:* 🕒\n🍔 ${biz.direccion}\n⏰ ${biz.horarios}`
-            });
+            }, msg.key);
             continue;
           }
 
@@ -1104,7 +1237,7 @@ class WhatsAppBotServer {
             session.step = 'SELECTING';
             session.catalogPage = 1;
             const reply = buildCatalogMessage(prods, 1, 8, false);
-            await this.sock.sendMessage(remoteJid, { text: reply });
+            await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
             continue;
           }
 
@@ -1112,7 +1245,7 @@ class WhatsAppBotServer {
             session.step = 'SELECTING';
             session.catalogPage = 1;
             const reply = buildCatalogMessage(prods, 1, 8, false);
-            await this.sock.sendMessage(remoteJid, { text: reply });
+            await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
             continue;
           }
 
@@ -1152,8 +1285,60 @@ class WhatsAppBotServer {
             const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
 
             const reply = `✅ *¡Excelente elección! Sumaste ${matchedProd.name}* 🍔 (+$$${Number(matchedProd.price).toLocaleString('es-AR')})\n\n🛒 *Tu comanda actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n👉 ¿Querés sumar otra burger o bebida? *(Escribí su número)*\n👉 ¿Algún cambio? *(Ej: Sin cebolla, Extra cheddar)*\n👉 O respondé *LISTO* para elegir forma de entrega.`;
-            await this.sock.sendMessage(remoteJid, { text: reply });
+            await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
             continue;
+          }
+
+          // -------------------------------------------------------------
+          // FILTRO ANTI-BUCLE Y DETECCIÓN DE CORTESÍA / AGRADECIMIENTOS
+          // (Evita spamear el menú completo a clientes que solo dan las gracias o se despiden)
+          // -------------------------------------------------------------
+          if (session.step === 'IDLE') {
+            const cleanText = lower.replace(/[!¡?¿.,;:]/g, '').trim();
+
+            const gratitudeMatches = [
+              'gracias', 'muchas gracias', 'muchas gracia', 'mil gracias', 'graciass', 'graciela',
+              'joya', 'genial', 'excelente', 'buenisimo', 'buenísimo', 'de diez', 'de 10',
+              'listo gracias', 'dale gracias', 'muchisimas gracias', 'gracias amigo', 'gracias genio',
+              'espectacular', 'muy rico', 'riquismo', 'riquísimo', 'tremendo'
+            ];
+
+            const farewellMatches = [
+              'chau', 'chau chau', 'adios', 'adiós', 'hasta luego', 'nos vemos', 'buenas noches',
+              'buen descanso', 'hasta mañana', 'que descansen'
+            ];
+
+            const acknowledgeMatches = [
+              'ok', 'oki', 'okis', 'dale', 'de una', 'perfecto', 'listo', 'entendido', 'impecable', 'barbaro', 'bárbaro'
+            ];
+
+            if (gratitudeMatches.some(g => cleanText === g || cleanText.startsWith(g + ' ') || cleanText.endsWith(' ' + g))) {
+              const gratitudeReplies = [
+                '¡De nada! 🙌 Que lo disfrutes un montón. Si querés consultar la carta o volver a pedir, escribí *MENU* cuando gustes. ¡Buen provecho! 🍔🔥',
+                '¡Un placer enorme atenderte! 😊 Avisanos cualquier cosa que necesites. Escribí *MENU* cuando quieras volver a pedir. ✨',
+                '¡Muchas gracias a vos por tu compra! ❤️ Esperamos que la disfrutes. La cocina queda a tu entera disposición. 🍔'
+              ];
+              const randomReply = gratitudeReplies[Math.floor(Math.random() * gratitudeReplies.length)];
+              await this.safeSendMessage(remoteJid, { text: randomReply }, msg.key);
+              continue;
+            }
+
+            if (farewellMatches.some(f => cleanText === f || cleanText.startsWith(f + ' ') || cleanText.endsWith(' ' + f))) {
+              const farewellReplies = [
+                '¡Hasta la próxima! 👋 Gracias por contactarte con ComandaFast. ¡Que tengas un excelente descanso! ✨🍔',
+                '¡Nos vemos! Un saludo enorme de todo el equipo de ComandaFast. Escribí *MENU* cuando gustes volver a pedir. 🙌'
+              ];
+              const randomReply = farewellReplies[Math.floor(Math.random() * farewellReplies.length)];
+              await this.safeSendMessage(remoteJid, { text: randomReply }, msg.key);
+              continue;
+            }
+
+            if (acknowledgeMatches.some(a => cleanText === a)) {
+              await this.safeSendMessage(remoteJid, { 
+                text: '¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido.' 
+              }, msg.key);
+              continue;
+            }
           }
 
           // CONSULTA INTELIGENTE CON GOOGLE GEMINI AI (Patrón Candy Shop)
@@ -1168,7 +1353,7 @@ class WhatsAppBotServer {
 
             if (aiReply) {
               console.log(`✨ [WHATSAPP IA GEMINI]: Respondiendo a ${remoteJid}`);
-              await this.sock.sendMessage(remoteJid, { text: aiReply });
+              await this.safeSendMessage(remoteJid, { text: aiReply }, msg.key);
               continue;
             }
           } catch (aiErr) {
@@ -1181,7 +1366,7 @@ class WhatsAppBotServer {
             ? interpolateTemplate(biz.mensaje_bienvenida, { cliente: msg.pushName || '' })
             : '🍔 *¡Hola! Bienvenido a ComandaFast Burgers* 🔥';
           const reply = `${welcomeHeader}\n\n¿En qué podemos ayudarte hoy?\n\n1️⃣ *Consultar estado de pedido*\n2️⃣ *Datos de transferencia / Alias*\n3️⃣ *Horarios y ubicación*\n4️⃣ *Ver carta completa y fotos (${prods.length} burgers)*\n5️⃣ *Hacer un pedido ahora* 🍔\n\n_Respondé con el número de opción o escribí tu pedido directo._`;
-          await this.sock.sendMessage(remoteJid, { text: reply });
+          await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
         }
       });
 
@@ -1235,6 +1420,16 @@ botServer.start().catch(() => {});
 // ENDPOINTS HTTP
 // =========================================================
 app.get('/status', (req, res) => {
+  const now = Date.now();
+  let pausedCount = 0;
+  for (const [jid, data] of humanPausedChats.entries()) {
+    if (now < data.pausedUntil) {
+      pausedCount++;
+    } else {
+      humanPausedChats.delete(jid);
+    }
+  }
+
   res.json({
     status: botServer.status,
     qrCode: botServer.qrCode,
@@ -1242,8 +1437,66 @@ app.get('/status', (req, res) => {
     port: PORT,
     productsCount: getStoredProducts().length,
     pendingOrdersCount: pendingOrdersForPos.length,
+    antiBanProtection: {
+      active: true,
+      humanPresenceSimulation: true,
+      naturalTypingDelay: true,
+      humanTakeoverDetection: true,
+      courtesyFilter: true,
+      pausedChatsCount: pausedCount
+    },
     timestamp: new Date().toISOString()
   });
+});
+
+// Endpoint para consultar chats en Modo Humano (pausados por operador)
+app.get('/api/human-mode/chats', (req, res) => {
+  const now = Date.now();
+  const list = [];
+  for (const [jid, data] of humanPausedChats.entries()) {
+    if (now < data.pausedUntil) {
+      list.push({
+        jid,
+        phone: jid.replace('@s.whatsapp.net', '').replace('@lid', ''),
+        remainingMinutes: Math.ceil((data.pausedUntil - now) / 60000),
+        reason: data.reason,
+        pausedAt: new Date(data.timestamp).toISOString()
+      });
+    } else {
+      humanPausedChats.delete(jid);
+    }
+  }
+  res.json({ success: true, count: list.length, chats: list });
+});
+
+// Endpoint para reanudar el bot en un chat manualmente
+app.post('/api/human-mode/resume', (req, res) => {
+  const { jid } = req.body;
+  if (!jid) return res.status(400).json({ error: 'jid requerido' });
+  const normalizedJid = jid.includes('@') ? jid : `${jid.replace(/\D/g, '')}@s.whatsapp.net`;
+  const wasResumed = resumeBotForCustomer(normalizedJid);
+  res.json({ success: true, jid: normalizedJid, resumed: wasResumed });
+});
+
+// Endpoint para pausar el bot manualmente desde el panel para un chat
+app.post('/api/human-mode/pause', (req, res) => {
+  const { jid, minutes } = req.body;
+  if (!jid) return res.status(400).json({ error: 'jid requerido' });
+  const durationMs = (Number(minutes) || 25) * 60 * 1000;
+  const normalizedJid = jid.includes('@') ? jid : `${jid.replace(/\D/g, '')}@s.whatsapp.net`;
+  pauseBotForCustomer(normalizedJid, durationMs, 'panel_administrador');
+  res.json({ success: true, jid: normalizedJid, minutes: Math.round(durationMs / 60000) });
+});
+
+// Endpoint para actualizar plantillas y configuración del negocio
+app.post('/api/bot-templates', (req, res) => {
+  const { templates } = req.body;
+  if (templates && typeof templates === 'object') {
+    saveBotTemplates(templates);
+    pushBotConfigToSupabase('templates', templates).catch(() => {});
+    return res.json({ success: true, templates });
+  }
+  res.status(400).json({ error: 'Objeto templates requerido' });
 });
 
 app.post('/start', async (req, res) => {
