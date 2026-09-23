@@ -167,7 +167,8 @@ const KEYS = {
   CANCELLED_ORDERS: 'comandafast_cancelled_orders',
   SETTINGS: 'comandafast_settings',
   ORDER_COUNTER: 'comandafast_order_counter',
-  ORDER_COUNTER_DATE: 'comandafast_order_counter_date'
+  ORDER_COUNTER_DATE: 'comandafast_order_counter_date',
+  ORDER_COUNTER_RESET_AT: 'comandafast_order_counter_reset_at'
 };
 
 
@@ -271,67 +272,88 @@ export const storageService = {
     this._cloudOrderNumberFetcher = fn;
   },
 
+  getOrderCounter() {
+    return parseInt(localStorage.getItem(KEYS.ORDER_COUNTER) || '0', 10);
+  },
+
+  getOrderCounterResetAt() {
+    return localStorage.getItem(KEYS.ORDER_COUNTER_RESET_AT) || null;
+  },
+
+  setOrderCounterState(state) {
+    if (!state) return;
+    const remoteResetAt = state.lastResetAt || null;
+    const remoteCounter = Number(state.counter) || 0;
+    const localResetAt = localStorage.getItem(KEYS.ORDER_COUNTER_RESET_AT);
+    const localCounter = parseInt(localStorage.getItem(KEYS.ORDER_COUNTER) || '0', 10);
+
+    const remoteResetTime = remoteResetAt ? new Date(remoteResetAt).getTime() : 0;
+    const localResetTime = localResetAt ? new Date(localResetAt).getTime() : 0;
+
+    if (remoteResetTime > localResetTime) {
+      localStorage.setItem(KEYS.ORDER_COUNTER, remoteCounter.toString());
+      localStorage.setItem(KEYS.ORDER_COUNTER_RESET_AT, remoteResetAt);
+      if (state.resetDate) {
+        localStorage.setItem(KEYS.ORDER_COUNTER_DATE, state.resetDate);
+      }
+    } else if (remoteResetTime === localResetTime || !remoteResetAt) {
+      if (remoteCounter > localCounter) {
+        localStorage.setItem(KEYS.ORDER_COUNTER, remoteCounter.toString());
+      }
+    }
+  },
+
   getNextOrderNumber() {
     const settings = this.getSettings();
     const today = new Date().toLocaleDateString('en-CA');
     const lastDate = localStorage.getItem(KEYS.ORDER_COUNTER_DATE);
-
-    let current = parseInt(localStorage.getItem(KEYS.ORDER_COUNTER) || '0', 10);
-    const existingOrders = this.getOrders();
-    const maxExisting = existingOrders.reduce((max, o) => Math.max(max, Number(o.orderNumber) || 0), 0);
-    if (maxExisting > current) {
-      current = maxExisting;
-    }
+    let lastResetAt = localStorage.getItem(KEYS.ORDER_COUNTER_RESET_AT);
 
     if (settings.resetDailyOrderNumber !== false && lastDate && lastDate !== today) {
-      if (current === 0 && maxExisting === 0) {
-        current = 0;
-        localStorage.setItem(KEYS.ORDER_COUNTER_DATE, today);
-        localStorage.setItem(KEYS.ORDER_COUNTER, '0');
-      }
+      lastResetAt = new Date().toISOString();
+      localStorage.setItem(KEYS.ORDER_COUNTER, '0');
+      localStorage.setItem(KEYS.ORDER_COUNTER_DATE, today);
+      localStorage.setItem(KEYS.ORDER_COUNTER_RESET_AT, lastResetAt);
+    }
+
+    const resetTime = lastResetAt ? new Date(lastResetAt).getTime() : 0;
+    let current = parseInt(localStorage.getItem(KEYS.ORDER_COUNTER) || '0', 10);
+
+    const existingOrders = this.getOrders();
+    const activeOrders = existingOrders.filter(o => {
+      if (!resetTime) return true;
+      const t = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+      return t > resetTime;
+    });
+
+    const maxExisting = activeOrders.reduce((max, o) => Math.max(max, Number(o.orderNumber) || 0), 0);
+    if (maxExisting > current) {
+      current = maxExisting;
     }
 
     current += 1;
     localStorage.setItem(KEYS.ORDER_COUNTER, current.toString());
     localStorage.setItem(KEYS.ORDER_COUNTER_DATE, today);
+    if (!lastResetAt) {
+      lastResetAt = new Date().toISOString();
+      localStorage.setItem(KEYS.ORDER_COUNTER_RESET_AT, lastResetAt);
+    }
     return current;
   },
 
-  async getNextOrderNumberAsync() {
-    // 1. Intentar consultar el último número registrado en Supabase Cloud
-    if (typeof this._cloudOrderNumberFetcher === 'function') {
-      try {
-        const cloudMax = await this._cloudOrderNumberFetcher();
-        if (cloudMax && Number(cloudMax) > 0) {
-          this.updateOrderCounterIfHigher(cloudMax);
-        }
-      } catch (_) {}
-    }
-
-    // 2. Intentar consultar al servidor local LAN (puerto 3002) por si hubo pedidos locales
-    try {
-      if (typeof window !== 'undefined' && window.location) {
-        const botHost = window.location.hostname || 'localhost';
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1200);
-        const res = await fetch(`http://${botHost}:3002/api/latest-order-number`, { signal: controller.signal }).catch(() => null);
-        clearTimeout(timeoutId);
-        if (res && res.ok) {
-          const data = await res.json().catch(() => null);
-          if (data && data.latestOrderNumber) {
-            this.updateOrderCounterIfHigher(data.latestOrderNumber);
-          }
-        }
-      }
-    } catch (_) {}
-
-    // 3. Generar el siguiente correlativo garantizado
-    return this.getNextOrderNumber();
-  },
-
-  updateOrderCounterIfHigher(val) {
+  updateOrderCounterIfHigher(val, orderCreatedAt = null) {
     const num = Number(val) || 0;
     if (num <= 0) return;
+
+    const lastResetAt = localStorage.getItem(KEYS.ORDER_COUNTER_RESET_AT);
+    if (lastResetAt && orderCreatedAt) {
+      const resetTime = new Date(lastResetAt).getTime();
+      const orderTime = new Date(orderCreatedAt).getTime();
+      if (orderTime <= resetTime) {
+        return;
+      }
+    }
+
     const current = parseInt(localStorage.getItem(KEYS.ORDER_COUNTER) || '0', 10);
     if (num > current) {
       localStorage.setItem(KEYS.ORDER_COUNTER, num.toString());
@@ -339,10 +361,13 @@ export const storageService = {
     }
   },
 
-  resetOrderCounter(val = 0) {
+  resetOrderCounter(val = 0, resetAt = null) {
+    const today = new Date().toLocaleDateString('en-CA');
+    const timestamp = resetAt || new Date().toISOString();
     localStorage.setItem(KEYS.ORDER_COUNTER, val.toString());
-    localStorage.setItem(KEYS.ORDER_COUNTER_DATE, new Date().toLocaleDateString('en-CA'));
-    return val;
+    localStorage.setItem(KEYS.ORDER_COUNTER_DATE, today);
+    localStorage.setItem(KEYS.ORDER_COUNTER_RESET_AT, timestamp);
+    return { counter: val, lastResetAt: timestamp, resetDate: today };
   },
 
   reorderOrders(orderId, direction) {
@@ -686,6 +711,36 @@ export const storageService = {
     });
     localStorage.setItem(KEYS.CASH_SHIFT, JSON.stringify(shift));
     return shift;
+  },
+
+  
+  saveCashShiftsHistory(history) {
+    localStorage.setItem(KEYS.CASH_SHIFTS_HISTORY, JSON.stringify(history));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('comandafast:shifts_updated', { detail: history }));
+    }
+    return history;
+  },
+
+  syncCashShiftsFromCloud(cloudShifts) {
+    if (!Array.isArray(cloudShifts) || cloudShifts.length === 0) return this.getCashShiftsHistory();
+    const existing = this.getCashShiftsHistory();
+    const map = new Map();
+    // Insert cloud shifts (closed shifts)
+    cloudShifts.filter(s => s && s.id && s.isClosed).forEach(s => map.set(s.id, s));
+    // Keep local shifts that are not in cloud yet
+    existing.forEach(s => {
+      if (s && s.id && !map.has(s.id)) {
+        map.set(s.id, s);
+      }
+    });
+    const merged = Array.from(map.values()).sort((a, b) => {
+      const ta = a.openedAt ? new Date(a.openedAt).getTime() : 0;
+      const tb = b.openedAt ? new Date(b.openedAt).getTime() : 0;
+      return tb - ta;
+    });
+    this.saveCashShiftsHistory(merged);
+    return merged;
   },
 
   getCashShiftsHistory() {

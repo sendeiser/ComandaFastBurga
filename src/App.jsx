@@ -399,40 +399,64 @@ export default function App() {
           }
         }
 
-        // E. Sincronización de Caja Abierta (Cash Shift) en tiempo real
+        // E. Sincronización de Caja Abierta (Cash Shift) en tiempo real con Supabase
         try {
-          let remoteShift = null;
+          let cloudShifts = [];
           if (supabaseSync.isConfigured()) {
-            remoteShift = await supabaseSync.fetchLatestCashShift();
+            cloudShifts = await supabaseSync.fetchCashShifts(25);
           }
-          if (!remoteShift && localServerOnline) {
+
+          let remoteActiveShift = cloudShifts.find(s => !s.isClosed) || null;
+
+          if (!remoteActiveShift && localServerOnline) {
             try {
               const csRes = await fetch(`http://${botHost}:3002/api/cash-shift`);
               if (csRes.ok) {
                 const csData = await csRes.json();
-                if (csData && csData.cashShift) remoteShift = csData.cashShift;
+                if (csData && csData.cashShift && !csData.cashShift.isClosed) {
+                  remoteActiveShift = csData.cashShift;
+                }
               }
             } catch (_) {}
           }
 
-          if (remoteShift) {
-            const localShift = storageService.getCashShift();
-            if (!localShift || (remoteShift.id !== localShift.id && !remoteShift.isClosed)) {
-              storageService.saveCashShift(remoteShift);
-              setCashShift(remoteShift);
-            } else if (localShift && remoteShift.id === localShift.id) {
-              if (remoteShift.isClosed && !localShift.isClosed) {
-                storageService.saveCashShift(remoteShift);
-                setCashShift(remoteShift);
-              } else if (!remoteShift.isClosed && (remoteShift.expenses?.length || 0) > (localShift.expenses?.length || 0)) {
-                storageService.saveCashShift(remoteShift);
-                setCashShift(remoteShift);
+          if (cloudShifts.length > 0) {
+            storageService.syncCashShiftsFromCloud(cloudShifts);
+          }
+
+          const localShift = storageService.getCashShift();
+
+          if (remoteActiveShift) {
+            // Caso 1: Hay un turno activo abierto en la base de datos
+            if (!localShift || localShift.id !== remoteActiveShift.id || localShift.isClosed) {
+              storageService.saveCashShift(remoteActiveShift);
+              setCashShift(remoteActiveShift);
+            } else if (localShift && remoteActiveShift.id === localShift.id) {
+              if ((remoteActiveShift.expenses?.length || 0) > (localShift.expenses?.length || 0)) {
+                storageService.saveCashShift(remoteActiveShift);
+                setCashShift(remoteActiveShift);
               }
             }
           } else {
-            const localShift = storageService.getCashShift();
+            // Caso 2: En la base de datos NO hay turno abierto (Caja Cerrada)
             if (localShift && !localShift.isClosed) {
-              supabaseSync.pushCashShift(localShift).catch(() => {});
+              const closedMatch = cloudShifts.find(s => s.id === localShift.id) || cloudShifts[0];
+              const closedShift = {
+                ...localShift,
+                isClosed: true,
+                closedAt: closedMatch?.closedAt || new Date().toISOString(),
+                countedCash: closedMatch?.countedCash !== undefined && closedMatch?.countedCash !== null ? closedMatch.countedCash : localShift.initialCash,
+                difference: closedMatch?.difference !== undefined && closedMatch?.difference !== null ? closedMatch.difference : 0,
+                notes: closedMatch?.notes || localShift.notes
+              };
+              storageService.saveCashShift(closedShift);
+              setCashShift(closedShift);
+
+              const history = storageService.getCashShiftsHistory();
+              if (!history.some(h => h.id === closedShift.id)) {
+                history.unshift(closedShift);
+                storageService.saveCashShiftsHistory(history);
+              }
             }
           }
         } catch (_) {}
@@ -576,28 +600,14 @@ export default function App() {
   };
 
   // Cash Handlers (Sincronización Total con Supabase y Red Local)
-  const handleOpenShift = (initialAmount, cashierName) => {
+  const handleOpenShift = async (initialAmount, cashierName) => {
     const activeCashierName = currentCashier?.name || cashierName || 'Cajero 1';
     const shift = storageService.openCashShift(initialAmount, activeCashierName);
     setCashShift(shift);
-    // Crear turno directamente en Supabase Cloud
-    supabaseSync.createCashShift(shift);
-    try {
-      const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
-      fetch(`http://${botHost}:3002/api/cash-shift`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cashShift: shift })
-      }).catch(() => {});
-    } catch (_) {}
-  };
-
-  const handleAddExpense = (amount, reason) => {
-    const shift = storageService.addCashExpense(amount, reason);
-    setCashShift(shift);
-    // Sincronizar gastos directamente en Supabase Cloud
-    if (shift && shift.id) {
-      supabaseSync.updateCashShift(shift.id, { expenses: shift.expenses });
+    if (supabaseSync.isConfigured()) {
+      try {
+        await supabaseSync.pushCashShift(shift);
+      } catch (_) {}
     }
     try {
       const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
@@ -609,20 +619,31 @@ export default function App() {
     } catch (_) {}
   };
 
-  const handleCloseShift = (countedCash, notes) => {
+    const handleAddExpense = async (amount, reason) => {
+    const shift = storageService.addCashExpense(amount, reason);
+    setCashShift(shift);
+    if (supabaseSync.isConfigured() && shift) {
+      try {
+        await supabaseSync.pushCashShift(shift);
+      } catch (_) {}
+    }
+    try {
+      const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+      fetch(`http://${botHost}:3002/api/cash-shift`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cashShift: shift })
+      }).catch(() => {});
+    } catch (_) {}
+  };
+
+  const handleCloseShift = async (countedCash, notes) => {
     const shift = storageService.closeCashShift(countedCash, notes);
     setCashShift(shift);
-    // Cerrar turno directamente en Supabase Cloud (arqueo ciego)
-    if (shift && shift.id) {
-      supabaseSync.updateCashShift(shift.id, {
-        closedAt: shift.closedAt,
-        countedCash: shift.countedCash,
-        isClosed: true,
-        notes: shift.notes,
-        cashSales: shift.cashSales,
-        expectedCash: shift.expectedCash,
-        difference: shift.difference
-      });
+    if (supabaseSync.isConfigured() && shift) {
+      try {
+        await supabaseSync.pushCashShift(shift);
+      } catch (_) {}
     }
     try {
       const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';

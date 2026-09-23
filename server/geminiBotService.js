@@ -14,7 +14,7 @@ dotenv.config();
 const DATA_DIR = path.join(process.cwd(), 'data');
 const AI_CONFIG_FILE = path.join(DATA_DIR, 'ai_config.json');
 
-const DEFAULT_GEMINI_KEY_1 = Buffer.from('QVEuQWI4Uk42S2wyVXEzaEtEUjZubnljV3BTc1l4SjJGbXhWUTRDQVg5TjhxbFVZaDVkR0E=', 'base64').toString('utf8');
+const DEFAULT_GEMINI_KEY_1 = Buffer.from('QVEuQWI4Uk42S1pNWmJTTENxMDhNNVVXbVVJdXp3RWdWZkxadVFMdHJJeFJOMnRYdXNCeEE=', 'base64').toString('utf8');
 const DEFAULT_GEMINI_KEY_2 = Buffer.from('QVEuQWI4Uk42S1pNWmJTTENxMDhNNVVXbVVJdXp3RWdWZkxadVFMdHJJeFJOMnRYdXNCeEE=', 'base64').toString('utf8');
 
 if (!fs.existsSync(DATA_DIR)) {

@@ -388,9 +388,15 @@ export default function SettingsModal({ settings, onSaveSettings, onClose }) {
                 type="button" 
                 className="qty-btn"
                 style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.8rem', gap: '6px', background: 'var(--bg-card)', color: 'var(--accent-amber)' }}
-                onClick={() => {
+                onClick={async () => {
                   if (window.confirm('¿Deseas reiniciar el contador de órdenes a 0 ahora? El próximo pedido será el #1.')) {
-                    storageService.resetOrderCounter(0);
+                    const nowIso = new Date().toISOString();
+                    storageService.resetOrderCounter(0, nowIso);
+                    try {
+                      if (typeof supabaseSync !== 'undefined' && supabaseSync.pushOrderCounterState) {
+                        await supabaseSync.pushOrderCounterState({ counter: 0, lastResetAt: nowIso });
+                      }
+                    } catch (_) {}
                     alert('Contador de órdenes reiniciado a 0. Próxima orden: #1.');
                   }
                 }}

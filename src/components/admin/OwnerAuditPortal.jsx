@@ -35,11 +35,25 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout })
   // Turnos históricos
   const [shifts, setShifts] = React.useState(() => storageService.getCashShiftsHistory());
   React.useEffect(() => {
-    if (supabaseSync.isConfigured()) {
-      supabaseSync.fetchCashShiftsHistory(100).then(cloudShifts => {
-        if (cloudShifts && cloudShifts.length > 0) setShifts(cloudShifts);
-      });
+    const handleUpdate = () => {
+      setShifts(storageService.getCashShiftsHistory());
+    };
+    window.addEventListener('comandafast:shifts_updated', handleUpdate);
+    window.addEventListener('comandafast:cash-shift-change', handleUpdate);
+
+    if (supabaseSync && supabaseSync.isConfigured()) {
+      supabaseSync.fetchCashShifts(50).then(cloudShifts => {
+        if (Array.isArray(cloudShifts) && cloudShifts.length > 0) {
+          const merged = storageService.syncCashShiftsFromCloud(cloudShifts);
+          setShifts(merged);
+        }
+      }).catch(() => {});
     }
+
+    return () => {
+      window.removeEventListener('comandafast:shifts_updated', handleUpdate);
+      window.removeEventListener('comandafast:cash-shift-change', handleUpdate);
+    };
   }, []);
   // Pedidos cancelados
   const cancelledOrders = useMemo(() => storageService.getCancelledOrders(), []);

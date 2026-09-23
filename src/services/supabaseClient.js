@@ -202,7 +202,14 @@ export const supabaseSync = {
         const rows = await res.json();
         if (Array.isArray(rows)) {
           const mapped = rows.map(mapOrderFromDB).filter(o => o && !storageService.isOrderDeleted(o.id));
-          const maxOrderNum = mapped.reduce((max, o) => Math.max(max, Number(o.orderNumber) || 0), 0);
+          const resetAt = storageService.getOrderCounterResetAt();
+          const resetTime = resetAt ? new Date(resetAt).getTime() : 0;
+          const activeOrders = mapped.filter(o => {
+            if (!resetTime) return true;
+            const t = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+            return t > resetTime;
+          });
+          const maxOrderNum = activeOrders.reduce((max, o) => Math.max(max, Number(o.orderNumber) || 0), 0);
           if (maxOrderNum > 0) {
             storageService.updateOrderCounterIfHigher(maxOrderNum);
           }
@@ -228,6 +235,14 @@ export const supabaseSync = {
       });
       if (res.ok) {
         const rows = await res.json();
+        const currentCounter = storageService.getOrderCounter();
+        const lastResetAt = storageService.getOrderCounterResetAt();
+        if (order.orderNumber && order.orderNumber >= currentCounter) {
+          this.pushOrderCounterState({
+            counter: order.orderNumber,
+            lastResetAt: lastResetAt || order.createdAt || new Date().toISOString()
+          });
+        }
         return Array.isArray(rows) ? mapOrderFromDB(rows[0]) : null;
       }
     } catch (e) {
@@ -237,12 +252,64 @@ export const supabaseSync = {
   },
 
   
+  async fetchOrderCounterState() {
+    if (!this.isConfigured()) return null;
+    try {
+      const res = await fetch(this._url('system_settings', 'id=eq.order_counter&select=*'), {
+        headers: this._headers()
+      });
+      if (res.ok) {
+        const rows = await res.json();
+        if (Array.isArray(rows) && rows.length > 0) {
+          const counterData = rows[0].data || {};
+          storageService.setOrderCounterState(counterData);
+          return counterData;
+        }
+      }
+    } catch (e) {
+      console.warn('[Supabase] fetchOrderCounterState error:', e);
+    }
+    return null;
+  },
+
+  async pushOrderCounterState(counterData) {
+    if (!this.isConfigured()) return false;
+    try {
+      const payload = {
+        id: 'order_counter',
+        data: {
+          counter: Number(counterData.counter) || 0,
+          lastResetAt: counterData.lastResetAt || new Date().toISOString(),
+          resetDate: counterData.resetDate || new Date().toLocaleDateString('en-CA'),
+          updatedAt: new Date().toISOString()
+        },
+        updated_at: new Date().toISOString()
+      };
+      const res = await fetch(this._url('system_settings'), {
+        method: 'POST',
+        headers: this._headers({ 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' }),
+        body: JSON.stringify(payload)
+      });
+      return res.ok;
+    } catch (e) {
+      console.warn('[Supabase] pushOrderCounterState error:', e);
+      return false;
+    }
+  },
+
   async fetchLatestOrderNumber() {
     if (!this.isConfigured()) return null;
     try {
+      await this.fetchOrderCounterState();
+
+      const lastResetAt = storageService.getOrderCounterResetAt();
+      let query = 'select=order_number,created_at&order=order_number.desc&limit=1';
+      if (lastResetAt) {
+        query = 'select=order_number,created_at&created_at=gt.' + encodeURIComponent(lastResetAt) + '&order=order_number.desc&limit=1';
+      }
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2500);
-      const res = await fetch(this._url('orders', 'select=order_number,created_at&order=order_number.desc&limit=1'), {
+      const res = await fetch(this._url('orders', query), {
         headers: this._headers(),
         signal: controller.signal
       });
@@ -252,7 +319,7 @@ export const supabaseSync = {
         if (Array.isArray(rows) && rows.length > 0) {
           const maxNum = Number(rows[0].order_number) || 0;
           if (maxNum > 0) {
-            storageService.updateOrderCounterIfHigher(maxNum);
+            storageService.updateOrderCounterIfHigher(maxNum, rows[0].created_at);
             return maxNum;
           }
         }
@@ -260,7 +327,7 @@ export const supabaseSync = {
     } catch (e) {
       console.warn('[Supabase] fetchLatestOrderNumber error:', e);
     }
-    return null;
+    return storageService.getOrderCounter();
   },
 
   // Alias legacy
@@ -571,6 +638,10 @@ export const supabaseSync = {
     return null;
   },
 
+  async fetchCashShifts(limit = 50) {
+    return this.fetchCashShiftsHistory(limit);
+  },
+
   async fetchCashShiftsHistory(limit = 50) {
     if (!this.isConfigured()) return [];
     try {
@@ -586,15 +657,49 @@ export const supabaseSync = {
   },
 
   async createCashShift(shift) {
-    if (!this.isConfigured() || !shift) return;
+    if (!this.isConfigured() || !shift) return false;
     try {
-      await fetch(this._url('cash_shifts'), {
+      if (!shift.isClosed) {
+        try {
+          await fetch(this._url('cash_shifts', `is_closed=eq.false&id=neq.${shift.id}`), {
+            method: 'PATCH',
+            headers: this._headers(),
+            body: JSON.stringify({ is_closed: true, closed_at: new Date().toISOString() })
+          });
+        } catch (_) {}
+      }
+
+      let fullNotes = shift.notes || '';
+      if (shift.isClosed) {
+        const meta = {
+          cashSales: Number(shift.cashSales) || 0,
+          expectedCash: Number(shift.expectedCash) || 0,
+          difference: Number(shift.difference) || 0
+        };
+        fullNotes = `[AUDIT: ${JSON.stringify(meta)}] ${fullNotes}`.trim();
+      }
+
+      const payload = {
+        id: shift.id,
+        opened_at: shift.openedAt,
+        closed_at: shift.closedAt || null,
+        initial_cash: Number(shift.initialCash) || 0,
+        counted_cash: shift.countedCash !== undefined && shift.countedCash !== null ? Number(shift.countedCash) : null,
+        cashier_name: shift.cashierName || 'Cajero 1',
+        expenses: shift.expenses || [],
+        notes: fullNotes,
+        is_closed: Boolean(shift.isClosed)
+      };
+
+      const res = await fetch(this._url('cash_shifts'), {
         method: 'POST',
         headers: this._headers({ 'Prefer': 'resolution=merge-duplicates' }),
-        body: JSON.stringify(mapCashShiftToDB(shift))
+        body: JSON.stringify(payload)
       });
+      return res.ok;
     } catch (e) {
       console.warn('[Supabase] createCashShift error:', e);
+      return false;
     }
   },
 
