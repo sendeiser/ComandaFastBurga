@@ -5,7 +5,6 @@ import {
   LogOut, 
   ShoppingCart, 
   ChefHat, 
-  DollarSign, 
   History, 
   UtensilsCrossed, 
   Settings, 
@@ -16,7 +15,6 @@ import {
   Sun, 
   Moon
 } from 'lucide-react';
-import { printerService } from '../../services/printerService';
 import { supabaseSync } from '../../services/supabaseClient';
 
 export default function Header({ 
@@ -40,10 +38,6 @@ export default function Header({
     } else {
       document.exitFullscreen().catch(() => {});
     }
-  };
-
-  const handleOpenDrawer = () => {
-    printerService.kickCashDrawer(settings);
   };
 
   return (
@@ -102,18 +96,6 @@ export default function Header({
       </nav>
 
       <div className="header-right-actions">
-        {/* Cash Drawer Kick Button (Desktop Only) */}
-        <button 
-          type="button" 
-          className="qty-btn desktop-only-action"
-          style={{ width: 'auto', padding: '0.4rem 0.75rem', gap: '4px', color: 'var(--accent-emerald)', height: '34px' }}
-          onClick={handleOpenDrawer}
-          title="Abrir cajón de dinero (ESC/POS)"
-        >
-          <DollarSign size={16} />
-          <span>Abrir Cajón</span>
-        </button>
-
         {/* Cashier Badge & Logout */}
         {currentCashier && (
           <div 
