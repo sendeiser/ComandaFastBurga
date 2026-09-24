@@ -383,21 +383,12 @@ export default function KitchenDisplay({
           <span className="kds-tab-label">Listos</span>
           <span className="kds-tab-badge">{readyOrders.length}</span>
         </button>
-
-        <button
-          type="button"
-          className={`kds-mobile-tab-btn all ${mobileColumnTab === 'all' ? 'active' : ''}`}
-          onClick={() => setMobileColumnTab('all')}
-        >
-          <span className="kds-tab-label">Todos</span>
-          <span className="kds-tab-badge">{activeOrders.length}</span>
-        </button>
       </div>
 
       {/* 3-Column Kanban Board */}
       <div className={`kds-columns-grid mobile-${mobileColumnTab}`}>
         {/* Column 1: Pendientes */}
-        <div className={`kds-column ${mobileColumnTab !== 'all' && mobileColumnTab !== 'pendiente' ? 'mobile-hidden' : ''}`}>
+        <div className={`kds-column ${mobileColumnTab !== 'pendiente' ? 'mobile-hidden' : ''}`}>
           <div className="kds-column-header pending">
             <div className="kds-col-header-left">
               <span className="kds-status-indicator pending" />
@@ -419,7 +410,7 @@ export default function KitchenDisplay({
         </div>
 
         {/* Column 2: En Cocina */}
-        <div className={`kds-column ${mobileColumnTab !== 'all' && mobileColumnTab !== 'cocina' ? 'mobile-hidden' : ''}`}>
+        <div className={`kds-column ${mobileColumnTab !== 'cocina' ? 'mobile-hidden' : ''}`}>
           <div className="kds-column-header cooking">
             <div className="kds-col-header-left">
               <span className="kds-status-indicator cooking" />
@@ -441,7 +432,7 @@ export default function KitchenDisplay({
         </div>
 
         {/* Column 3: Listo / Por despachar */}
-        <div className={`kds-column ${mobileColumnTab !== 'all' && mobileColumnTab !== 'listo' ? 'mobile-hidden' : ''}`}>
+        <div className={`kds-column ${mobileColumnTab !== 'listo' ? 'mobile-hidden' : ''}`}>
           <div className="kds-column-header ready">
             <div className="kds-col-header-left">
               <span className="kds-status-indicator ready" />

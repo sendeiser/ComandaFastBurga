@@ -2029,7 +2029,7 @@ h1, h2, h3, h4, .brand-title {
   /* Segmented Column Switcher Tabs on Mobile */
   .kds-mobile-tabs-bar {
     display: grid !important;
-    grid-template-columns: repeat(4, 1fr) !important;
+    grid-template-columns: repeat(3, 1fr) !important;
     gap: 4px !important;
     background: var(--bg-card) !important;
     padding: 4px !important;
