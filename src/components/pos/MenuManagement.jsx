@@ -170,123 +170,56 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
   }, [products, selectedFilterCategory, searchQuery]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
+    <div className="menu-container">
       {/* BARRA SUPERIOR CON SUB-PESTAÑAS */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        background: 'var(--bg-card)',
-        padding: '1rem 1.25rem',
-        borderRadius: 'var(--radius-lg)',
-        border: '1px solid var(--border-subtle)',
-        flexWrap: 'wrap',
-        gap: '1rem'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.35))',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '1px solid var(--accent-amber)'
-          }}>
-            <UtensilsCrossed size={22} style={{ color: 'var(--accent-amber)' }} />
+      <div className="menu-header-bar">
+        <div className="menu-header-info">
+          <div className="menu-header-icon-box">
+            <UtensilsCrossed size={20} />
           </div>
           <div>
-            <div style={{ fontWeight: 900, fontSize: '1.15rem', color: 'var(--text-primary)' }}>
-              MÓDULO DE MENÚ & CATEGORÍAS
+            <div className="menu-header-title">
+              Menú & Categorías
             </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-              Gestiona los productos, fotos, modificadores y categorías disponibles en la plataforma
+            <div className="menu-header-subtitle">
+              Gestiona productos, modificadores y fotos
             </div>
           </div>
         </div>
 
         {/* SELECTOR DE SUB-PESTAÑAS: PRODUCTOS / CATEGORÍAS */}
-        <div style={{
-          display: 'flex',
-          gap: '6px',
-          background: 'var(--bg-main)',
-          padding: '4px',
-          borderRadius: '12px',
-          border: '1px solid var(--border-subtle)'
-        }}>
+        <div className="menu-subtabs-control">
           <button
             type="button"
+            className={`menu-subtab-btn ${activeSubTab === 'products' ? 'active' : ''}`}
             onClick={() => setActiveSubTab('products')}
-            style={{
-              padding: '7px 16px',
-              borderRadius: '9px',
-              border: 'none',
-              background: activeSubTab === 'products' ? 'var(--accent-amber)' : 'transparent',
-              color: activeSubTab === 'products' ? '#000' : 'var(--text-secondary)',
-              fontWeight: 800,
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.15s ease'
-            }}
           >
             <span>🍔 Productos</span>
-            <span style={{
-              background: activeSubTab === 'products' ? 'rgba(0,0,0,0.18)' : 'var(--bg-card)',
-              color: activeSubTab === 'products' ? '#000' : 'var(--text-muted)',
-              padding: '2px 7px',
-              borderRadius: '10px',
-              fontSize: '0.72rem',
-              fontWeight: 900
-            }}>
+            <span className="menu-subtab-badge">
               {products.length}
             </span>
           </button>
 
           <button
             type="button"
+            className={`menu-subtab-btn ${activeSubTab === 'categories' ? 'active' : ''}`}
             onClick={() => setActiveSubTab('categories')}
-            style={{
-              padding: '7px 16px',
-              borderRadius: '9px',
-              border: 'none',
-              background: activeSubTab === 'categories' ? 'var(--accent-amber)' : 'transparent',
-              color: activeSubTab === 'categories' ? '#000' : 'var(--text-secondary)',
-              fontWeight: 800,
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.15s ease'
-            }}
           >
-            <Layers size={16} />
             <span>📁 Categorías</span>
-            <span style={{
-              background: activeSubTab === 'categories' ? 'rgba(0,0,0,0.18)' : 'var(--bg-card)',
-              color: activeSubTab === 'categories' ? '#000' : 'var(--text-muted)',
-              padding: '2px 7px',
-              borderRadius: '10px',
-              fontSize: '0.72rem',
-              fontWeight: 900
-            }}>
+            <span className="menu-subtab-badge">
               {availableCategories.length}
             </span>
           </button>
         </div>
 
-        {/* BOTÓN NUEVO PRODUCTO (SOLO EN SUB-PESTAÑA PRODUCTOS) */}
+        {/* BOTÓN NUEVO PRODUCTO */}
         {activeSubTab === 'products' && (
           <button
-            className="btn-confirm-order"
-            style={{ width: 'auto', padding: '0.55rem 1.25rem', fontSize: '0.85rem', gap: '6px' }}
+            type="button"
+            className="btn-confirm-order btn-new-product"
             onClick={openNew}
           >
-            <Plus size={18} />
+            <Plus size={17} />
             <span>Nuevo Producto</span>
           </button>
         )}
@@ -296,38 +229,26 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
       {/* VISTA 1: GESTIÓN DE PRODUCTOS                             */}
       {/* ========================================================= */}
       {activeSubTab === 'products' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1, minHeight: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1, minHeight: 0 }}>
           
           {/* BARRA DE BÚSQUEDA Y FILTRO DE CATEGORÍAS */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            flexWrap: 'wrap',
-            background: 'var(--bg-card)',
-            padding: '0.75rem 1rem',
-            borderRadius: 'var(--radius-lg)',
-            border: '1px solid var(--border-subtle)'
-          }}>
-            <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: '340px' }}>
-              <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <div className="menu-filter-bar">
+            <div className="search-input-wrapper">
+              <Search size={16} className="search-icon-inside" />
               <input
                 type="text"
-                placeholder="Buscar por nombre o ingredientes..."
+                placeholder="Buscar por nombre o ingrediente..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="search-input"
-                style={{ width: '100%', height: '36px', paddingLeft: '32px', fontSize: '0.82rem' }}
               />
             </div>
 
             {/* PÍLDORAS DE FILTRADO POR CATEGORÍA */}
-            <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', flex: '2 1 300px', paddingBottom: '2px' }}>
+            <div className="category-scroll-pills">
               <button
                 type="button"
                 className={`cat-pill-btn ${selectedFilterCategory === 'Todas' ? 'active' : ''}`}
                 onClick={() => setSelectedFilterCategory('Todas')}
-                style={{ fontSize: '0.78rem', height: '32px', padding: '0 12px', flexShrink: 0 }}
               >
                 Todas ({products.length})
               </button>
@@ -339,7 +260,6 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
                     type="button"
                     className={`cat-pill-btn ${selectedFilterCategory.toLowerCase() === (cat.name || '').toLowerCase() ? 'active' : ''}`}
                     onClick={() => setSelectedFilterCategory(cat.name)}
-                    style={{ fontSize: '0.78rem', height: '32px', padding: '0 12px', flexShrink: 0, gap: '4px' }}
                   >
                     <span>{cat.emoji}</span>
                     <span>{cat.name}</span>
@@ -352,18 +272,7 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
 
           {/* GRILLA DE PRODUCTOS */}
           {filteredProducts.length === 0 ? (
-            <div style={{
-              background: 'var(--bg-card)',
-              border: '1px dashed var(--border-subtle)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '3rem 1.5rem',
-              textAlign: 'center',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '0.75rem',
-              margin: 'auto 0'
-            }}>
+            <div className="menu-empty-state">
               <UtensilsCrossed size={36} style={{ color: 'var(--text-muted)' }} />
               <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)' }}>
                 No se encontraron productos
@@ -385,57 +294,20 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
               )}
             </div>
           ) : (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-              gap: '1rem',
-              overflowY: 'auto',
-              flex: 1,
-              paddingRight: '4px'
-            }}>
+            <div className="menu-products-grid">
               {filteredProducts.map(prod => (
-                <div
-                  key={prod.id}
-                  style={{
-                    background: 'var(--bg-card)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: 'var(--radius-lg)',
-                    padding: '1rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    gap: '0.75rem',
-                    boxShadow: 'var(--shadow-sm)'
-                  }}
-                >
-                  <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
+                <div key={prod.id} className="menu-product-card">
+                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
                     {/* Thumbnail del Producto (Foto o Emoji) */}
                     <div style={{ position: 'relative', flexShrink: 0 }}>
                       {prod.image ? (
                         <img
                           src={prod.image}
                           alt={prod.name}
-                          style={{
-                            width: '64px',
-                            height: '64px',
-                            borderRadius: '12px',
-                            objectFit: 'cover',
-                            border: '1.5px solid var(--border-subtle)',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
-                          }}
+                          className="menu-card-img"
                         />
                       ) : (
-                        <div style={{
-                          width: '64px',
-                          height: '64px',
-                          borderRadius: '12px',
-                          background: 'var(--bg-main)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '2rem',
-                          border: '1px solid var(--border-subtle)'
-                        }}>
+                        <div className="menu-card-emoji-box">
                           {prod.emoji}
                         </div>
                       )}
@@ -456,42 +328,42 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
                     </div>
 
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 900, color: 'var(--text-primary)', fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div className="menu-card-title">
                         {prod.name}
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--accent-amber)', fontWeight: 800, marginTop: '1px' }}>
+                      <div className="menu-card-cat">
                         {prod.category}
                       </div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', lineHeight: '1.3', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      <div className="menu-card-desc">
                         {prod.description || 'Sin descripción'}
                       </div>
                     </div>
                   </div>
 
                   {prod.modifiers && prod.modifiers.length > 0 && (
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', background: 'var(--bg-main)', padding: '6px 8px', borderRadius: '6px', lineHeight: '1.3' }}>
+                    <div className="menu-card-mods">
                       <strong style={{ color: 'var(--text-primary)' }}>Modificadores:</strong> {prod.modifiers.join(', ')}
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: '0.65rem' }}>
-                    <span style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--accent-amber)' }}>
-                      ${prod.price.toLocaleString('es-AR')}
+                  <div className="menu-card-footer">
+                    <span className="menu-card-price">
+                      ${Number(prod.price || 0).toLocaleString('es-AR')}
                     </span>
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <button
+                        type="button"
                         className="btn-edit-item"
                         onClick={() => openEdit(prod)}
                         title="Editar Producto & Foto"
-                        style={{ height: '32px', width: '32px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       >
                         <Edit2 size={14} />
                       </button>
                       <button
+                        type="button"
                         className="btn-delete-item"
                         onClick={() => handleDelete(prod.id)}
                         title="Eliminar Producto"
-                        style={{ height: '32px', width: '32px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       >
                         <Trash2 size={14} />
                       </button>
@@ -545,7 +417,7 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <ImageIcon size={14} style={{ color: 'var(--accent-amber)' }} />
-                    <span>Foto del Producto (para Menú y Chatbot)</span>
+                    <span>Foto del Producto</span>
                   </span>
 
                   <div style={{ display: 'flex', gap: '4px' }}>
@@ -663,7 +535,7 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
                       {compressing ? 'Procesando y optimizando imagen...' : '📷 Subir foto desde este dispositivo / celular'}
                     </span>
                     <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                      Toca o haz clic aquí para seleccionar archivo JPG, PNG o WEBP (se comprime automáticamente)
+                      Toca aquí para seleccionar foto (JPG, PNG, WEBP)
                     </span>
                   </div>
                 ) : (

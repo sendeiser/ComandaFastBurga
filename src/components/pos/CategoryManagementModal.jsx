@@ -217,9 +217,9 @@ export default function CategoryManagementModal({ products = [], onProductsUpdat
               <span>Crear Nueva Categoría</span>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr auto', gap: '8px', alignItems: 'center' }}>
+            <div className="category-form-grid">
               <div>
-                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted, #94a3b8)', fontWeight: 700, display: 'block', marginBottom: '2px' }}>Emoji</label>
+                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, display: 'block', marginBottom: '2px' }}>Emoji</label>
                 <input
                   type="text"
                   value={newEmoji}
@@ -230,16 +230,16 @@ export default function CategoryManagementModal({ products = [], onProductsUpdat
                     height: '38px',
                     textAlign: 'center',
                     fontSize: '1.3rem',
-                    background: 'var(--bg-card, #1e293b)',
-                    border: '1px solid var(--border-subtle, rgba(255,255,255,0.15))',
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border-subtle)',
                     borderRadius: '8px',
-                    color: '#fff'
+                    color: 'var(--text-primary)'
                   }}
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted, #94a3b8)', fontWeight: 700, display: 'block', marginBottom: '2px' }}>Nombre de la Categoría</label>
+                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, display: 'block', marginBottom: '2px' }}>Nombre de la Categoría</label>
                 <input
                   type="text"
                   placeholder="Ej: Pizzas, Empanadas, Cafetería..."
@@ -250,22 +250,23 @@ export default function CategoryManagementModal({ products = [], onProductsUpdat
                     height: '38px',
                     padding: '0 12px',
                     fontSize: '0.9rem',
-                    background: 'var(--bg-card, #1e293b)',
-                    border: '1px solid var(--border-subtle, rgba(255,255,255,0.15))',
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border-subtle)',
                     borderRadius: '8px',
-                    color: '#fff'
+                    color: 'var(--text-primary)'
                   }}
                   required
                 />
               </div>
 
-              <div style={{ alignSelf: 'flex-end' }}>
+              <div className="btn-add-cat-cell" style={{ alignSelf: 'flex-end' }}>
                 <button
                   type="submit"
                   style={{
                     height: '38px',
+                    width: '100%',
                     padding: '0 16px',
-                    background: 'var(--accent-amber, #f59e0b)',
+                    background: 'var(--accent-amber)',
                     color: '#000',
                     border: 'none',
                     borderRadius: '8px',
@@ -274,6 +275,7 @@ export default function CategoryManagementModal({ products = [], onProductsUpdat
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
+                    justifyContent: 'center',
                     gap: '6px'
                   }}
                 >
@@ -399,19 +401,10 @@ export default function CategoryManagementModal({ products = [], onProductsUpdat
                 }
 
                 return (
-                  <div key={cat.id} style={{
-                    background: 'var(--bg-main, #0f172a)',
-                    border: '1px solid var(--border-subtle, rgba(255,255,255,0.08))',
-                    borderRadius: '10px',
-                    padding: '8px 14px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '12px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '1.4rem' }}>{cat.emoji || '📁'}</span>
-                      <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-primary, #fff)' }}>
+                  <div key={cat.id} className="category-item-row">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '1.3rem' }}>{cat.emoji || '📁'}</span>
+                      <span style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
                         {cat.name}
                       </span>
                       <span style={{
@@ -419,9 +412,9 @@ export default function CategoryManagementModal({ products = [], onProductsUpdat
                         fontWeight: 700,
                         padding: '2px 8px',
                         borderRadius: '12px',
-                        background: count > 0 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255,255,255,0.05)',
-                        color: count > 0 ? 'var(--accent-amber, #f59e0b)' : 'var(--text-muted, #94a3b8)',
-                        border: count > 0 ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid transparent'
+                        background: count > 0 ? 'rgba(245, 158, 11, 0.15)' : 'var(--bg-card)',
+                        color: count > 0 ? 'var(--accent-amber)' : 'var(--text-muted)',
+                        border: count > 0 ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid var(--border-subtle)'
                       }}>
                         {count} {count === 1 ? 'producto' : 'productos'}
                       </span>
