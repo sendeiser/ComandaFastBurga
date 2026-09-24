@@ -10,6 +10,7 @@ export default function KitchenDisplay({
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [channelFilter, setChannelFilter] = useState('all');
   const [notifyingId, setNotifyingId] = useState(null);
+  const [mobileColumnTab, setMobileColumnTab] = useState('cocina'); // 'all' | 'pendiente' | 'cocina' | 'listo'
 
   // Update timer tick every 10 seconds
   useEffect(() => {
@@ -162,7 +163,7 @@ export default function KitchenDisplay({
 
         {typeof order.customer === 'object' && order.customer.address && order.deliveryType === 'delivery' && (
           <div style={{ fontSize: '0.75rem', color: 'var(--accent-amber)', marginTop: '2px', fontWeight: 600 }}>
-            ðŸ“ Envío: {order.customer.address}
+            📍 Envío: {order.customer.address}
           </div>
         )}
 
@@ -310,53 +311,106 @@ export default function KitchenDisplay({
   return (
     <div className="kds-container">
       {/* Top Filter Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <ChefHat size={22} style={{ color: 'var(--accent-orange)' }} />
-          <span style={{ fontWeight: 800, fontSize: '1.1rem' }}>TABLERO KDS EN VIVO</span>
+      <div className="kds-header-bar">
+        <div className="kds-header-title-box">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <ChefHat size={20} style={{ color: 'var(--accent-orange)', flexShrink: 0 }} />
+            <span className="kds-header-title">Tablero KDS en Vivo</span>
+          </div>
           <span className="brand-badge">{activeOrders.length} activas</span>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.4rem' }}>
+        <div className="kds-channel-filters">
           <button 
+            type="button"
             className={`cat-pill-btn ${channelFilter === 'all' ? 'active' : ''}`}
             onClick={() => setChannelFilter('all')}
           >
             Todas
           </button>
           <button 
+            type="button"
             className={`cat-pill-btn ${channelFilter === 'whatsapp' ? 'active' : ''}`}
             onClick={() => setChannelFilter('whatsapp')}
           >
-            <MessageSquare size={14} /> Delivery
+            <MessageSquare size={13} /> Delivery
           </button>
           <button 
+            type="button"
             className={`cat-pill-btn ${channelFilter === 'mostrador' ? 'active' : ''}`}
             onClick={() => setChannelFilter('mostrador')}
           >
-            <ShoppingBag size={14} /> Mostrador
+            <ShoppingBag size={13} /> Mostrador
           </button>
           <button 
+            type="button"
             className={`cat-pill-btn ${channelFilter === 'mesa' ? 'active' : ''}`}
             onClick={() => setChannelFilter('mesa')}
           >
-            <Utensils size={14} /> Mesas
+            <Utensils size={13} /> Mesas
           </button>
         </div>
       </div>
 
-      {/* 3-Column Kanban */}
-      <div className="kds-columns-grid">
+      {/* Mobile Column Switcher Tabs */}
+      <div className="kds-mobile-tabs-bar">
+        <button
+          type="button"
+          className={`kds-mobile-tab-btn pending ${mobileColumnTab === 'pendiente' ? 'active' : ''}`}
+          onClick={() => setMobileColumnTab('pendiente')}
+        >
+          <span className="kds-tab-dot pending" />
+          <span className="kds-tab-label">Pendientes</span>
+          <span className="kds-tab-badge">{pendingOrders.length}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`kds-mobile-tab-btn cooking ${mobileColumnTab === 'cocina' ? 'active' : ''}`}
+          onClick={() => setMobileColumnTab('cocina')}
+        >
+          <span className="kds-tab-dot cooking" />
+          <span className="kds-tab-label">En Cocina</span>
+          <span className="kds-tab-badge">{cookingOrders.length}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`kds-mobile-tab-btn ready ${mobileColumnTab === 'listo' ? 'active' : ''}`}
+          onClick={() => setMobileColumnTab('listo')}
+        >
+          <span className="kds-tab-dot ready" />
+          <span className="kds-tab-label">Listos</span>
+          <span className="kds-tab-badge">{readyOrders.length}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`kds-mobile-tab-btn all ${mobileColumnTab === 'all' ? 'active' : ''}`}
+          onClick={() => setMobileColumnTab('all')}
+        >
+          <span className="kds-tab-label">Todos</span>
+          <span className="kds-tab-badge">{activeOrders.length}</span>
+        </button>
+      </div>
+
+      {/* 3-Column Kanban Board */}
+      <div className={`kds-columns-grid mobile-${mobileColumnTab}`}>
         {/* Column 1: Pendientes */}
-        <div className="kds-column">
+        <div className={`kds-column ${mobileColumnTab !== 'all' && mobileColumnTab !== 'pendiente' ? 'mobile-hidden' : ''}`}>
           <div className="kds-column-header pending">
-            <span>🟡 PENDIENTES ({pendingOrders.length})</span>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Por iniciar</span>
+            <div className="kds-col-header-left">
+              <span className="kds-status-indicator pending" />
+              <span className="kds-col-header-title">PENDIENTES</span>
+              <span className="kds-col-count-badge">{pendingOrders.length}</span>
+            </div>
+            <span className="kds-col-header-sub">Por iniciar</span>
           </div>
           <div className="kds-cards-list">
             {pendingOrders.length === 0 ? (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem 1rem', fontSize: '0.9rem' }}>
-                Sin pedidos en espera
+              <div className="kds-empty-column">
+                <Clock size={28} style={{ opacity: 0.35, marginBottom: '6px' }} />
+                <span>Sin pedidos en espera</span>
               </div>
             ) : (
               pendingOrders.map(renderOrderCard)
@@ -365,15 +419,20 @@ export default function KitchenDisplay({
         </div>
 
         {/* Column 2: En Cocina */}
-        <div className="kds-column">
+        <div className={`kds-column ${mobileColumnTab !== 'all' && mobileColumnTab !== 'cocina' ? 'mobile-hidden' : ''}`}>
           <div className="kds-column-header cooking">
-            <span>🟠 EN COCINA ({cookingOrders.length})</span>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>En preparación</span>
+            <div className="kds-col-header-left">
+              <span className="kds-status-indicator cooking" />
+              <span className="kds-col-header-title">EN COCINA</span>
+              <span className="kds-col-count-badge">{cookingOrders.length}</span>
+            </div>
+            <span className="kds-col-header-sub">En preparación</span>
           </div>
           <div className="kds-cards-list">
             {cookingOrders.length === 0 ? (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem 1rem', fontSize: '0.9rem' }}>
-                Cocina libre
+              <div className="kds-empty-column">
+                <ChefHat size={28} style={{ opacity: 0.35, marginBottom: '6px' }} />
+                <span>Cocina libre</span>
               </div>
             ) : (
               cookingOrders.map(renderOrderCard)
@@ -382,15 +441,20 @@ export default function KitchenDisplay({
         </div>
 
         {/* Column 3: Listo / Por despachar */}
-        <div className="kds-column">
+        <div className={`kds-column ${mobileColumnTab !== 'all' && mobileColumnTab !== 'listo' ? 'mobile-hidden' : ''}`}>
           <div className="kds-column-header ready">
-            <span>🟢 LISTO / DESPACHAR ({readyOrders.length})</span>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Completados</span>
+            <div className="kds-col-header-left">
+              <span className="kds-status-indicator ready" />
+              <span className="kds-col-header-title">LISTO / DESPACHAR</span>
+              <span className="kds-col-count-badge">{readyOrders.length}</span>
+            </div>
+            <span className="kds-col-header-sub">Completados</span>
           </div>
           <div className="kds-cards-list">
             {readyOrders.length === 0 ? (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem 1rem', fontSize: '0.9rem' }}>
-                Sin pedidos listos pendientes de entrega
+              <div className="kds-empty-column">
+                <CheckCircle2 size={28} style={{ opacity: 0.35, marginBottom: '6px' }} />
+                <span>Sin pedidos listos</span>
               </div>
             ) : (
               readyOrders.map(renderOrderCard)
