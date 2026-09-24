@@ -40,12 +40,16 @@ export default function Header({
     }
   };
 
+  const cashierFirstName = currentCashier?.name 
+    ? currentCashier.name.trim().split(' ')[0] 
+    : 'Cajero';
+
   return (
     <>
     <header className="top-header">
       <div className="brand-section">
         <div className="brand-logo-icon">
-          <Flame size={22} />
+          <Flame size={20} />
         </div>
         <div>
           <div className="brand-name">
@@ -100,56 +104,37 @@ export default function Header({
         {/* Cashier Badge & Logout */}
         {currentCashier && (
           <div 
-            className="tactile-btn"
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px',
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--radius-full)',
-              padding: '2px 8px 2px 10px',
-              height: '34px',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
-            }}
+            className="header-cashier-pill tactile-btn"
             title={`Cajero conectado: ${currentCashier.name} (@${currentCashier.username})`}
           >
-            <User size={15} style={{ color: 'var(--accent-amber)', flexShrink: 0 }} />
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', maxWidth: '95px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <User size={14} style={{ color: 'var(--accent-amber)', flexShrink: 0 }} />
+            <span className="cashier-name-desktop">
               {currentCashier.name}
+            </span>
+            <span className="cashier-name-mobile">
+              {cashierFirstName}
             </span>
             <button
               type="button"
+              className="btn-header-logout"
               onClick={onLogoutCashier}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--text-muted)',
-                cursor: 'pointer',
-                padding: '3px 4px',
-                borderRadius: 'var(--radius-sm)',
-                display: 'flex',
-                alignItems: 'center',
-                minWidth: '22px',
-                minHeight: '22px'
-              }}
               title="Cerrar sesión de cajero"
             >
-              <LogOut size={14} />
+              <LogOut size={13} />
             </button>
           </div>
         )}
 
         {/* Shift status pill */}
         {cashShift && !cashShift.isClosed ? (
-          <div className="shift-status-pill" onClick={onOpenCashModal} title="Click para ver control de caja">
-            <CheckCircle2 size={16} />
+          <div className="shift-status-pill open" onClick={onOpenCashModal} title="Click para ver control de caja">
+            <span className="shift-status-dot open" />
             <span className="shift-status-full-text">Caja Abierta (${cashShift.initialCash.toLocaleString('es-AR')})</span>
             <span className="shift-status-short-text">Abierta</span>
           </div>
         ) : (
           <div className="shift-status-pill closed" onClick={onOpenCashModal} title="Click para abrir turno de caja">
-            <AlertCircle size={16} />
+            <span className="shift-status-dot closed" />
             <span className="shift-status-full-text">Caja Cerrada</span>
             <span className="shift-status-short-text">Cerrada</span>
           </div>
@@ -173,36 +158,33 @@ export default function Header({
         {/* Theme Toggle Button (Light / Dark) */}
         <button 
           type="button"
-          className="qty-btn" 
+          className="header-icon-btn" 
           onClick={onToggleTheme}
           title={theme === 'light' ? 'Cambiar a Modo Oscuro' : 'Cambiar a Modo Claro'}
-          style={{ width: '34px', height: '34px', padding: 0 }}
         >
           {theme === 'light' ? (
-            <Moon size={16} style={{ color: 'var(--accent-indigo, #6366f1)' }} />
+            <Moon size={15} style={{ color: 'var(--accent-indigo, #6366f1)' }} />
           ) : (
-            <Sun size={16} style={{ color: 'var(--accent-amber)' }} />
+            <Sun size={15} style={{ color: 'var(--accent-amber)' }} />
           )}
         </button>
 
         {/* Settings Modal Button */}
         <button 
           type="button"
-          className="qty-btn" 
+          className="header-icon-btn" 
           onClick={onOpenSettings}
           title="Configuración general e impresión"
-          style={{ width: '34px', height: '34px', padding: 0 }}
         >
-          <Settings size={16} />
+          <Settings size={15} />
         </button>
 
         {/* Fullscreen Toggle (Desktop Only) */}
         <button 
           type="button"
-          className="qty-btn desktop-only-action" 
+          className="header-icon-btn desktop-only-action" 
           onClick={toggleFullscreen}
           title="Pantalla completa"
-          style={{ width: '34px', height: '34px', padding: 0 }}
         >
           <Maximize2 size={16} />
         </button>
@@ -216,8 +198,10 @@ export default function Header({
         className={`mobile-nav-item ${currentTab === 'pos' ? 'active' : ''}`}
         onClick={() => setCurrentTab('pos')}
       >
-        <ShoppingCart size={19} />
-        <span>Mostrador</span>
+        <div className="mobile-nav-icon-box">
+          <ShoppingCart size={19} />
+        </div>
+        <span className="mobile-nav-label">Mostrador</span>
       </button>
 
       <button 
@@ -225,13 +209,13 @@ export default function Header({
         className={`mobile-nav-item ${currentTab === 'kds' ? 'active' : ''}`}
         onClick={() => setCurrentTab('kds')}
       >
-        <div className="mobile-nav-icon-container">
+        <div className="mobile-nav-icon-box">
           <ChefHat size={19} />
           {pendingKitchenCount > 0 && (
             <span className="mobile-nav-badge">{pendingKitchenCount}</span>
           )}
         </div>
-        <span>Cocina</span>
+        <span className="mobile-nav-label">Cocina</span>
       </button>
 
       <button 
@@ -239,8 +223,10 @@ export default function Header({
         className={`mobile-nav-item ${currentTab === 'history' ? 'active' : ''}`}
         onClick={() => setCurrentTab('history')}
       >
-        <History size={19} />
-        <span>Historial</span>
+        <div className="mobile-nav-icon-box">
+          <History size={19} />
+        </div>
+        <span className="mobile-nav-label">Historial</span>
       </button>
 
       <button 
@@ -248,8 +234,10 @@ export default function Header({
         className={`mobile-nav-item ${currentTab === 'menu' ? 'active' : ''}`}
         onClick={() => setCurrentTab('menu')}
       >
-        <UtensilsCrossed size={19} />
-        <span>Menú</span>
+        <div className="mobile-nav-icon-box">
+          <UtensilsCrossed size={19} />
+        </div>
+        <span className="mobile-nav-label">Menú</span>
       </button>
     </nav>
     </>
