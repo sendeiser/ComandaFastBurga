@@ -612,21 +612,58 @@ function saveStoredOrder(order) {
 }
 
 // Obtener el número de orden más alto entre almacenamiento local y Supabase
+let serverOrderCounterResetAt = null;
+
 async function getLatestOrderNumber() {
   let highest = 0;
-  // 1. Revisar orders.json local
+  let lastResetAt = serverOrderCounterResetAt;
+
+  // 1. Intentar consultar lastResetAt en Supabase system_settings
+  try {
+    const sController = new AbortController();
+    const sTimeout = setTimeout(() => sController.abort(), 1500);
+    const sRes = await fetch(`${SUPABASE_URL}/rest/v1/system_settings?id=eq.order_counter&select=*`, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      },
+      signal: sController.signal
+    });
+    clearTimeout(sTimeout);
+    if (sRes.ok) {
+      const sRows = await sRes.json();
+      if (Array.isArray(sRows) && sRows.length > 0 && sRows[0].data?.lastResetAt) {
+        lastResetAt = sRows[0].data.lastResetAt;
+        serverOrderCounterResetAt = lastResetAt;
+        const remoteCounter = Number(sRows[0].data.counter) || 0;
+        if (remoteCounter > highest) highest = remoteCounter;
+      }
+    }
+  } catch (_) {}
+
+  const resetTime = lastResetAt ? new Date(lastResetAt).getTime() : 0;
+
+  // 2. Revisar orders.json local (solo órdenes creadas tras el corte)
   const localOrders = getStoredOrders();
   if (Array.isArray(localOrders)) {
     for (const o of localOrders) {
-      const num = Number(o.orderNumber || o.order_number) || 0;
-      if (num > highest) highest = num;
+      const oTime = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+      if (!resetTime || oTime > resetTime) {
+        const num = Number(o.orderNumber || o.order_number) || 0;
+        if (num > highest) highest = num;
+      }
     }
   }
-  // 2. Consultar Supabase
+
+  // 3. Consultar Supabase (filtrando por created_at > lastResetAt si existe)
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2000);
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=order_number&order=order_number.desc&limit=1`, {
+    let query = 'select=order_number&order=order_number.desc&limit=1';
+    if (lastResetAt) {
+      query = `select=order_number&created_at=gt.${encodeURIComponent(lastResetAt)}&order=order_number.desc&limit=1`;
+    }
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/orders?${query}`, {
       headers: {
         'apikey': SUPABASE_ANON_KEY,
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
@@ -642,6 +679,7 @@ async function getLatestOrderNumber() {
       }
     }
   } catch (_) {}
+
   return highest;
 }
 
@@ -1824,6 +1862,14 @@ app.get('/api/latest-order-number', async (req, res) => {
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
+});
+
+// Endpoint para reiniciar el contador de pedidos a 0 desde el frontend o app móvil
+app.post('/api/order-counter/reset', (req, res) => {
+  const { counter = 0, lastResetAt = new Date().toISOString() } = req.body || {};
+  serverOrderCounterResetAt = lastResetAt;
+  console.log(`🔄 [COUNTER RESET LOCAL] Contador de pedidos reiniciado a ${counter} (corte: ${lastResetAt})`);
+  res.json({ success: true, counter, lastResetAt });
 });
 
 // Endpoint para actualizar estado de un pedido desde cualquier dispositivo (Android, POS, etc.)

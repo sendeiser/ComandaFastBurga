@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { X, DollarSign, ArrowDownRight, CheckCircle2, AlertTriangle, Printer, Lock, Unlock, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, DollarSign, ArrowDownRight, CheckCircle2, AlertTriangle, Printer, Lock, Unlock, User, RotateCcw } from 'lucide-react';
 import { authService } from '../../services/authService';
+import { storageService } from '../../services/storageService';
+import { supabaseSync } from '../../services/supabaseClient';
 
 export default function CashControlModal({ 
   cashShift, 
@@ -21,6 +23,47 @@ export default function CashControlModal({
   const [countedCashInput, setCountedCashInput] = useState('');
   const [closeNotes, setCloseNotes] = useState('');
   const [isClosingConfirm, setIsClosingConfirm] = useState(false);
+
+  // Estado para reinicio de contador de órdenes
+  const [resetOrderCounterOnOpen, setResetOrderCounterOnOpen] = useState(true);
+  const [currentOrderCounter, setCurrentOrderCounter] = useState(() => storageService.getOrderCounter());
+  const [isResettingNow, setIsResettingNow] = useState(false);
+  const [resetFeedback, setResetFeedback] = useState(null);
+
+  useEffect(() => {
+    const updateCounter = () => setCurrentOrderCounter(storageService.getOrderCounter());
+    window.addEventListener('comandafast:order-counter-reset', updateCounter);
+    window.addEventListener('comandafast:new-order', updateCounter);
+    return () => {
+      window.removeEventListener('comandafast:order-counter-reset', updateCounter);
+      window.removeEventListener('comandafast:new-order', updateCounter);
+    };
+  }, []);
+
+  const handleDirectResetCounter = async () => {
+    if (window.confirm('¿Deseas reiniciar la numeración de pedidos a cero (0) ahora? El próximo pedido en cualquier terminal o app móvil comenzará en #1.')) {
+      setIsResettingNow(true);
+      const nowIso = new Date().toISOString();
+      storageService.resetOrderCounter(0, nowIso);
+      setCurrentOrderCounter(0);
+      try {
+        if (typeof supabaseSync !== 'undefined' && supabaseSync.pushOrderCounterState) {
+          await supabaseSync.pushOrderCounterState({ counter: 0, lastResetAt: nowIso });
+        }
+      } catch (_) {}
+      try {
+        const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+        fetch(`http://${botHost}:3002/api/order-counter/reset`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ counter: 0, lastResetAt: nowIso })
+        }).catch(() => {});
+      } catch (_) {}
+      setIsResettingNow(false);
+      setResetFeedback('✅ Contador reiniciado a 0. Próxima orden: #1.');
+      setTimeout(() => setResetFeedback(null), 4000);
+    }
+  };
 
   // Calculate totals for active shift
   const shiftOrders = orders.filter(o => {
@@ -54,7 +97,7 @@ export default function CashControlModal({
       return;
     }
     const resolvedName = activeCashier?.name || cashierNameInput.trim() || 'Cajero 1';
-    onOpenShift(initialCashInput, resolvedName);
+    onOpenShift(initialCashInput, resolvedName, resetOrderCounterOnOpen);
   };
 
   const handleAddExpense = (e) => {
@@ -164,6 +207,77 @@ export default function CashControlModal({
               />
             </div>
 
+            {/* Opción y Botón de Reinicio de Contador de Pedidos a 0 */}
+            <div style={{
+              background: 'var(--bg-main)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-md)',
+              padding: '0.85rem 1rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.6rem'
+            }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem', cursor: 'pointer', margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={resetOrderCounterOnOpen}
+                  onChange={e => setResetOrderCounterOnOpen(e.target.checked)}
+                  style={{ width: '18px', height: '18px', marginTop: '2px', accentColor: 'var(--accent-amber)', cursor: 'pointer' }}
+                />
+                <div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <RotateCcw size={15} style={{ color: 'var(--accent-amber)' }} />
+                    <span>Reiniciar pedidos a cero (#1) al abrir esta caja</span>
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.4 }}>
+                    El próximo pedido comenzará en #1 y se sincronizará automáticamente en la nube (Supabase) para que todas las demás instancias y celulares continúen esa numeración.
+                  </div>
+                </div>
+              </label>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.5rem', borderTop: '1px dashed var(--border-subtle)', flexWrap: 'wrap', gap: '6px' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                  Contador actual en sistema: <strong>#{currentOrderCounter}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleDirectResetCounter}
+                  disabled={isResettingNow}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '0.35rem 0.75rem',
+                    background: 'rgba(245, 158, 11, 0.12)',
+                    border: '1px solid var(--accent-amber)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: 'var(--accent-amber)',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                  title="Reiniciar contador a 0 de inmediato y sincronizar con la base de datos"
+                >
+                  <RotateCcw size={12} className={isResettingNow ? 'animate-spin' : ''} />
+                  <span>{isResettingNow ? 'Sincronizando...' : 'Reiniciar a 0 ahora'}</span>
+                </button>
+              </div>
+
+              {resetFeedback && (
+                <div style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  color: 'var(--accent-emerald)',
+                  background: 'rgba(16, 185, 129, 0.12)',
+                  padding: '0.4rem 0.6rem',
+                  borderRadius: 'var(--radius-xs)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)'
+                }}>
+                  {resetFeedback}
+                </div>
+              )}
+            </div>
+
             <button 
               className="btn-confirm-order"
               style={{ background: 'var(--accent-emerald)', color: '#000' }}
@@ -253,6 +367,65 @@ export default function CashControlModal({
                 </div>
               )}
             </form>
+
+            {/* Control de Numeración de Pedidos del Turno Activo */}
+            <div style={{
+              background: 'var(--bg-main)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-md)',
+              padding: '0.85rem 1rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '0.75rem',
+              flexWrap: 'wrap'
+            }}>
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <RotateCcw size={15} style={{ color: 'var(--accent-amber)' }} />
+                  <span>Numeración de Pedidos:</span>
+                  <span style={{ color: 'var(--accent-amber)' }}>#{currentOrderCounter}</span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>(Próxima orden: #{currentOrderCounter + 1})</span>
+                </div>
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  Sincronizado con Supabase Cloud. Puedes reiniciar el contador a 0 para que la próxima comanda sea la #1.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleDirectResetCounter}
+                disabled={isResettingNow}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '0.45rem 0.85rem',
+                  background: 'rgba(245, 158, 11, 0.12)',
+                  border: '1px solid var(--accent-amber)',
+                  borderRadius: 'var(--radius-sm)',
+                  color: 'var(--accent-amber)',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                <RotateCcw size={13} className={isResettingNow ? 'animate-spin' : ''} />
+                <span>{isResettingNow ? 'Sincronizando...' : 'Reiniciar a 0 ahora'}</span>
+              </button>
+            </div>
+            {resetFeedback && (
+              <div style={{
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                color: 'var(--accent-emerald)',
+                background: 'rgba(16, 185, 129, 0.12)',
+                padding: '0.4rem 0.6rem',
+                borderRadius: 'var(--radius-xs)',
+                border: '1px solid rgba(16, 185, 129, 0.3)'
+              }}>
+                {resetFeedback}
+              </div>
+            )}
 
             {/* Close Shift Accordion / Form */}
             {!isClosingConfirm ? (

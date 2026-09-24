@@ -298,7 +298,7 @@ export default function App() {
 
           for (const ord of mergedMap.values()) {
             if (ord && ord.orderNumber) {
-              storageService.updateOrderCounterIfHigher(ord.orderNumber);
+              storageService.updateOrderCounterIfHigher(ord.orderNumber, ord.createdAt);
             }
             const existing = currentOrders.find(o => o.id === ord.id);
             if (!existing) {
@@ -461,6 +461,13 @@ export default function App() {
           }
         } catch (_) {}
 
+        // F. Sincronización en tiempo real del estado del contador de órdenes desde la Nube
+        if (supabaseSync.isConfigured()) {
+          try {
+            await supabaseSync.fetchOrderCounterState();
+          } catch (_) {}
+        }
+
       } catch (_) {
         consecutiveOfflineErrors++;
         if (consecutiveOfflineErrors >= 2) nextDelay = 5000;
@@ -600,10 +607,30 @@ export default function App() {
   };
 
   // Cash Handlers (Sincronización Total con Supabase y Red Local)
-  const handleOpenShift = async (initialAmount, cashierName) => {
+  const handleOpenShift = async (initialAmount, cashierName, resetCounter = false) => {
     const activeCashierName = currentCashier?.name || cashierName || 'Cajero 1';
     const shift = storageService.openCashShift(initialAmount, activeCashierName);
     setCashShift(shift);
+
+    // Reiniciar contador de órdenes a 0 y sincronizar con la nube si se solicitó al abrir caja
+    if (resetCounter) {
+      const nowIso = new Date().toISOString();
+      storageService.resetOrderCounter(0, nowIso);
+      if (supabaseSync.isConfigured()) {
+        try {
+          await supabaseSync.pushOrderCounterState({ counter: 0, lastResetAt: nowIso });
+        } catch (_) {}
+      }
+      try {
+        const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+        fetch(`http://${botHost}:3002/api/order-counter/reset`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ counter: 0, lastResetAt: nowIso })
+        }).catch(() => {});
+      } catch (_) {}
+    }
+
     if (supabaseSync.isConfigured()) {
       try {
         await supabaseSync.pushCashShift(shift);

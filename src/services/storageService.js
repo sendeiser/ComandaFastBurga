@@ -296,6 +296,11 @@ export const storageService = {
       if (state.resetDate) {
         localStorage.setItem(KEYS.ORDER_COUNTER_DATE, state.resetDate);
       }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('comandafast:order-counter-reset', { 
+          detail: { counter: remoteCounter, lastResetAt: remoteResetAt } 
+        }));
+      }
     } else if (remoteResetTime === localResetTime || !remoteResetAt) {
       if (remoteCounter > localCounter) {
         localStorage.setItem(KEYS.ORDER_COUNTER, remoteCounter.toString());
@@ -341,6 +346,38 @@ export const storageService = {
     return current;
   },
 
+  async getNextOrderNumberAsync() {
+    // 1. Intentar consultar el último número registrado en Supabase Cloud
+    if (typeof this._cloudOrderNumberFetcher === 'function') {
+      try {
+        const cloudMax = await this._cloudOrderNumberFetcher();
+        if (cloudMax && Number(cloudMax) > 0) {
+          this.updateOrderCounterIfHigher(cloudMax);
+        }
+      } catch (_) {}
+    }
+
+    // 2. Intentar consultar al servidor local LAN (puerto 3002) por si hubo pedidos locales
+    try {
+      if (typeof window !== 'undefined' && window.location) {
+        const botHost = window.location.hostname || 'localhost';
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1200);
+        const res = await fetch(`http://${botHost}:3002/api/latest-order-number`, { signal: controller.signal }).catch(() => null);
+        clearTimeout(timeoutId);
+        if (res && res.ok) {
+          const data = await res.json().catch(() => null);
+          if (data && data.latestOrderNumber) {
+            this.updateOrderCounterIfHigher(data.latestOrderNumber);
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 3. Generar el siguiente correlativo garantizado
+    return this.getNextOrderNumber();
+  },
+
   updateOrderCounterIfHigher(val, orderCreatedAt = null) {
     const num = Number(val) || 0;
     if (num <= 0) return;
@@ -367,6 +404,11 @@ export const storageService = {
     localStorage.setItem(KEYS.ORDER_COUNTER, val.toString());
     localStorage.setItem(KEYS.ORDER_COUNTER_DATE, today);
     localStorage.setItem(KEYS.ORDER_COUNTER_RESET_AT, timestamp);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('comandafast:order-counter-reset', { 
+        detail: { counter: val, lastResetAt: timestamp, resetDate: today } 
+      }));
+    }
     return { counter: val, lastResetAt: timestamp, resetDate: today };
   },
 
@@ -406,8 +448,9 @@ export const storageService = {
     if (this.isOrderDeleted(id)) {
       return null;
     }
+    const orderCreatedAt = order.createdAt || new Date().toISOString();
     if (order.orderNumber) {
-      this.updateOrderCounterIfHigher(order.orderNumber);
+      this.updateOrderCounterIfHigher(order.orderNumber, orderCreatedAt);
     }
     const orders = this.getOrders();
     const idx = orders.findIndex(o => o.id === id);
@@ -418,20 +461,20 @@ export const storageService = {
         updatedAt: order.updatedAt || Date.now()
       };
       if (orders[idx].orderNumber) {
-        this.updateOrderCounterIfHigher(orders[idx].orderNumber);
+        this.updateOrderCounterIfHigher(orders[idx].orderNumber, orders[idx].createdAt || orderCreatedAt);
       }
       localStorage.setItem(KEYS.ORDERS, JSON.stringify(orders));
       return orders[idx];
     }
 
     const assignedNumber = order.orderNumber || this.getNextOrderNumber();
-    this.updateOrderCounterIfHigher(assignedNumber);
+    this.updateOrderCounterIfHigher(assignedNumber, orderCreatedAt);
 
     const newOrder = {
       ...order,
       id,
       orderNumber: assignedNumber,
-      createdAt: order.createdAt || new Date().toISOString(),
+      createdAt: orderCreatedAt,
       updatedAt: order.updatedAt || Date.now(),
       status: order.status || 'pendiente',
       statusTimestamps: order.statusTimestamps || {
@@ -451,13 +494,20 @@ export const storageService = {
     const deleted = this.getDeletedOrderIds();
     let orders = this.getOrders();
     let highestOrderNum = 0;
+    const lastResetAt = localStorage.getItem(KEYS.ORDER_COUNTER_RESET_AT);
+    const resetTime = lastResetAt ? new Date(lastResetAt).getTime() : 0;
 
     for (const ord of batch) {
       if (!ord || !ord.id) continue;
       if (deleted.has(String(ord.id))) continue;
-      if (ord.orderNumber) {
-        const num = Number(ord.orderNumber) || 0;
-        if (num > highestOrderNum) highestOrderNum = num;
+      const ordCreatedAt = ord.createdAt || new Date().toISOString();
+      const ordTime = new Date(ordCreatedAt).getTime();
+
+      if (!resetTime || ordTime > resetTime) {
+        if (ord.orderNumber) {
+          const num = Number(ord.orderNumber) || 0;
+          if (num > highestOrderNum) highestOrderNum = num;
+        }
       }
       const idx = orders.findIndex(o => o.id === ord.id);
       if (idx !== -1) {
@@ -468,11 +518,13 @@ export const storageService = {
         };
       } else {
         const assignedOrderNum = ord.orderNumber || (highestOrderNum > 0 ? highestOrderNum + 1 : this.getNextOrderNumber());
-        if (assignedOrderNum > highestOrderNum) highestOrderNum = assignedOrderNum;
+        if (!resetTime || ordTime > resetTime) {
+          if (assignedOrderNum > highestOrderNum) highestOrderNum = assignedOrderNum;
+        }
         orders.unshift({
           ...ord,
           orderNumber: assignedOrderNum,
-          createdAt: ord.createdAt || new Date().toISOString(),
+          createdAt: ordCreatedAt,
           updatedAt: ord.updatedAt || Date.now(),
           status: ord.status || 'pendiente',
           statusTimestamps: ord.statusTimestamps || {
@@ -485,7 +537,7 @@ export const storageService = {
       }
     }
     if (highestOrderNum > 0) {
-      this.updateOrderCounterIfHigher(highestOrderNum);
+      this.updateOrderCounterIfHigher(highestOrderNum, new Date().toISOString());
     }
     localStorage.setItem(KEYS.ORDERS, JSON.stringify(orders));
     return orders;

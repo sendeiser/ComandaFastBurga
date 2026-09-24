@@ -113,10 +113,10 @@ export default function KitchenDisplay({
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
             <span className={`order-type-chip ${order.channel}`}>
-              {order.channel === 'whatsapp' ? (order.deliveryType === 'local' ? 'ðŸ›ï¸ WA RETIRO' : '🛵 WA DELIVERY') :
-               order.channel === 'mesa' ? `ðŸ½ï¸ MESA #${order.tableNumber || 'S/N'}` :
+              {order.channel === 'whatsapp' ? (order.deliveryType === 'local' ? '🛍️ WA RETIRO' : '🛵 WA DELIVERY') :
+               order.channel === 'mesa' ? `🍽️ MESA #${order.tableNumber || 'S/N'}` :
                order.channel === 'delivery' ? '🛵 DELIVERY' :
-               'ðŸ›ï¸ MOSTRADOR'}
+               '🛍️ MOSTRADOR'}
             </span>
 
             <div className={`kds-timer-chip ${isDelayed ? 'danger' : isWarning ? 'warning' : ''}`}>
@@ -227,18 +227,7 @@ export default function KitchenDisplay({
           )}
 
           {order.status === 'cocina' && (
-            <>
-              <button 
-                type="button"
-                className="qty-btn"
-                style={{ height: '36px', padding: '0 8px', fontSize: '0.78rem', gap: '4px' }}
-                title="Volver a Pendientes"
-                onClick={() => onUpdateStatus(order.id, 'pendiente')}
-              >
-                <RotateCcw size={14} />
-                <span>A Pendiente</span>
-              </button>
-              <button 
+            <button 
                 type="button"
                 className="btn-kds-action to-ready"
                 style={{ flex: 1 }}
@@ -247,22 +236,10 @@ export default function KitchenDisplay({
                 <CheckCircle2 size={16} />
                 <span>Marcar ¡LISTO!</span>
               </button>
-            </>
           )}
 
           {order.status === 'listo' && (
-            <>
-              <button 
-                type="button"
-                className="qty-btn"
-                style={{ height: '36px', padding: '0 8px', fontSize: '0.78rem', gap: '4px' }}
-                title="Volver a Cocina"
-                onClick={() => onUpdateStatus(order.id, 'cocina')}
-              >
-                <RotateCcw size={14} />
-                <span>A Cocina</span>
-              </button>
-              <button 
+            <button 
                 type="button"
                 className="btn-kds-action to-done"
                 style={{ flex: 1 }}
@@ -270,7 +247,6 @@ export default function KitchenDisplay({
               >
                 <span>Despachar / Entregado</span>
               </button>
-            </>
           )}
 
           {(order.channel === 'whatsapp' || (order.customer && order.customer.phone)) && (
