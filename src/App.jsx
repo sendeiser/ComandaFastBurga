@@ -87,9 +87,15 @@ export default function App() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [previewOrder, setPreviewOrder] = useState(null);
 
-  // Theme state ('dark' | 'light')
+  // Theme state ('light' as primary default | 'dark')
   const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('comandafast_theme') || 'dark';
+    const initialized = localStorage.getItem('comandafast_theme_primary_v1');
+    if (!initialized) {
+      localStorage.setItem('comandafast_theme_primary_v1', 'true');
+      localStorage.setItem('comandafast_theme', 'light');
+      return 'light';
+    }
+    return localStorage.getItem('comandafast_theme') || 'light';
   });
 
   useEffect(() => {
@@ -693,6 +699,8 @@ export default function App() {
             orders={orders}
             onBackToPos={handleExitOwnerPortal}
             onLogout={handleOwnerLogout}
+            theme={theme}
+            onToggleTheme={handleToggleTheme}
           />
         ) : (
           <OwnerLogin 

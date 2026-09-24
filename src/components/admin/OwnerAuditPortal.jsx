@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { 
   ShieldCheck, Bot, BarChart3, DollarSign, ShieldAlert, Sparkles, LogOut, 
   ArrowLeft, Download, Calendar, Printer, Database, Smartphone,
-  ChevronLeft, ChevronRight, ChevronDown, Check
+  ChevronLeft, ChevronRight, ChevronDown, Check, Sun, Moon
 } from 'lucide-react';
 import AuditKpisTab from './AuditKpisTab';
 import AuditCashShiftsTab from './AuditCashShiftsTab';
@@ -16,7 +16,7 @@ import { storageService } from '../../services/storageService';
 import { supabaseSync } from '../../services/supabaseClient';
 import { authService } from '../../services/authService';
 
-export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout }) {
+export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout, theme, onToggleTheme }) {
   const portalRef = useRef(null);
   const [activeTab, setActiveTab] = useState('kpis'); // 'kpis' | 'shifts' | 'security' | 'menu' | 'settings' | 'bot' | 'database'
   const [botSubTab, setBotSubTab] = useState('connection'); // 'connection' | 'security' | 'templates' | 'flows'
@@ -276,6 +276,38 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout })
             <ShieldCheck size={16} />
             <span>Seguridad & Anti-Spam</span>
           </button>
+
+          {onToggleTheme && (
+            <button
+              type="button"
+              className="qty-btn tactile-btn theme-toggle-btn"
+              style={{ 
+                width: 'auto', 
+                padding: '0.45rem 0.85rem', 
+                fontSize: '0.82rem', 
+                gap: '6px', 
+                minHeight: '38px',
+                color: theme === 'dark' ? '#f59e0b' : '#0f172a',
+                background: theme === 'dark' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(15, 23, 42, 0.05)',
+                borderColor: theme === 'dark' ? 'rgba(245, 158, 11, 0.35)' : 'rgba(15, 23, 42, 0.2)',
+                fontWeight: 800
+              }}
+              onClick={onToggleTheme}
+              title={theme === 'dark' ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'}
+            >
+              {theme === 'dark' ? (
+                <>
+                  <Sun size={16} style={{ color: 'var(--accent-amber)' }} />
+                  <span>Modo Claro</span>
+                </>
+              ) : (
+                <>
+                  <Moon size={16} style={{ color: '#0f172a' }} />
+                  <span>Modo Oscuro</span>
+                </>
+              )}
+            </button>
+          )}
 
           <button
             type="button"

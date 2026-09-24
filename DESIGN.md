@@ -1,13 +1,13 @@
 ---
 name: ComandaFast Design System
-description: High-performance, high-contrast dark design system for fast-food POS & Kitchen Display System
+description: High-performance, tactile design system for fast-food POS & Kitchen Display System with pristine Light Mode as primary theme and high-contrast Dark Mode
 colors:
   primary: "#f59e0b"
   primary-glow: "rgba(245, 158, 11, 0.2)"
   primary-deep: "#d97706"
-  neutral-bg: "#0b0f19"
-  neutral-card: "#131b2e"
-  neutral-card-hover: "#1a253e"
+  neutral-bg: "#f8fafc"
+  neutral-card: "#ffffff"
+  neutral-card-hover: "#f1f5f9"
   neutral-input: "#0e1626"
   neutral-text: "#f8fafc"
   neutral-text-secondary: "#94a3b8"
