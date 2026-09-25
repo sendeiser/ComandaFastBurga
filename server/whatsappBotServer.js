@@ -626,7 +626,7 @@ const DEFAULT_SERVER_TEMPLATES = {
   template_anti_loop_gratitude: '¡De nada! 🙌 Que lo disfrutes un montón. Si querés consultar la carta o volver a pedir, escribí *MENU* cuando gustes. ¡Buen provecho! 🍔🔥',
   template_anti_loop_farewell: '¡Hasta la próxima! 👋 Gracias por contactarte con {nombre_local}. ¡Que tengas un excelente descanso! ✨🍔',
   template_anti_loop_acknowledge: '¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido.',
-  template_menu: `🍔 *¡Hola {cliente}! Bienvenido a {nombre_local}* 🔥\n\n¿En qué podemos ayudarte hoy? *Respondé con el número de opción:*\n\n1️⃣ 📋 *Consultar estado de mi pedido*\n2️⃣ 💳 *Ver datos de transferencia bancaria / Alias*\n3️⃣ 📍 *Horarios y ubicación de nuestro local*\n4️⃣ 🍔 *Ver menú completo de hamburguesas y combos*\n5️⃣ 👤 *Hablar con un encargado del local*\n\n_O escribí directamente *COMPRAR* o el número de la burger que quieras pedir._`,
+  template_menu: `🍔 *¡Hola {cliente}! Bienvenido a {nombre_local}* 🔥\n\n¿En qué podemos ayudarte hoy? *Respondé con el número de opción:*\n\n🏷️ 0️⃣ *Ver Promociones y Ofertas especiales del día* 🛵💥\n1️⃣ 📋 *Consultar estado de mi pedido*\n2️⃣ 💳 *Ver datos de transferencia bancaria / Alias*\n3️⃣ 📍 *Horarios y ubicación de nuestro local*\n4️⃣ 🍔 *Ver menú completo de hamburguesas y combos*\n5️⃣ 👤 *Hablar con un encargado del local*\n\n👉 *O escribí PROMO, o el nombre de lo que quieras pedir (ej: Promo Clasica, Promo Doña Burga).*`,
   menu_response_1: `📋 *Estado de tu Pedido:* #{pedido_id}\n\n• *Estado:* {estado}\n• *Total:* \${total}\n• *Destino:* {direccion}\n\n_Para volver al menú, enviá la palabra *MENU*._`,
   menu_response_2: `💳 *Datos para Transferencia Bancaria:* 🏦\n\n• *Alias:* \`{alias_banco}\`\n• *Banco:* {banco}\n• *Titular:* {titular}\n• *CBU:* \`{cbu}\`\n\n📸 *Una vez realizada la transferencia, podés enviar la captura o foto del comprobante por este mismo chat para comenzar a cocinar.*\n\n_Enviá *MENU* para volver al menú principal._`,
   menu_response_3: `📍 *Ubicación y Horarios de Atención:* 🕒\n\n🍔 *Dirección:* {direccion}\n⏰ *Horarios de Cocina:* {horarios}\n\n¡Te esperamos con las mejores burgers a la plancha! 🔥\n\n_Enviá *MENU* para volver al menú principal._`,
@@ -851,57 +851,100 @@ function buildPromosMessage(prods) {
     return `${numBadge} *${p.name}* — ${priceStr}${promoBadge}${freeShippingBadge} ${photoBadge}${desc}${mods}`;
   }).join('\n\n');
 
-  return `🏷️ *PROMOCIONES & COMBOS DE ${storeName.toUpperCase()}* 🔥\n\n${list}\n\n───────────────────\n👉 *Para pedir una promo:* Respondé con el NÚMERO (ej: *${prods.indexOf(promoProds[0]) + 1}*) o escribí su nombre.\n👉 Escribí *COMPRAR* o *MENU* para ver todas las opciones.`;
+  return `🏷️ *PROMOCIONES & COMBOS DE ${storeName.toUpperCase()}* 🔥\n\n${list}\n\n───────────────────\n👉 *Para pedir una promo:* Respondé con el NÚMERO (ej: *1* o *2*) o escribí su nombre (ej: *Promo ${promoProds[0].name}*).\n👉 Escribí *COMPRAR* o *MENU* para ver todas las opciones.`;
 }
 
-function findProductByText(lowerText, prodsList) {
-  if (!lowerText || !Array.isArray(prodsList)) return null;
-  const cleanLower = lowerText.toLowerCase().trim();
-  const isPromoSearch = cleanLower.includes('promo') || cleanLower.includes('oferta') || cleanLower.includes('descuento') || cleanLower.includes('combo');
+function normalizeSearchText(str) {
+  if (!str) return '';
+  return str.toString()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
 
-  // 1. Si el texto incluye "promo", buscar prioritariamente en la categoría Promos
+function findProductByText(inputText, prodsList) {
+  if (!inputText || !Array.isArray(prodsList) || prodsList.length === 0) return null;
+  const rawNorm = normalizeSearchText(inputText);
+  if (!rawNorm) return null;
+
+  const isPromoSearch = /\b(promos?|promocion(es)?|ofertas?|descuentos?|combos?)\b/.test(rawNorm);
+
+  // Limpiar palabras accesorias
+  const strippedText = rawNorm
+    .replace(/\b(promos?|promocion(es)?|ofertas?|descuentos?|combos?)\b/g, '')
+    .replace(/\b(quiero|dame|pedir|comprar|la|el|un|una|de|con|por favor|me das)\b/g, '')
+    .replace(/[!¡?¿.,;:\-_]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const promoProds = prodsList.filter(p => normalizeSearchText(p.category) === 'promos');
+  const regularProds = prodsList.filter(p => normalizeSearchText(p.category) !== 'promos');
+
+  // Si busca "promo 1" o "promo 2"
+  const promoNumMatch = rawNorm.match(/\bpromo\s*(\d+)\b/);
+  if (promoNumMatch) {
+    const pIdx = parseInt(promoNumMatch[1], 10);
+    if (pIdx >= 1 && pIdx <= promoProds.length) {
+      return promoProds[pIdx - 1];
+    }
+  }
+
+  // 1. Si es búsqueda de promo o incluye strippedText que coincide con alguna promo
+  if (isPromoSearch && strippedText) {
+    const promoMatch = promoProds.find(p => {
+      const pNorm = normalizeSearchText(p.name);
+      return pNorm === strippedText || strippedText.includes(pNorm) || pNorm.includes(strippedText);
+    });
+    if (promoMatch) return promoMatch;
+  }
+
+  // 2. Si el strippedText coincide exactamente con una promo (priorizar Promos si tienen el mismo nombre!)
+  if (strippedText) {
+    const exactPromo = promoProds.find(p => normalizeSearchText(p.name) === strippedText);
+    if (exactPromo) return exactPromo;
+  }
+
+  // 3. Coincidencia exacta con strippedText en productos regulares
+  if (strippedText) {
+    const exactRegular = regularProds.find(p => normalizeSearchText(p.name) === strippedText);
+    if (exactRegular) return exactRegular;
+  }
+
+  // 4. Coincidencia exacta completa (rawNorm) con nombre de producto (priorizando promo)
+  const exactFullPromo = promoProds.find(p => {
+    const pNorm = normalizeSearchText(p.name);
+    return rawNorm === pNorm || rawNorm === `promo ${pNorm}` || rawNorm === `la ${pNorm}`;
+  });
+  if (exactFullPromo) return exactFullPromo;
+
+  const exactFullRegular = regularProds.find(p => {
+    const pNorm = normalizeSearchText(p.name);
+    return rawNorm === pNorm || rawNorm === `promo ${pNorm}` || rawNorm === `la ${pNorm}`;
+  });
+  if (exactFullRegular) return exactFullRegular;
+
+  // 5. Coincidencia parcial donde el texto contenga el nombre de algún producto o viceversa
   if (isPromoSearch) {
-    const promoProds = prodsList.filter(p => (p.category || '').toLowerCase() === 'promos');
-    const strippedText = cleanLower
-      .replace(/\b(promos?|promocion(es)?|ofertas?|descuentos?|combos?)\b/gi, '')
-      .replace(/\b(quiero|dame|pedir|comprar|la|el|un|una|de|con)\b/gi, '')
-      .trim();
-
-    if (strippedText) {
-      const promoMatch = promoProds.find(p => {
-        const pName = p.name.toLowerCase();
-        return pName === strippedText || strippedText.includes(pName) || pName.includes(strippedText);
-      });
-      if (promoMatch) return promoMatch;
-    }
+    const promoCand = promoProds.find(p => {
+      const pNorm = normalizeSearchText(p.name);
+      return rawNorm.includes(pNorm) || pNorm.includes(rawNorm) || (pNorm.length >= 4 && rawNorm.includes(pNorm.slice(0, -1)));
+    });
+    if (promoCand) return promoCand;
   }
 
-  // 2. Si NO es búsqueda de promo, buscar coincidencia exacta en productos regulares primero
-  if (!isPromoSearch) {
-    const regularExact = prodsList.find(p => (p.category || '').toLowerCase() !== 'promos' && cleanLower === p.name.toLowerCase());
-    if (regularExact) return regularExact;
-  }
-
-  // 3. Coincidencia exacta de nombre o con prefijo "promo"
-  const exactMatch = prodsList.find(p => {
-    const pName = p.name.toLowerCase();
-    return cleanLower === pName || cleanLower === `promo ${pName}` || cleanLower === `la ${pName}`;
-  });
-  if (exactMatch) return exactMatch;
-
-  // 3. Buscar si el texto del cliente contiene el nombre de algún producto
-  const candidates = prodsList.filter(p => {
-    const pName = p.name.toLowerCase();
-    return cleanLower.includes(pName) || (pName.length >= 4 && cleanLower.includes(pName.slice(0, -1)));
+  const allCandidates = prodsList.filter(p => {
+    const pNorm = normalizeSearchText(p.name);
+    return rawNorm.includes(pNorm) || (rawNorm.length >= 4 && pNorm.includes(rawNorm)) || (pNorm.length >= 4 && rawNorm.includes(pNorm.slice(0, -1)));
   });
 
-  if (candidates.length > 0) {
+  if (allCandidates.length > 0) {
     if (isPromoSearch) {
-      const promoCand = candidates.find(p => (p.category || '').toLowerCase() === 'promos');
-      if (promoCand) return promoCand;
+      const pPromo = allCandidates.find(p => normalizeSearchText(p.category) === 'promos');
+      if (pPromo) return pPromo;
     }
-    candidates.sort((a, b) => b.name.length - a.name.length);
-    return candidates[0];
+    allCandidates.sort((a, b) => b.name.length - a.name.length);
+    return allCandidates[0];
   }
 
   return null;
@@ -915,8 +958,8 @@ function buildMainMenuMessage(customerName = '') {
 
   let rawMenu = tpls.template_menu || DEFAULT_SERVER_TEMPLATES.template_menu;
 
-  // Si la plantilla guardada está vacía, recortada o no contiene opciones numéricas básicas, asegurar la estructura completa
-  if (!rawMenu || !rawMenu.includes('1️⃣') || !rawMenu.includes('5️⃣')) {
+  // Si la plantilla guardada está vacía, recortada o no contiene opciones numéricas básicas, asegurar la estructura completa con opción 0 y 5
+  if (!rawMenu || !rawMenu.includes('1️⃣') || !rawMenu.includes('5️⃣') || !rawMenu.includes('0️⃣')) {
     rawMenu = DEFAULT_SERVER_TEMPLATES.template_menu;
   }
 
@@ -1558,7 +1601,11 @@ class WhatsAppBotServer {
               // Eco del propio bot: ignorar silenciosamente sin pausar la atención
               continue;
             }
-            if (this.connectedUser?.id && remoteJid.includes(this.connectedUser.id.split(':')[0])) {
+            const isSelfChat = (this.connectedUser?.id && remoteJid.includes(this.connectedUser.id.split(':')[0])) ||
+                               (this.connectedUser?.lid && remoteJid.includes(this.connectedUser.lid.split(':')[0])) ||
+                               (this.connectedUser?.id && remoteJid === this.connectedUser.id) ||
+                               (this.connectedUser?.lid && remoteJid === this.connectedUser.lid);
+            if (isSelfChat) {
               // Mensaje personal a sí mismo
               continue;
             }
@@ -1982,10 +2029,12 @@ class WhatsAppBotServer {
               session.subtotal = session.items.reduce((acc, it) => acc + (it.price * (it.qty || 1)), 0);
               session.total = session.subtotal;
 
-              const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
+              const modsHint = selectedProd.modifiers && selectedProd.modifiers.length > 0 
+                ? `\n👉 *Modificadores disponibles:* ${selectedProd.modifiers.join(', ')}`
+                : `\n👉 *¿Modificaciones?* (Ej: Sin cebolla, Extra cheddar)`;
 
               await this.safeSendMessage(remoteJid, {
-                text: `✅ *¡Sumaste ${selectedProd.name}!* 🍔 (+$${Number(selectedProd.price).toLocaleString('es-AR')})\n\n🛒 *Tu pedido actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n👉 ¿Querés sumar algo más? *(Escribí otro número)*\n👉 ¿Modificaciones? *(Ej: Sin cebolla, Extra cheddar)*\n👉 O escribí *LISTO* para continuar.`
+                text: `✅ *¡Sumaste ${selectedProd.name}!* 🍔 (+$${Number(selectedProd.price).toLocaleString('es-AR')})\n\n🛒 *Tu pedido actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n👉 ¿Querés sumar algo más? *(Escribí otro número)*${modsHint}\n👉 O escribí *LISTO* para continuar.`
               }, msg.key);
               continue;
             }
@@ -2028,12 +2077,21 @@ class WhatsAppBotServer {
           // -------------------------------------------------------------
           // COMANDO: CONSULTA DIRECTA DE PROMOS ("promos", "ver promos", "ofertas")
           // -------------------------------------------------------------
-          const isPromoTrigger = [
-            'promo', 'promos', 'ver promo', 'ver promos', 'promocion', 'promociones',
-            'oferta', 'ofertas', 'descuento', 'descuentos', 'combo', 'combos'
-          ].includes(lower) || /^(ver\s+)?(las\s+)?(promos?|promocion(es)?|ofertas?)$/i.test(lower);
+          const cleanNormText = normalizeSearchText(lower);
+          const isGeneralPromoInquiry = (
+            ['promo', 'promos', 'ver promo', 'ver promos', 'promocion', 'promociones', 'oferta', 'ofertas', 'descuento', 'descuentos', 'combo', 'combos', '0'].includes(cleanNormText) ||
+            /^(ver\s+)?(las\s+)?(promos?|promocion(es)?|ofertas?|combos?)$/i.test(cleanNormText) ||
+            (/\b(promos?|promocion(es)?|ofertas?|combos?|descuentos?)\b/i.test(cleanNormText) && (
+              cleanNormText.includes('que') || cleanNormText.includes('hay') || cleanNormText.includes('tienen') ||
+              cleanNormText.includes('tenes') || cleanNormText.includes('cuales') || cleanNormText.includes('ver') ||
+              cleanNormText.includes('mostrar') || cleanNormText.includes('quiero') || cleanNormText.includes('disponible')
+            ))
+          );
 
-          if (isPromoTrigger) {
+          // Si el texto coincide con una promo o producto específico (ej: "promo clasica"), se procesará más abajo para agregarlo directamente
+          const directProdCheck = findProductByText(lower, prods);
+
+          if (isGeneralPromoInquiry && !directProdCheck) {
             session.step = 'SELECTING';
             const promoReply = buildPromosMessage(prods);
             await this.safeSendMessage(remoteJid, { text: promoReply }, msg.key);
@@ -2059,9 +2117,17 @@ class WhatsAppBotServer {
           }
 
           // -------------------------------------------------------------
-          // OPCIONES DEL MENÚ PRINCIPAL EN MODO IDLE (1, 2, 3, 4, 5)
+          // OPCIONES DEL MENÚ PRINCIPAL EN MODO IDLE (0, 1, 2, 3, 4, 5)
           // -------------------------------------------------------------
           if (session.step === 'IDLE') {
+            // OPCIÓN 0: VER PROMOCIONES DEL DÍA
+            if (lower === '0' || lower === 'promo' || lower === 'promos' || lower === 'ofertas' || lower === 'combos') {
+              session.step = 'SELECTING';
+              const promoReply = buildPromosMessage(prods);
+              await this.safeSendMessage(remoteJid, { text: promoReply }, msg.key);
+              continue;
+            }
+
             // OPCIÓN 1: CONSULTAR ESTADO DE PEDIDO
             if (lower === '1' || lower === 'estado' || lower === 'mi pedido' || lower === 'mi orden') {
               const cleanPhone = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '');
@@ -2157,18 +2223,19 @@ class WhatsAppBotServer {
           }
 
           // -------------------------------------------------------------
-          // SELECCIÓN DIRECTA DE HAMBURGUESAS EN CUALQUIER MOMENTO (NÚMERO O NOMBRE)
-          // Si el cliente pide directamente "quiero la 1", "dame una 2" o un número >= 6
+          // SELECCIÓN DIRECTA DE HAMBURGUESAS O PROMOS EN CUALQUIER MOMENTO (NÚMERO O NOMBRE)
           // -------------------------------------------------------------
           const initialNum = parseInt(lower.replace(/\D/g, ''), 10);
           let matchedProd = null;
-          if (!isNaN(initialNum) && initialNum >= 1 && initialNum <= prods.length && !lower.includes('hamburguesa') && !lower.includes('burger')) {
+          if (!isNaN(initialNum) && initialNum >= 1 && initialNum <= prods.length && !lower.includes('hamburguesa') && !lower.includes('burger') && /^(pedir|comprar|la|el|nro|numero)?\s*\d+$/i.test(lower)) {
             matchedProd = prods[initialNum - 1];
           } else {
-            matchedProd = findProductByText(lower, prods);
+            matchedProd = directProdCheck || findProductByText(lower, prods);
           }
 
-          if (matchedProd && (lower.startsWith('comprar') || lower.startsWith('pedir') || lower.startsWith('quiero') || lower.startsWith('dame') || (initialNum >= 6 && initialNum <= prods.length) || session.step === 'SELECTING')) {
+          const isPureMenuDigitInIdle = session.step === 'IDLE' && /^[0-5]$/.test(cleanNormText);
+
+          if (matchedProd && !isPureMenuDigitInIdle) {
             session.step = 'SELECTING';
             if (!session.items) session.items = [];
             
@@ -2193,7 +2260,11 @@ class WhatsAppBotServer {
 
             const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
 
-            const reply = `✅ *¡Excelente elección! Sumaste ${matchedProd.name}* 🍔 (+$${Number(matchedProd.price).toLocaleString('es-AR')})\n\n🛒 *Tu pedido actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n👉 ¿Querés sumar otra burger o bebida? *(Escribí su número)*\n👉 ¿Algún cambio? *(Ej: Sin cebolla, Extra cheddar)*\n👉 O respondé *LISTO* para elegir forma de entrega.`;
+            const modsHint = matchedProd.modifiers && matchedProd.modifiers.length > 0 
+              ? `\n👉 *Modificadores disponibles:* ${matchedProd.modifiers.join(', ')}`
+              : `\n👉 *¿Algún cambio?* (Ej: Sin cebolla, Extra cheddar)`;
+
+            const reply = `✅ *¡Excelente elección! Sumaste ${matchedProd.name}* 🍔 (+$${Number(matchedProd.price).toLocaleString('es-AR')})\n\n🛒 *Tu pedido actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n👉 ¿Querés sumar otra burger o bebida? *(Escribí su número)*${modsHint}\n👉 O respondé *LISTO* para elegir forma de entrega.`;
             await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
             continue;
           }
