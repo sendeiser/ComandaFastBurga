@@ -228,6 +228,13 @@ export const chatbotService = {
       localStorage.setItem(BOT_SETTINGS_KEY, JSON.stringify(newSettings));
       if (supabaseSync.isConfigured()) {
         await supabaseSync.saveBotTemplates(newSettings);
+        // Notificar en tiempo real al servidor Baileys / bot de WhatsApp
+        await supabaseSync.saveBotConfig('server_commands', {
+          id: 'cmd_' + Date.now(),
+          action: 'sync_templates',
+          status: 'pending',
+          timestamp: Date.now()
+        }).catch(() => {});
       }
       try {
         const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
@@ -916,26 +923,35 @@ export const chatbotService = {
       const acknowledgeMatches = settings.anti_loop_acknowledge || DEFAULT_ANTI_LOOP_ACKNOWLEDGE;
 
       if (gratitudeMatches.some(g => cleanText === g || cleanText.startsWith(g + ' ') || cleanText.endsWith(' ' + g))) {
-        const gratitudeReplies = [
+        const customReply = settings.template_anti_loop_gratitude;
+        const defaultReplies = [
           '¡De nada! 🙌 Que lo disfrutes un montón. Si querés consultar la carta o volver a pedir, escribí *MENU* cuando gustes. ¡Buen provecho! 🍔🔥',
           '¡Un placer enorme atenderte! 😊 Avisanos cualquier cosa que necesites. Escribí *MENU* cuando quieras volver a pedir. ✨',
           '¡Muchas gracias a vos por tu compra! ❤️ Esperamos que la disfrutes. La cocina queda a tu entera disposición. 🍔'
         ];
-        reply = gratitudeReplies[Math.floor(Math.random() * gratitudeReplies.length)];
+        reply = (customReply && customReply.trim())
+          ? customReply
+          : defaultReplies[Math.floor(Math.random() * defaultReplies.length)];
         return { reply, newState };
       }
 
       if (farewellMatches.some(f => cleanText === f || cleanText.startsWith(f + ' ') || cleanText.endsWith(' ' + f))) {
-        const farewellReplies = [
+        const customReply = settings.template_anti_loop_farewell;
+        const defaultReplies = [
           '¡Hasta la próxima! 👋 Gracias por contactarte con ComandaFast. ¡Que tengas un excelente descanso! ✨🍔',
           '¡Nos vemos! Un saludo enorme de todo el equipo de ComandaFast. Escribí *MENU* cuando gustes volver a pedir. 🙌'
         ];
-        reply = farewellReplies[Math.floor(Math.random() * farewellReplies.length)];
+        reply = (customReply && customReply.trim())
+          ? customReply
+          : defaultReplies[Math.floor(Math.random() * defaultReplies.length)];
         return { reply, newState };
       }
 
       if (acknowledgeMatches.some(a => cleanText === a)) {
-        reply = '¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido.';
+        const customReply = settings.template_anti_loop_acknowledge;
+        reply = (customReply && customReply.trim())
+          ? customReply
+          : '¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido.';
         return { reply, newState };
       }
     }

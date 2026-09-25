@@ -14,7 +14,8 @@ import {
   DEFAULT_CHATBOT_KEYWORDS,
   DEFAULT_ANTI_LOOP_GRATITUDE,
   DEFAULT_ANTI_LOOP_FAREWELL,
-  DEFAULT_ANTI_LOOP_ACKNOWLEDGE
+  DEFAULT_ANTI_LOOP_ACKNOWLEDGE,
+  DEFAULT_ANTI_LOOP_RESPONSES
 } from '../../../services/whatsappBotConstants';
 import { chatbotService } from '../../../services/chatbotService';
 import { supabaseSync } from '../../../services/supabaseClient';
@@ -84,6 +85,8 @@ export default function AdminWhatsAppBot({ initialTab }) {
   const [newAntiLoopWord, setNewAntiLoopWord] = useState('');
   const [newAntiLoopCategory, setNewAntiLoopCategory] = useState('gratitude');
   const [antiLoopSearch, setAntiLoopSearch] = useState('');
+  const [savingAntiLoop, setSavingAntiLoop] = useState(false);
+  const [antiLoopSaveMsg, setAntiLoopSaveMsg] = useState('');
 
   // Live Baileys Server Connection State
   const [serverOnline, setServerOnline] = useState(false);
@@ -415,7 +418,7 @@ export default function AdminWhatsAppBot({ initialTab }) {
     chatbotService.saveSettings(updated);
   };
 
-  const handleAddAntiLoopWord = () => {
+  const handleAddAntiLoopWord = async () => {
     const word = newAntiLoopWord.trim().toLowerCase();
     if (!word) return;
 
@@ -439,12 +442,16 @@ export default function AdminWhatsAppBot({ initialTab }) {
         [targetKey]: [...currentList, word]
       };
       setSettings(updated);
-      chatbotService.saveSettings(updated);
+      setSavingAntiLoop(true);
+      await chatbotService.saveSettings(updated);
+      setSavingAntiLoop(false);
+      setAntiLoopSaveMsg(`Palabra "${word}" sincronizada con la BD & Bot`);
+      setTimeout(() => setAntiLoopSaveMsg(''), 3000);
     }
     setNewAntiLoopWord('');
   };
 
-  const handleRemoveAntiLoopWord = (category, wordToRemove) => {
+  const handleRemoveAntiLoopWord = async (category, wordToRemove) => {
     const targetKey = category === 'gratitude' 
       ? 'anti_loop_gratitude' 
       : category === 'farewell' 
@@ -464,18 +471,59 @@ export default function AdminWhatsAppBot({ initialTab }) {
       [targetKey]: currentList.filter(w => w !== wordToRemove)
     };
     setSettings(updated);
-    chatbotService.saveSettings(updated);
+    setSavingAntiLoop(true);
+    await chatbotService.saveSettings(updated);
+    setSavingAntiLoop(false);
+    setAntiLoopSaveMsg(`Palabra eliminada y sincronizada en BD & Bot`);
+    setTimeout(() => setAntiLoopSaveMsg(''), 3000);
   };
 
-  const handleResetAntiLoopWords = () => {
+  const handleResetAntiLoopWords = async () => {
     const updated = {
       ...settings,
       anti_loop_gratitude: DEFAULT_ANTI_LOOP_GRATITUDE,
       anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,
-      anti_loop_acknowledge: DEFAULT_ANTI_LOOP_ACKNOWLEDGE
+      anti_loop_acknowledge: DEFAULT_ANTI_LOOP_ACKNOWLEDGE,
+      template_anti_loop_gratitude: DEFAULT_ANTI_LOOP_RESPONSES.template_anti_loop_gratitude,
+      template_anti_loop_farewell: DEFAULT_ANTI_LOOP_RESPONSES.template_anti_loop_farewell,
+      template_anti_loop_acknowledge: DEFAULT_ANTI_LOOP_RESPONSES.template_anti_loop_acknowledge
     };
     setSettings(updated);
-    chatbotService.saveSettings(updated);
+    setSavingAntiLoop(true);
+    await chatbotService.saveSettings(updated);
+    setSavingAntiLoop(false);
+    setAntiLoopSaveMsg('Filtro y respuestas restablecidos por defecto en BD & Bot');
+    setTimeout(() => setAntiLoopSaveMsg(''), 3000);
+  };
+
+  const handleUpdateAntiLoopReply = (key, text) => {
+    setSettings(prev => ({
+      ...prev,
+      [key]: text
+    }));
+  };
+
+  const handleSaveAntiLoopReplies = async () => {
+    setSavingAntiLoop(true);
+    await chatbotService.saveSettings(settings);
+    setSavingAntiLoop(false);
+    setAntiLoopSaveMsg('✅ Frases y Respuestas Inteligentes sincronizadas con la BD y el Bot');
+    setTimeout(() => setAntiLoopSaveMsg(''), 3500);
+  };
+
+  const handleResetSingleReply = async (key) => {
+    const defaultValue = DEFAULT_ANTI_LOOP_RESPONSES[key];
+    if (!defaultValue) return;
+    const updated = {
+      ...settings,
+      [key]: defaultValue
+    };
+    setSettings(updated);
+    setSavingAntiLoop(true);
+    await chatbotService.saveSettings(updated);
+    setSavingAntiLoop(false);
+    setAntiLoopSaveMsg('Respuesta restablecida al valor por defecto y guardada en BD');
+    setTimeout(() => setAntiLoopSaveMsg(''), 3000);
   };
 
   // Acciones en vivo con el servidor Baileys
@@ -1416,7 +1464,7 @@ call npm run dev
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.6rem' }}>
               <div>
-                <h4 style={{ fontSize: '1.02rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '7px' }}>
+                <h4 style={{ fontSize: '1.02rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap' }}>
                   <MessageSquare size={18} color="#d97706" />
                   <span>Filtro Anti-Bucle de Cortesía & Respuestas Inteligentes</span>
                   <span style={{
@@ -1429,6 +1477,20 @@ call npm run dev
                     borderRadius: '999px'
                   }}>
                     {allAntiLoopWordsWithCategory.length} palabras configuradas
+                  </span>
+                  <span style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 800,
+                    background: 'rgba(5, 150, 105, 0.12)',
+                    color: '#059669',
+                    border: '1px solid rgba(5, 150, 105, 0.3)',
+                    padding: '1px 7px',
+                    borderRadius: '999px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <Wifi size={11} /> Sync BD & Bot en Vivo
                   </span>
                 </h4>
                 <div style={{ fontSize: '0.78rem', color: '#475569', marginTop: '3px' }}>
@@ -1641,31 +1703,201 @@ call npm run dev
               )}
             </div>
 
-            {/* HELPER NOTICE DE RESPUESTAS CORDIALES */}
+            {/* NOTIFICACIÓN DE GUARDADO / SYNC EN TIEMPO REAL */}
+            {antiLoopSaveMsg && (
+              <div style={{
+                padding: '0.6rem 0.85rem',
+                borderRadius: '6px',
+                background: 'rgba(5, 150, 105, 0.12)',
+                border: '1px solid rgba(5, 150, 105, 0.3)',
+                color: '#065f46',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <CheckCircle2 size={16} />
+                <span>{antiLoopSaveMsg}</span>
+              </div>
+            )}
+
+            {/* SECCIÓN EDITABLE: RESPUESTAS INTELIGENTES DEL BOT */}
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-              gap: '0.6rem',
-              marginTop: '0.2rem'
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              padding: '0.9rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.85rem'
             }}>
-              <div style={{ padding: '0.65rem 0.8rem', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.74rem' }}>
-                <strong style={{ color: '#047857' }}>💖 Si dicen "gracias", "joya", etc.:</strong>
-                <div style={{ color: '#475569', marginTop: '2px', fontStyle: 'italic' }}>
-                  "¡De nada! 🙌 Que lo disfrutes un montón. Si querés consultar la carta, escribí MENU..."
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Sparkles size={16} color="#d97706" />
+                    <span>Respuestas Inteligentes de Cortesía (Editables)</span>
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
+                    Mensajes automáticos que el bot responde cuando un cliente usa las palabras clave configuradas. Se guardan en la Base de Datos y se sincronizan con el bot en vivo.
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="cat-pill-btn active"
+                    onClick={handleSaveAntiLoopReplies}
+                    disabled={savingAntiLoop}
+                    style={{ height: '32px', padding: '0 0.85rem', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+                  >
+                    <Save size={13} />
+                    <span>{savingAntiLoop ? 'Guardando en BD...' : 'Guardar Frases en BD'}</span>
+                  </button>
                 </div>
               </div>
 
-              <div style={{ padding: '0.65rem 0.8rem', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.74rem' }}>
-                <strong style={{ color: '#b45309' }}>👋 Si dicen "chau", "buenas noches", etc.:</strong>
-                <div style={{ color: '#475569', marginTop: '2px', fontStyle: 'italic' }}>
-                  "¡Hasta la próxima! 👋 Gracias por contactarte. ¡Que tengas un excelente descanso!..."
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                gap: '0.75rem'
+              }}>
+                {/* 1. AGRADECIMIENTOS */}
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(16, 185, 129, 0.35)',
+                  padding: '0.75rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.4rem'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#047857' }}>
+                      💖 Ante Agradecimientos ("gracias", "joya", etc.)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleResetSingleReply('template_anti_loop_gratitude')}
+                      style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                      title="Restablecer respuesta por defecto"
+                    >
+                      <RotateCcw size={11} /> Default
+                    </button>
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={settings.template_anti_loop_gratitude ?? DEFAULT_ANTI_LOOP_RESPONSES.template_anti_loop_gratitude}
+                    onChange={(e) => handleUpdateAntiLoopReply('template_anti_loop_gratitude', e.target.value)}
+                    onBlur={handleSaveAntiLoopReplies}
+                    placeholder="Escribí la respuesta de agradecimiento..."
+                    style={{
+                      width: '100%',
+                      padding: '0.45rem 0.6rem',
+                      borderRadius: '5px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.76rem',
+                      color: '#0f172a',
+                      background: '#ffffff',
+                      lineHeight: '1.4',
+                      resize: 'vertical'
+                    }}
+                  />
+                  <div style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic' }}>
+                    💡 Se guarda en BD y el bot la usa inmediatamente.
+                  </div>
                 </div>
-              </div>
 
-              <div style={{ padding: '0.65rem 0.8rem', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.74rem' }}>
-                <strong style={{ color: '#1d4ed8' }}>👍 Si dicen "ok", "listo", "dale":</strong>
-                <div style={{ color: '#475569', marginTop: '2px', fontStyle: 'italic' }}>
-                  "¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí MENU cuando quieras..."
+                {/* 2. DESPEDIDAS */}
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(245, 158, 11, 0.35)',
+                  padding: '0.75rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.4rem'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#b45309' }}>
+                      👋 Ante Despedidas ("chau", "buenas noches", etc.)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleResetSingleReply('template_anti_loop_farewell')}
+                      style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                      title="Restablecer respuesta por defecto"
+                    >
+                      <RotateCcw size={11} /> Default
+                    </button>
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={settings.template_anti_loop_farewell ?? DEFAULT_ANTI_LOOP_RESPONSES.template_anti_loop_farewell}
+                    onChange={(e) => handleUpdateAntiLoopReply('template_anti_loop_farewell', e.target.value)}
+                    onBlur={handleSaveAntiLoopReplies}
+                    placeholder="Escribí la respuesta de despedida..."
+                    style={{
+                      width: '100%',
+                      padding: '0.45rem 0.6rem',
+                      borderRadius: '5px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.76rem',
+                      color: '#0f172a',
+                      background: '#ffffff',
+                      lineHeight: '1.4',
+                      resize: 'vertical'
+                    }}
+                  />
+                  <div style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic' }}>
+                    💡 Se envía cuando el cliente saluda al terminar su pedido.
+                  </div>
+                </div>
+
+                {/* 3. CONFIRMACIONES BREVES */}
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(37, 99, 235, 0.35)',
+                  padding: '0.75rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.4rem'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d4ed8' }}>
+                      👍 Ante Confirmaciones ("ok", "listo", "dale")
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleResetSingleReply('template_anti_loop_acknowledge')}
+                      style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                      title="Restablecer respuesta por defecto"
+                    >
+                      <RotateCcw size={11} /> Default
+                    </button>
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={settings.template_anti_loop_acknowledge ?? DEFAULT_ANTI_LOOP_RESPONSES.template_anti_loop_acknowledge}
+                    onChange={(e) => handleUpdateAntiLoopReply('template_anti_loop_acknowledge', e.target.value)}
+                    onBlur={handleSaveAntiLoopReplies}
+                    placeholder="Escribí la respuesta de confirmación..."
+                    style={{
+                      width: '100%',
+                      padding: '0.45rem 0.6rem',
+                      borderRadius: '5px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.76rem',
+                      color: '#0f172a',
+                      background: '#ffffff',
+                      lineHeight: '1.4',
+                      resize: 'vertical'
+                    }}
+                  />
+                  <div style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic' }}>
+                    💡 Cierra el ciclo sin volver a mostrar el menú completo.
+                  </div>
                 </div>
               </div>
             </div>

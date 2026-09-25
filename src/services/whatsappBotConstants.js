@@ -26,12 +26,23 @@ export const DEFAULT_ANTI_LOOP_ACKNOWLEDGE = [
   'ok', 'oki', 'okis', 'dale', 'de una', 'perfecto', 'listo', 'entendido', 'impecable', 'barbaro', 'bárbaro'
 ];
 
+export const DEFAULT_ANTI_LOOP_RESPONSES = {
+  template_anti_loop_gratitude: '¡De nada! 🙌 Que lo disfrutes un montón. Si querés consultar la carta o volver a pedir, escribí *MENU* cuando gustes. ¡Buen provecho! 🍔🔥',
+  template_anti_loop_farewell: '¡Hasta la próxima! 👋 Gracias por contactarte con ComandaFast. ¡Que tengas un excelente descanso! ✨🍔',
+  template_anti_loop_acknowledge: '¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido.'
+};
+
 export const DEFAULT_TEMPLATES = {
   // Parámetros de Blindaje & Modo Humano
   human_mode_sleep_minutes: 25,
   anti_loop_gratitude: DEFAULT_ANTI_LOOP_GRATITUDE,
   anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,
   anti_loop_acknowledge: DEFAULT_ANTI_LOOP_ACKNOWLEDGE,
+
+  // Respuestas Inteligentes de Cortesía
+  template_anti_loop_gratitude: DEFAULT_ANTI_LOOP_RESPONSES.template_anti_loop_gratitude,
+  template_anti_loop_farewell: DEFAULT_ANTI_LOOP_RESPONSES.template_anti_loop_farewell,
+  template_anti_loop_acknowledge: DEFAULT_ANTI_LOOP_RESPONSES.template_anti_loop_acknowledge,
 
   // 1. Menú Principal y Opciones
   template_menu: `🍔 *¡Hola {cliente}! Bienvenido a ComandaFast Burgers* 🔥\n\n¿En qué podemos ayudarte hoy? *Respondé con el número de opción:*\n\n1️⃣ 📋 *Consultar estado de mi pedido*\n2️⃣ 💳 *Ver datos de transferencia bancaria / Alias*\n3️⃣ 📍 *Horarios y ubicación de nuestro local*\n4️⃣ 🍔 *Ver menú completo de hamburguesas y combos*\n5️⃣ 👤 *Hablar con un encargado del local*\n\n_O escribí directamente tu pedido (ej: *2 Dobles con queso sin cebolla y unas papas*)._`,
@@ -99,7 +110,10 @@ export const ALL_TEMPLATE_NODES = [
   { id: 'template_order_preparing', label: 'KDS: En Preparación', category: 'notifications', description: 'Notificación cuando cocina toma el pedido' },
   { id: 'template_order_ready', label: 'KDS: Pedido Listo', category: 'notifications', description: 'Notificación para que el cliente retire' },
   { id: 'template_order_shipped', label: 'KDS: En Camino', category: 'notifications', description: 'Notificación cuando sale con el repartidor' },
-  { id: 'template_payment_proof', label: 'Aviso de Comprobante Recibido', category: 'notifications', description: 'Agradecimiento tras recibir captura de transferencia' }
+  { id: 'template_payment_proof', label: 'Aviso de Comprobante Recibido', category: 'notifications', description: 'Agradecimiento tras recibir captura de transferencia' },
+  { id: 'template_anti_loop_gratitude', label: 'Anti-Bucle: Agradecimientos', category: 'menu', description: 'Respuesta cordial cuando el cliente da las gracias' },
+  { id: 'template_anti_loop_farewell', label: 'Anti-Bucle: Despedida', category: 'menu', description: 'Respuesta cordial cuando el cliente se despide' },
+  { id: 'template_anti_loop_acknowledge', label: 'Anti-Bucle: Confirmación Breve', category: 'menu', description: 'Respuesta cordial ante OK, listo o dale' }
 ];
 
 export const TEST_PERSONAS = [

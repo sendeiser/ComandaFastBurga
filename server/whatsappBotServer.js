@@ -436,6 +436,9 @@ const DEFAULT_SERVER_TEMPLATES = {
   anti_loop_gratitude: DEFAULT_ANTI_LOOP_GRATITUDE,
   anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,
   anti_loop_acknowledge: DEFAULT_ANTI_LOOP_ACKNOWLEDGE,
+  template_anti_loop_gratitude: '¡De nada! 🙌 Que lo disfrutes un montón. Si querés consultar la carta o volver a pedir, escribí *MENU* cuando gustes. ¡Buen provecho! 🍔🔥',
+  template_anti_loop_farewell: '¡Hasta la próxima! 👋 Gracias por contactarte con ComandaFast. ¡Que tengas un excelente descanso! ✨🍔',
+  template_anti_loop_acknowledge: '¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido.',
   template_order_preparing: `👨‍🍳🔥 *¡Buenas noticias {cliente}! Tu pedido #{pedido_id} ya está en la plancha.*
 
 Nuestros cocineros están preparando tus hamburguesas con la carne recién smashada y el cheddar fundido. ¡Te avisamos apenas esté listo! 🍔✨`,
@@ -1603,32 +1606,41 @@ class WhatsAppBotServer {
           if (session.step === 'IDLE') {
             const cleanText = lower.replace(/[!¡?¿.,;:]/g, '').trim();
             const { gratitude, farewell, acknowledge } = getAntiLoopWords();
+            const tpls = getBotTemplates();
 
             if (gratitude.some(g => cleanText === g || cleanText.startsWith(g + ' ') || cleanText.endsWith(' ' + g))) {
-              const gratitudeReplies = [
+              const customReply = tpls.template_anti_loop_gratitude;
+              const defaultReplies = [
                 '¡De nada! 🙌 Que lo disfrutes un montón. Si querés consultar la carta o volver a pedir, escribí *MENU* cuando gustes. ¡Buen provecho! 🍔🔥',
                 '¡Un placer enorme atenderte! 😊 Avisanos cualquier cosa que necesites. Escribí *MENU* cuando quieras volver a pedir. ✨',
                 '¡Muchas gracias a vos por tu compra! ❤️ Esperamos que la disfrutes. La cocina queda a tu entera disposición. 🍔'
               ];
-              const randomReply = gratitudeReplies[Math.floor(Math.random() * gratitudeReplies.length)];
-              await this.safeSendMessage(remoteJid, { text: randomReply }, msg.key);
+              const reply = (customReply && customReply.trim())
+                ? customReply
+                : defaultReplies[Math.floor(Math.random() * defaultReplies.length)];
+              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
               continue;
             }
 
             if (farewell.some(f => cleanText === f || cleanText.startsWith(f + ' ') || cleanText.endsWith(' ' + f))) {
-              const farewellReplies = [
+              const customReply = tpls.template_anti_loop_farewell;
+              const defaultReplies = [
                 '¡Hasta la próxima! 👋 Gracias por contactarte con ComandaFast. ¡Que tengas un excelente descanso! ✨🍔',
                 '¡Nos vemos! Un saludo enorme de todo el equipo de ComandaFast. Escribí *MENU* cuando gustes volver a pedir. 🙌'
               ];
-              const randomReply = farewellReplies[Math.floor(Math.random() * farewellReplies.length)];
-              await this.safeSendMessage(remoteJid, { text: randomReply }, msg.key);
+              const reply = (customReply && customReply.trim())
+                ? customReply
+                : defaultReplies[Math.floor(Math.random() * defaultReplies.length)];
+              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
               continue;
             }
 
             if (acknowledge.some(a => cleanText === a)) {
-              await this.safeSendMessage(remoteJid, { 
-                text: '¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido.' 
-              }, msg.key);
+              const customReply = tpls.template_anti_loop_acknowledge;
+              const reply = (customReply && customReply.trim())
+                ? customReply
+                : '¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido.';
+              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
               continue;
             }
           }
@@ -1777,6 +1789,12 @@ async function checkRemoteCommands() {
       } else if (cmd.action === 'resume_chat' && cmd.jid) {
         resumeBotForCustomer(cmd.jid);
         publishBotStatusToSupabase();
+      } else if (cmd.action === 'sync_templates') {
+        const cloudTemplates = await fetchBotConfigFromSupabase('templates');
+        if (cloudTemplates && typeof cloudTemplates === 'object') {
+          saveBotTemplates(cloudTemplates);
+          console.log(`⚡ [WHATSAPP BOT] Plantillas, Filtro Anti-Bucle y Respuestas Inteligentes sincronizados en tiempo real desde Supabase!`);
+        }
       }
       await pushBotConfigToSupabase('server_commands', {
         ...cmd,
@@ -1787,6 +1805,34 @@ async function checkRemoteCommands() {
   } catch (_) {}
 }
 setInterval(checkRemoteCommands, 3500);
+
+// Sincronización periódica automática de plantillas, frases anti-bucle y respuestas desde Supabase Cloud
+let lastCloudTemplatesSyncTimestamp = null;
+async function syncTemplatesFromCloudPeriodically() {
+  try {
+    const queryUrl = `${SUPABASE_URL}/rest/v1/bot_config?id=eq.templates&select=updated_at,data`;
+    const res = await fetch(queryUrl, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      }
+    });
+    if (res.ok) {
+      const rows = await res.json();
+      if (Array.isArray(rows) && rows.length > 0) {
+        const row = rows[0];
+        if (row.updated_at && row.updated_at !== lastCloudTemplatesSyncTimestamp) {
+          lastCloudTemplatesSyncTimestamp = row.updated_at;
+          if (row.data && typeof row.data === 'object') {
+            saveBotTemplates(row.data);
+            console.log(`🔄 [WHATSAPP BOT] Plantillas & Filtro Anti-Bucle actualizados automáticamente desde la Base de Datos (${row.updated_at}).`);
+          }
+        }
+      }
+    }
+  } catch (_) {}
+}
+setInterval(syncTemplatesFromCloudPeriodically, 5000);
 
 // Señal de apagado limpio
 process.on('SIGINT', async () => {
