@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { storageService } from '../../services/storageService';
-import { Search, ShoppingBag, Plus, Trash2, Send, MessageSquare, Utensils, DollarSign, Sparkles, Image as ImageIcon, Lock, AlertCircle } from 'lucide-react';
+import { Search, ShoppingBag, Plus, Minus, RotateCcw, GripVertical, Trash2, Send, MessageSquare, Utensils, DollarSign, Sparkles, Image as ImageIcon, Lock, AlertCircle } from 'lucide-react';
 import ItemModifierModal from './ItemModifierModal';
 import PaymentModal from './PaymentModal';
 import WhatsAppImportModal from './WhatsAppImportModal';
@@ -38,6 +38,109 @@ export default function FastOrderPad({
       } catch (_) {}
       return next;
     });
+  };
+
+  // Ancho manual ajustable del panel de pedido/confirmación (en px)
+  const [cartWidth, setCartWidth] = useState(() => {
+    try {
+      const saved = localStorage.getItem('comandafast_pos_cart_width');
+      const parsed = parseInt(saved, 10);
+      if (!isNaN(parsed) && parsed >= 320 && parsed <= 900) {
+        return parsed;
+      }
+    } catch (_) {}
+    return 430;
+  });
+
+  const isDraggingRef = useRef(false);
+  const startDragRef = useRef({ startX: 0, startWidth: 430 });
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleMouseDownResize = (e) => {
+    e.preventDefault();
+    isDraggingRef.current = true;
+    startDragRef.current = {
+      startX: e.clientX,
+      startWidth: cartWidth
+    };
+    setIsDragging(true);
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+  };
+
+  const handleTouchStartResize = (e) => {
+    if (e.touches && e.touches.length > 0) {
+      isDraggingRef.current = true;
+      startDragRef.current = {
+        startX: e.touches[0].clientX,
+        startWidth: cartWidth
+      };
+      setIsDragging(true);
+    }
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isDraggingRef.current) return;
+      const delta = startDragRef.current.startX - e.clientX;
+      const maxW = Math.min(850, Math.floor(window.innerWidth * 0.7));
+      const nextWidth = Math.max(320, Math.min(startDragRef.current.startWidth + delta, maxW));
+      setCartWidth(nextWidth);
+    };
+
+    const handleTouchMove = (e) => {
+      if (!isDraggingRef.current || !e.touches || e.touches.length === 0) return;
+      const delta = startDragRef.current.startX - e.touches[0].clientX;
+      const maxW = Math.min(850, Math.floor(window.innerWidth * 0.7));
+      const nextWidth = Math.max(320, Math.min(startDragRef.current.startWidth + delta, maxW));
+      setCartWidth(nextWidth);
+    };
+
+    const handleStopDrag = () => {
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        setIsDragging(false);
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+        setCartWidth(curr => {
+          try {
+            localStorage.setItem('comandafast_pos_cart_width', String(curr));
+          } catch (_) {}
+          return curr;
+        });
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleStopDrag);
+    window.addEventListener('touchmove', handleTouchMove);
+    window.addEventListener('touchend', handleStopDrag);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleStopDrag);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleStopDrag);
+    };
+  }, []);
+
+  const handleStepWidth = (delta) => {
+    setCartWidth(prev => {
+      const maxW = Math.min(850, Math.floor(window.innerWidth * 0.7));
+      const next = Math.max(320, Math.min(prev + delta, maxW));
+      try {
+        localStorage.setItem('comandafast_pos_cart_width', String(next));
+      } catch (_) {}
+      return next;
+    });
+  };
+
+  const handleResetWidth = () => {
+    const defaultW = 430;
+    setCartWidth(defaultW);
+    try {
+      localStorage.setItem('comandafast_pos_cart_width', String(defaultW));
+    } catch (_) {}
   };
 
   // Mobile tab state ('catalog' or 'cart') - only affects mobile screens <= 768px
@@ -189,7 +292,10 @@ export default function FastOrderPad({
   };
 
   return (
-    <div className="pos-container">
+    <div 
+      className="pos-container"
+      style={{ '--pos-cart-width': `${cartWidth}px` }}
+    >
       {/* MOBILE SWITCHER TABS (Only visible on screens <= 768px via CSS) */}
       <div className="pos-mobile-tabs">
         <button 
@@ -369,8 +475,30 @@ export default function FastOrderPad({
         )}
       </div>
 
+      {/* DRAGGABLE RESIZER HANDLE (Desktop only) */}
+      <div 
+        className={`pos-resizer-handle ${isDragging ? 'dragging' : ''}`}
+        onMouseDown={handleMouseDownResize}
+        onTouchStart={handleTouchStartResize}
+        onDoubleClick={handleResetWidth}
+        title="Arrastra para cambiar el ancho del pedido (Doble clic para restaurar 430px)"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Ajustar ancho del panel de pedido"
+      >
+        <div className="pos-resizer-line" />
+        <div className="pos-resizer-grip">
+          <GripVertical size={13} />
+        </div>
+        {isDragging && (
+          <div className="pos-resizer-tooltip">
+            {cartWidth}px
+          </div>
+        )}
+      </div>
+
       {/* RIGHT: LIVE CART & TICKET PAD */}
-      <div className={`pos-cart-panel ${mobileTab === 'cart' ? 'mobile-active' : ''}`}>
+      <div className={`pos-cart-panel ${mobileTab === 'cart' ? 'mobile-active' : ''} ${cartWidth < 410 ? 'compact-cart-width' : ''}`}>
         <div className="cart-header">
           {/* Mobile Back Button to return to menu */}
           <button 
@@ -381,15 +509,61 @@ export default function FastOrderPad({
             ← Volver al Menú
           </button>
 
+          {/* Top Bar with Title & Manual Width Controls */}
+          <div className="cart-header-top-bar">
+            <div className="cart-header-top-title">
+              <ShoppingBag size={15} className="cart-title-icon" />
+              <span>Pedido en Curso</span>
+              {totalItemsCount > 0 && (
+                <span className="cart-badge-count">{totalItemsCount}</span>
+              )}
+            </div>
+
+            <div className="cart-width-controls" title="Ajustar ancho manualmente">
+              <button
+                type="button"
+                className="cart-width-btn"
+                onClick={() => handleStepWidth(-30)}
+                title="Reducir ancho ( -30px )"
+              >
+                <Minus size={12} />
+              </button>
+              <span 
+                className="cart-width-label" 
+                title="Doble clic para restaurar (430px)"
+                onDoubleClick={handleResetWidth}
+              >
+                {cartWidth}px
+              </span>
+              <button
+                type="button"
+                className="cart-width-btn"
+                onClick={() => handleStepWidth(30)}
+                title="Aumentar ancho ( +30px )"
+              >
+                <Plus size={12} />
+              </button>
+              <button
+                type="button"
+                className="cart-width-btn reset-btn"
+                onClick={handleResetWidth}
+                title="Restablecer ancho por defecto (430px)"
+              >
+                <RotateCcw size={11} />
+              </button>
+            </div>
+          </div>
+
           {/* Channel Selector */}
           <div className="channel-selector">
             <button 
               type="button"
               className={`channel-btn whatsapp ${channel === 'whatsapp' ? 'active' : ''}`}
               onClick={() => setChannel('whatsapp')}
+              title="WhatsApp / Pedido Delivery"
             >
-              <MessageSquare size={16} />
-              <span className="channel-label-desktop">WhatsApp / Delivery</span>
+              <MessageSquare size={cartWidth < 410 ? 14 : 16} />
+              <span className="channel-label-desktop">{cartWidth < 410 ? 'Delivery' : 'WhatsApp / Delivery'}</span>
               <span className="channel-label-mobile">Delivery</span>
             </button>
 
@@ -397,8 +571,9 @@ export default function FastOrderPad({
               type="button"
               className={`channel-btn ${channel === 'mostrador' ? 'active' : ''}`}
               onClick={() => setChannel('mostrador')}
+              title="Venta en Mostrador"
             >
-              <ShoppingBag size={16} />
+              <ShoppingBag size={cartWidth < 410 ? 14 : 16} />
               <span>Mostrador</span>
             </button>
 
@@ -406,9 +581,10 @@ export default function FastOrderPad({
               type="button"
               className={`channel-btn ${channel === 'mesa' ? 'active' : ''}`}
               onClick={() => setChannel('mesa')}
+              title="Consumo en Mesa Local"
             >
-              <Utensils size={16} />
-              <span className="channel-label-desktop">Mesa Local</span>
+              <Utensils size={cartWidth < 410 ? 14 : 16} />
+              <span className="channel-label-desktop">{cartWidth < 410 ? 'Mesa' : 'Mesa Local'}</span>
               <span className="channel-label-mobile">Mesa</span>
             </button>
           </div>

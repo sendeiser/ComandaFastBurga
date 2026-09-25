@@ -82,32 +82,32 @@ export default function KitchenDisplay({
       >
         <div className="kds-card-top">
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
               <span className="order-num-badge">#{order.orderNumber}</span>
               {order.status === 'pendiente' && onReorderOrder && (
                 <div style={{ display: 'inline-flex', gap: '2px' }}>
                   <button 
                     type="button" 
                     className="qty-btn" 
-                    style={{ width: '22px', height: '22px', padding: 0 }} 
+                    style={{ width: '20px', height: '20px', padding: 0 }} 
                     title="Subir prioridad en fila"
                     onClick={() => onReorderOrder(order.id, -1)}
                   >
-                    <ChevronUp size={13} />
+                    <ChevronUp size={12} />
                   </button>
                   <button 
                     type="button" 
                     className="qty-btn" 
-                    style={{ width: '22px', height: '22px', padding: 0 }} 
+                    style={{ width: '20px', height: '20px', padding: 0 }} 
                     title="Bajar prioridad en fila"
                     onClick={() => onReorderOrder(order.id, 1)}
                   >
-                    <ChevronDown size={13} />
+                    <ChevronDown size={12} />
                   </button>
                 </div>
               )}
             </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '1px' }}>
               {new Date(order.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
             </div>
           </div>
@@ -198,22 +198,21 @@ export default function KitchenDisplay({
         </div>
 
         {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+        <div className="kds-card-actions">
           {order.status === 'pendiente' && (
             <>
               <button 
                 type="button"
                 className="btn-kds-action to-cooking"
-                style={{ flex: 1 }}
                 onClick={() => onUpdateStatus(order.id, 'cocina')}
+                title="Comenzar a Cocinar"
               >
-                <Play size={16} />
-                <span>Comenzar a Cocinar</span>
+                <Play size={13} />
+                <span>Cocinar</span>
               </button>
               <button 
                 type="button"
-                className="qty-btn"
-                style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)', background: 'rgba(239, 68, 68, 0.08)', width: 'auto', padding: '0 8px', height: '36px', fontSize: '0.78rem', gap: '4px' }}
+                className="kds-btn-cancel"
                 title="Cancelar Pedido"
                 onClick={() => {
                   if (window.confirm(`¿Estás seguro de CANCELAR el pedido #${order.orderNumber}?`)) {
@@ -221,7 +220,7 @@ export default function KitchenDisplay({
                   }
                 }}
               >
-                <XCircle size={15} />
+                <XCircle size={13} />
                 <span>Cancelar</span>
               </button>
             </>
@@ -229,76 +228,68 @@ export default function KitchenDisplay({
 
           {order.status === 'cocina' && (
             <button 
-                type="button"
-                className="btn-kds-action to-ready"
-                style={{ flex: 1 }}
-                onClick={() => onUpdateStatus(order.id, 'listo')}
-              >
-                <CheckCircle2 size={16} />
-                <span>Marcar ¡LISTO!</span>
-              </button>
+              type="button"
+              className="btn-kds-action to-ready"
+              onClick={() => onUpdateStatus(order.id, 'listo')}
+              title="Marcar pedido como ¡Listo!"
+            >
+              <CheckCircle2 size={14} />
+              <span>¡Listo!</span>
+            </button>
           )}
 
           {order.status === 'listo' && (
             <button 
-                type="button"
-                className="btn-kds-action to-done"
-                style={{ flex: 1 }}
-                onClick={() => onUpdateStatus(order.id, 'entregado')}
-              >
-                <span>Despachar / Entregado</span>
-              </button>
+              type="button"
+              className="btn-kds-action to-done"
+              onClick={() => onUpdateStatus(order.id, 'entregado')}
+              title="Despachar y entregar pedido"
+            >
+              <CheckCircle2 size={14} />
+              <span>Despachar</span>
+            </button>
           )}
 
           {(order.channel === 'whatsapp' || (order.customer && order.customer.phone)) && (
             <button 
               type="button"
-              className="qty-btn"
+              className={`kds-icon-action-btn whatsapp ${notifyingId === order.id ? 'loading' : ''}`}
               disabled={notifyingId === order.id}
-              style={{ 
-                width: '36px', 
-                height: '36px', 
-                color: '#25d366', 
-                borderColor: 'rgba(37, 211, 102, 0.4)', 
-                background: notifyingId === order.id ? 'rgba(37, 211, 102, 0.25)' : 'rgba(37, 211, 102, 0.08)',
-                cursor: notifyingId === order.id ? 'wait' : 'pointer'
-              }}
               title="Avisar / Reenviar estado por WhatsApp al cliente"
               onClick={() => handleNotifyWhatsApp(order)}
             >
-              <MessageSquare size={16} />
+              <MessageSquare size={14} />
             </button>
           )}
 
           <button 
             type="button"
-            className="qty-btn"
-            style={{ width: '36px', height: '36px' }}
+            className="kds-icon-action-btn"
             title="Reimprimir Comanda Cocina"
             onClick={() => onReprintTicket(order, 'kitchen')}
           >
-            <Printer size={16} />
+            <Printer size={14} />
           </button>
         </div>
 
         {/* Cambiar de lugar rápidamente */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px', marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed var(--border-subtle)', fontSize: '0.72rem' }}>
-          <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-            <ArrowLeftRight size={12} /> Mover lugar:
+        <div className="kds-quick-move-bar">
+          <span className="kds-quick-move-label">
+            <ArrowLeftRight size={11} /> Mover:
           </span>
           <div style={{ display: 'flex', gap: '3px' }}>
             {order.status !== 'pendiente' && (
-              <button type="button" className="cat-pill-btn" style={{ height: '20px', fontSize: '0.68rem', padding: '0 6px' }} onClick={() => onUpdateStatus(order.id, 'pendiente')}>
+              <button type="button" className="kds-mini-move-btn" onClick={() => onUpdateStatus(order.id, 'pendiente')}>
                 Pendiente
               </button>
             )}
             {order.status !== 'cocina' && (
-              <button type="button" className="cat-pill-btn" style={{ height: '20px', fontSize: '0.68rem', padding: '0 6px' }} onClick={() => onUpdateStatus(order.id, 'cocina')}>
+              <button type="button" className="kds-mini-move-btn" onClick={() => onUpdateStatus(order.id, 'cocina')}>
                 Cocina
               </button>
             )}
             {order.status !== 'listo' && (
-              <button type="button" className="cat-pill-btn" style={{ height: '20px', fontSize: '0.68rem', padding: '0 6px' }} onClick={() => onUpdateStatus(order.id, 'listo')}>
+              <button type="button" className="kds-mini-move-btn" onClick={() => onUpdateStatus(order.id, 'listo')}>
                 Listo
               </button>
             )}
