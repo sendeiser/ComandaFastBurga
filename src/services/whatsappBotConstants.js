@@ -10,7 +10,29 @@ export const DEFAULT_CHATBOT_KEYWORDS = [
   'promos', 'delivery', 'comanda', 'cheddar', 'bacon', 'doble', 'triple'
 ];
 
+export const DEFAULT_ANTI_LOOP_GRATITUDE = [
+  'gracias', 'muchas gracias', 'muchas gracia', 'mil gracias', 'graciass', 'graciela',
+  'joya', 'genial', 'excelente', 'buenisimo', 'buenísimo', 'de diez', 'de 10',
+  'listo gracias', 'dale gracias', 'muchisimas gracias', 'gracias amigo', 'gracias genio',
+  'espectacular', 'muy rico', 'riquismo', 'riquísimo', 'tremendo'
+];
+
+export const DEFAULT_ANTI_LOOP_FAREWELL = [
+  'chau', 'chau chau', 'adios', 'adiós', 'hasta luego', 'nos vemos', 'buenas noches',
+  'buen descanso', 'hasta mañana', 'que descansen'
+];
+
+export const DEFAULT_ANTI_LOOP_ACKNOWLEDGE = [
+  'ok', 'oki', 'okis', 'dale', 'de una', 'perfecto', 'listo', 'entendido', 'impecable', 'barbaro', 'bárbaro'
+];
+
 export const DEFAULT_TEMPLATES = {
+  // Parámetros de Blindaje & Modo Humano
+  human_mode_sleep_minutes: 25,
+  anti_loop_gratitude: DEFAULT_ANTI_LOOP_GRATITUDE,
+  anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,
+  anti_loop_acknowledge: DEFAULT_ANTI_LOOP_ACKNOWLEDGE,
+
   // 1. Menú Principal y Opciones
   template_menu: `🍔 *¡Hola {cliente}! Bienvenido a ComandaFast Burgers* 🔥\n\n¿En qué podemos ayudarte hoy? *Respondé con el número de opción:*\n\n1️⃣ 📋 *Consultar estado de mi pedido*\n2️⃣ 💳 *Ver datos de transferencia bancaria / Alias*\n3️⃣ 📍 *Horarios y ubicación de nuestro local*\n4️⃣ 🍔 *Ver menú completo de hamburguesas y combos*\n5️⃣ 👤 *Hablar con un encargado del local*\n\n_O escribí directamente tu pedido (ej: *2 Dobles con queso sin cebolla y unas papas*)._`,
   

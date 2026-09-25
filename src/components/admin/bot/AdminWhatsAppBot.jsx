@@ -8,7 +8,14 @@ import {
 import AdminBotFlowsTab from './AdminBotFlowsTab';
 import AdminBotVariablesTab from './AdminBotVariablesTab';
 import { GitBranch, Variable } from 'lucide-react';
-import { ALL_TEMPLATE_NODES, DEFAULT_TEMPLATES, DEFAULT_CHATBOT_KEYWORDS } from '../../../services/whatsappBotConstants';
+import { 
+  ALL_TEMPLATE_NODES, 
+  DEFAULT_TEMPLATES, 
+  DEFAULT_CHATBOT_KEYWORDS,
+  DEFAULT_ANTI_LOOP_GRATITUDE,
+  DEFAULT_ANTI_LOOP_FAREWELL,
+  DEFAULT_ANTI_LOOP_ACKNOWLEDGE
+} from '../../../services/whatsappBotConstants';
 import { chatbotService } from '../../../services/chatbotService';
 import { supabaseSync } from '../../../services/supabaseClient';
 
@@ -63,6 +70,10 @@ export default function AdminWhatsAppBot({ initialTab }) {
   const [newKeyword, setNewKeyword] = useState('');
   const [newIgnoredPhone, setNewIgnoredPhone] = useState('');
   const [newIgnoredLabel, setNewIgnoredLabel] = useState('');
+  const [antiLoopCategoryFilter, setAntiLoopCategoryFilter] = useState('all');
+  const [newAntiLoopWord, setNewAntiLoopWord] = useState('');
+  const [newAntiLoopCategory, setNewAntiLoopCategory] = useState('gratitude');
+  const [antiLoopSearch, setAntiLoopSearch] = useState('');
 
   // Live Baileys Server Connection State
   const [serverOnline, setServerOnline] = useState(false);
@@ -300,6 +311,79 @@ export default function AdminWhatsAppBot({ initialTab }) {
     chatbotService.saveSettings(updated);
   };
 
+  const handleUpdateSleepMinutes = (val) => {
+    const mins = Math.max(1, Math.min(240, Number(val) || 25));
+    const updated = {
+      ...settings,
+      human_mode_sleep_minutes: mins
+    };
+    setSettings(updated);
+    chatbotService.saveSettings(updated);
+  };
+
+  const handleAddAntiLoopWord = () => {
+    const word = newAntiLoopWord.trim().toLowerCase();
+    if (!word) return;
+
+    const targetKey = newAntiLoopCategory === 'gratitude' 
+      ? 'anti_loop_gratitude' 
+      : newAntiLoopCategory === 'farewell' 
+        ? 'anti_loop_farewell' 
+        : 'anti_loop_acknowledge';
+
+    const currentList = Array.isArray(settings[targetKey]) ? settings[targetKey] : (
+      newAntiLoopCategory === 'gratitude' 
+        ? DEFAULT_ANTI_LOOP_GRATITUDE 
+        : newAntiLoopCategory === 'farewell' 
+          ? DEFAULT_ANTI_LOOP_FAREWELL 
+          : DEFAULT_ANTI_LOOP_ACKNOWLEDGE
+    );
+
+    if (!currentList.includes(word)) {
+      const updated = {
+        ...settings,
+        [targetKey]: [...currentList, word]
+      };
+      setSettings(updated);
+      chatbotService.saveSettings(updated);
+    }
+    setNewAntiLoopWord('');
+  };
+
+  const handleRemoveAntiLoopWord = (category, wordToRemove) => {
+    const targetKey = category === 'gratitude' 
+      ? 'anti_loop_gratitude' 
+      : category === 'farewell' 
+        ? 'anti_loop_farewell' 
+        : 'anti_loop_acknowledge';
+
+    const currentList = Array.isArray(settings[targetKey]) ? settings[targetKey] : (
+      category === 'gratitude' 
+        ? DEFAULT_ANTI_LOOP_GRATITUDE 
+        : category === 'farewell' 
+          ? DEFAULT_ANTI_LOOP_FAREWELL 
+          : DEFAULT_ANTI_LOOP_ACKNOWLEDGE
+    );
+
+    const updated = {
+      ...settings,
+      [targetKey]: currentList.filter(w => w !== wordToRemove)
+    };
+    setSettings(updated);
+    chatbotService.saveSettings(updated);
+  };
+
+  const handleResetAntiLoopWords = () => {
+    const updated = {
+      ...settings,
+      anti_loop_gratitude: DEFAULT_ANTI_LOOP_GRATITUDE,
+      anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,
+      anti_loop_acknowledge: DEFAULT_ANTI_LOOP_ACKNOWLEDGE
+    };
+    setSettings(updated);
+    chatbotService.saveSettings(updated);
+  };
+
   // Acciones en vivo con el servidor Baileys
     // Descarga directa del script local para Windows (.bat)
   const handleDownloadBotScript = () => {
@@ -521,6 +605,22 @@ call npm run dev
   const filteredNodes = ALL_TEMPLATE_NODES.filter(n => {
     if (templateFilterCategory === 'all') return true;
     return n.category === templateFilterCategory;
+  });
+
+  const gratitudeList = settings.anti_loop_gratitude || DEFAULT_ANTI_LOOP_GRATITUDE;
+  const farewellList = settings.anti_loop_farewell || DEFAULT_ANTI_LOOP_FAREWELL;
+  const acknowledgeList = settings.anti_loop_acknowledge || DEFAULT_ANTI_LOOP_ACKNOWLEDGE;
+
+  const allAntiLoopWordsWithCategory = [
+    ...gratitudeList.map(w => ({ word: w, category: 'gratitude', label: 'Agradecimiento' })),
+    ...farewellList.map(w => ({ word: w, category: 'farewell', label: 'Despedida' })),
+    ...acknowledgeList.map(w => ({ word: w, category: 'acknowledge', label: 'Confirmación' }))
+  ];
+
+  const filteredAntiLoopWords = allAntiLoopWordsWithCategory.filter(item => {
+    const matchesCategory = antiLoopCategoryFilter === 'all' || item.category === antiLoopCategoryFilter;
+    const matchesSearch = !antiLoopSearch.trim() || item.word.toLowerCase().includes(antiLoopSearch.trim().toLowerCase());
+    return matchesCategory && matchesSearch;
   });
 
   return (
@@ -995,7 +1095,7 @@ call npm run dev
                     Modo Humano Automático
                   </div>
                   <div style={{ fontSize: '0.74rem', color: '#334155', marginTop: '3px', lineHeight: '1.35' }}>
-                    Si respondes en el celular físico, el bot se duerme 25 min para no entrometerse en la charla.
+                    Si respondes en el celular físico, el bot se duerme {settings.human_mode_sleep_minutes || 25} min para no entrometerse en la charla.
                   </div>
                 </div>
               </div>
@@ -1018,7 +1118,7 @@ call npm run dev
                     Filtro Anti-Bucle de Cortesía
                   </div>
                   <div style={{ fontSize: '0.74rem', color: '#334155', marginTop: '3px', lineHeight: '1.35' }}>
-                    Responde con calidez humana ante "gracias", "joya" o "chau" sin spamear el menú de 5 opciones.
+                    Detecta {allAntiLoopWordsWithCategory.length} palabras de cortesía (gracias, chau, ok) y responde cálido sin enviar menú.
                   </div>
                 </div>
               </div>
@@ -1055,16 +1155,88 @@ call npm run dev
               padding: '0.95rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.65rem',
+              gap: '0.75rem',
               boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <UserCheck size={16} color="#7c3aed" />
                   <span>Chats en Modo Humano Activo ({pausedChats.length})</span>
                 </div>
                 <div style={{ fontSize: '0.74rem', color: '#475569' }}>
-                  Auto-pausa de 25 min al enviar un mensaje desde el WhatsApp físico
+                  Auto-pausa de {settings.human_mode_sleep_minutes || 25} min al enviar un mensaje desde el WhatsApp físico
+                </div>
+              </div>
+
+              {/* CONTROL DE TIEMPO QUE EL BOT SE DUERME */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '0.65rem',
+                padding: '0.65rem 0.85rem',
+                background: '#f8fafc',
+                borderRadius: '6px',
+                border: '1px solid #e2e8f0'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                  <Clock size={16} color="#7c3aed" />
+                  <div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a' }}>
+                      Tiempo que el bot se duerme (Auto-Pausa):
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                      Duración de la pausa temporal cuando el operador responde desde su celular físico
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '3px' }}>
+                    {[5, 10, 15, 25, 45, 60].map(mins => (
+                      <button
+                        key={mins}
+                        type="button"
+                        onClick={() => handleUpdateSleepMinutes(mins)}
+                        style={{
+                          padding: '2px 8px',
+                          borderRadius: '5px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          border: (Number(settings.human_mode_sleep_minutes) || 25) === mins ? '1.5px solid #7c3aed' : '1px solid #cbd5e1',
+                          background: (Number(settings.human_mode_sleep_minutes) || 25) === mins ? 'rgba(124, 58, 237, 0.12)' : '#ffffff',
+                          color: (Number(settings.human_mode_sleep_minutes) || 25) === mins ? '#7c3aed' : '#334155',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {mins}m
+                      </button>
+                    ))}
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <input
+                      type="number"
+                      min="1"
+                      max="240"
+                      value={settings.human_mode_sleep_minutes || 25}
+                      onChange={(e) => handleUpdateSleepMinutes(e.target.value)}
+                      style={{
+                        width: '56px',
+                        height: '26px',
+                        padding: '1px 5px',
+                        borderRadius: '5px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        textAlign: 'center',
+                        color: '#0f172a',
+                        background: '#ffffff'
+                      }}
+                    />
+                    <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>min</span>
+                  </div>
                 </div>
               </div>
 
@@ -1079,7 +1251,7 @@ call npm run dev
                   textAlign: 'center',
                   lineHeight: '1.4'
                 }}>
-                  Ningún chat pausado actualmente. Cuando escribas a un cliente desde el teléfono celular físico de tu local, el bot se pausará automáticamente para ese cliente permitiéndote hablar libremente.
+                  Ningún chat pausado actualmente. Cuando escribas a un cliente desde el teléfono celular físico de tu local, el bot se pausará automáticamente por {settings.human_mode_sleep_minutes || 25} min para ese cliente permitiéndote hablar libremente.
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '160px', overflowY: 'auto' }}>
@@ -1113,6 +1285,274 @@ call npm run dev
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* SECCIÓN CONFIGURACIÓN: FILTRO ANTI-BUCLE DE CORTESÍA */}
+          <div style={{
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: 'var(--radius-md)',
+            padding: '1.1rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1rem',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.6rem' }}>
+              <div>
+                <h4 style={{ fontSize: '1.02rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '7px' }}>
+                  <MessageSquare size={18} color="#d97706" />
+                  <span>Filtro Anti-Bucle de Cortesía & Respuestas Inteligentes</span>
+                  <span style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 800,
+                    background: 'rgba(245, 158, 11, 0.12)',
+                    color: '#d97706',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    padding: '1px 7px',
+                    borderRadius: '999px'
+                  }}>
+                    {allAntiLoopWordsWithCategory.length} palabras configuradas
+                  </span>
+                </h4>
+                <div style={{ fontSize: '0.78rem', color: '#475569', marginTop: '3px' }}>
+                  Evita que el bot vuelva a disparar el menú de compras cuando un cliente simplemente da las gracias, se despide o envía un saludo cordial de cierre.
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="cat-pill-btn"
+                onClick={handleResetAntiLoopWords}
+                style={{ height: '30px', fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+                title="Restablecer el listado de palabras a los valores por defecto del sistema"
+              >
+                <RotateCcw size={12} />
+                <span>Restablecer por defecto</span>
+              </button>
+            </div>
+
+            {/* CATEGORY TABS & SEARCH */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '0.6rem'
+            }}>
+              <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => setAntiLoopCategoryFilter('all')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    border: antiLoopCategoryFilter === 'all' ? '1.5px solid #0f172a' : '1px solid #cbd5e1',
+                    background: antiLoopCategoryFilter === 'all' ? '#0f172a' : '#f8fafc',
+                    color: antiLoopCategoryFilter === 'all' ? '#ffffff' : '#475569'
+                  }}
+                >
+                  Todas ({allAntiLoopWordsWithCategory.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAntiLoopCategoryFilter('gratitude')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    border: antiLoopCategoryFilter === 'gratitude' ? '1.5px solid #059669' : '1px solid #cbd5e1',
+                    background: antiLoopCategoryFilter === 'gratitude' ? '#059669' : '#f8fafc',
+                    color: antiLoopCategoryFilter === 'gratitude' ? '#ffffff' : '#047857'
+                  }}
+                >
+                  💖 Agradecimiento ({gratitudeList.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAntiLoopCategoryFilter('farewell')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    border: antiLoopCategoryFilter === 'farewell' ? '1.5px solid #d97706' : '1px solid #cbd5e1',
+                    background: antiLoopCategoryFilter === 'farewell' ? '#d97706' : '#f8fafc',
+                    color: antiLoopCategoryFilter === 'farewell' ? '#ffffff' : '#b45309'
+                  }}
+                >
+                  👋 Despedidas ({farewellList.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAntiLoopCategoryFilter('acknowledge')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    border: antiLoopCategoryFilter === 'acknowledge' ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                    background: antiLoopCategoryFilter === 'acknowledge' ? '#2563eb' : '#f8fafc',
+                    color: antiLoopCategoryFilter === 'acknowledge' ? '#ffffff' : '#1d4ed8'
+                  }}
+                >
+                  👍 Confirmaciones ({acknowledgeList.length})
+                </button>
+              </div>
+
+              {/* SEARCH INPUT */}
+              <input
+                type="text"
+                className="search-input"
+                placeholder="Buscar palabra..."
+                value={antiLoopSearch}
+                onChange={(e) => setAntiLoopSearch(e.target.value)}
+                style={{ width: '180px', height: '32px', fontSize: '0.78rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1' }}
+              />
+            </div>
+
+            {/* ADD WORD INPUT + CATEGORY SELECTOR */}
+            <div style={{
+              display: 'flex',
+              gap: '0.5rem',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              background: '#f8fafc',
+              padding: '0.75rem',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0'
+            }}>
+              <input
+                type="text"
+                className="search-input"
+                placeholder="Nueva palabra o frase (ej: mil gracias, joya, chau)..."
+                value={newAntiLoopWord}
+                onChange={(e) => setNewAntiLoopWord(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddAntiLoopWord()}
+                style={{ flex: 1, minWidth: '220px', height: '34px', fontSize: '0.82rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1' }}
+              />
+              <select
+                value={newAntiLoopCategory}
+                onChange={(e) => setNewAntiLoopCategory(e.target.value)}
+                style={{
+                  height: '34px',
+                  padding: '0 0.75rem',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  color: '#0f172a',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="gratitude">💖 Agradecimiento / Elogio</option>
+                <option value="farewell">👋 Despedida</option>
+                <option value="acknowledge">👍 Confirmación / Cierre breve</option>
+              </select>
+              <button
+                type="button"
+                className="cat-pill-btn active"
+                style={{ height: '34px', padding: '0 1rem', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+                onClick={handleAddAntiLoopWord}
+              >
+                <Plus size={14} />
+                <span>Agregar Palabra</span>
+              </button>
+            </div>
+
+            {/* WORD TAGS CONTAINER */}
+            <div style={{
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: 'var(--radius-md)',
+              padding: '0.85rem',
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '0.45rem',
+              maxHeight: '220px',
+              overflowY: 'auto',
+              boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.03)'
+            }}>
+              {filteredAntiLoopWords.length === 0 ? (
+                <div style={{ padding: '1rem', color: '#64748b', fontSize: '0.78rem', width: '100%', textAlign: 'center' }}>
+                  No se encontraron palabras para el filtro seleccionado.
+                </div>
+              ) : (
+                filteredAntiLoopWords.map(item => {
+                  const isGrat = item.category === 'gratitude';
+                  const isFare = item.category === 'farewell';
+                  const bg = isGrat ? 'rgba(16, 185, 129, 0.08)' : isFare ? 'rgba(245, 158, 11, 0.08)' : 'rgba(59, 130, 246, 0.08)';
+                  const borderColor = isGrat ? 'rgba(16, 185, 129, 0.35)' : isFare ? 'rgba(245, 158, 11, 0.35)' : 'rgba(59, 130, 246, 0.35)';
+                  const textColor = isGrat ? '#065f46' : isFare ? '#92400e' : '#1e40af';
+                  const badgeIcon = isGrat ? '💖' : isFare ? '👋' : '👍';
+
+                  return (
+                    <span
+                      key={`${item.category}-${item.word}`}
+                      style={{
+                        background: bg,
+                        border: `1px solid ${borderColor}`,
+                        color: textColor,
+                        borderRadius: 'var(--radius-full)',
+                        padding: '4px 10px',
+                        fontSize: '0.76rem',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <span style={{ fontSize: '0.72rem' }}>{badgeIcon}</span>
+                      <span>{item.word}</span>
+                      <Trash2
+                        size={12}
+                        style={{ color: '#ef4444', cursor: 'pointer', marginLeft: '2px' }}
+                        title={`Eliminar "${item.word}"`}
+                        onClick={() => handleRemoveAntiLoopWord(item.category, item.word)}
+                      />
+                    </span>
+                  );
+                })
+              )}
+            </div>
+
+            {/* HELPER NOTICE DE RESPUESTAS CORDIALES */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+              gap: '0.6rem',
+              marginTop: '0.2rem'
+            }}>
+              <div style={{ padding: '0.65rem 0.8rem', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.74rem' }}>
+                <strong style={{ color: '#047857' }}>💖 Si dicen "gracias", "joya", etc.:</strong>
+                <div style={{ color: '#475569', marginTop: '2px', fontStyle: 'italic' }}>
+                  "¡De nada! 🙌 Que lo disfrutes un montón. Si querés consultar la carta, escribí MENU..."
+                </div>
+              </div>
+
+              <div style={{ padding: '0.65rem 0.8rem', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.74rem' }}>
+                <strong style={{ color: '#b45309' }}>👋 Si dicen "chau", "buenas noches", etc.:</strong>
+                <div style={{ color: '#475569', marginTop: '2px', fontStyle: 'italic' }}>
+                  "¡Hasta la próxima! 👋 Gracias por contactarte. ¡Que tengas un excelente descanso!..."
+                </div>
+              </div>
+
+              <div style={{ padding: '0.65rem 0.8rem', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.74rem' }}>
+                <strong style={{ color: '#1d4ed8' }}>👍 Si dicen "ok", "listo", "dale":</strong>
+                <div style={{ color: '#475569', marginTop: '2px', fontStyle: 'italic' }}>
+                  "¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí MENU cuando quieras..."
+                </div>
+              </div>
             </div>
           </div>
 

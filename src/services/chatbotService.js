@@ -3,7 +3,16 @@
 // Motor de atención automática, toma de pedidos y lab de simulación
 // =========================================================
 
-import { DEFAULT_CHATBOT_KEYWORDS, DEFAULT_TEMPLATES, DEFAULT_CUSTOM_FLOWS, DEFAULT_BOT_VARIABLES, formatItemNumber } from './whatsappBotConstants.js';
+import { 
+  DEFAULT_CHATBOT_KEYWORDS, 
+  DEFAULT_TEMPLATES, 
+  DEFAULT_CUSTOM_FLOWS, 
+  DEFAULT_BOT_VARIABLES, 
+  DEFAULT_ANTI_LOOP_GRATITUDE,
+  DEFAULT_ANTI_LOOP_FAREWELL,
+  DEFAULT_ANTI_LOOP_ACKNOWLEDGE,
+  formatItemNumber 
+} from './whatsappBotConstants.js';
 import { storageService } from './storageService';
 import { audioService } from './audioService';
 import { supabaseSync } from './supabaseClient';
@@ -174,7 +183,19 @@ export const chatbotService = {
     try {
       const saved = localStorage.getItem(BOT_SETTINGS_KEY);
       if (saved) {
-        return { ...DEFAULT_TEMPLATES, ...JSON.parse(saved) };
+        const parsed = JSON.parse(saved);
+        return {
+          human_mode_sleep_minutes: 25,
+          anti_loop_gratitude: DEFAULT_ANTI_LOOP_GRATITUDE,
+          anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,
+          anti_loop_acknowledge: DEFAULT_ANTI_LOOP_ACKNOWLEDGE,
+          ...DEFAULT_TEMPLATES,
+          ...parsed,
+          human_mode_sleep_minutes: Number(parsed.human_mode_sleep_minutes) || 25,
+          anti_loop_gratitude: Array.isArray(parsed.anti_loop_gratitude) ? parsed.anti_loop_gratitude : DEFAULT_ANTI_LOOP_GRATITUDE,
+          anti_loop_farewell: Array.isArray(parsed.anti_loop_farewell) ? parsed.anti_loop_farewell : DEFAULT_ANTI_LOOP_FAREWELL,
+          anti_loop_acknowledge: Array.isArray(parsed.anti_loop_acknowledge) ? parsed.anti_loop_acknowledge : DEFAULT_ANTI_LOOP_ACKNOWLEDGE
+        };
       }
     } catch (e) {
       console.error('[chatbotService] Error al leer ajustes:', e);
@@ -193,6 +214,10 @@ export const chatbotService = {
       pickup_address: 'Av. Belgrano 1234, Centro',
       opening_hours: 'Miércoles a Domingos de 19:30 a 00:30 hs',
       store_website_url: window.location.origin,
+      human_mode_sleep_minutes: 25,
+      anti_loop_gratitude: DEFAULT_ANTI_LOOP_GRATITUDE,
+      anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,
+      anti_loop_acknowledge: DEFAULT_ANTI_LOOP_ACKNOWLEDGE,
       ...DEFAULT_TEMPLATES
     };
   },
@@ -877,6 +902,40 @@ export const chatbotService = {
           pendingProduct: null
         };
         reply = '❌ Comanda cancelada. Escribí *MENU* para ver más opciones.';
+        return { reply, newState };
+      }
+    }
+
+    // -------------------------------------------------------------
+    // FILTRO ANTI-BUCLE Y DETECCIÓN DE CORTESÍA / AGRADECIMIENTOS
+    // -------------------------------------------------------------
+    if (newState.step === 'IDLE') {
+      const cleanText = lower.replace(/[!¡?¿.,;:]/g, '').trim();
+      const gratitudeMatches = settings.anti_loop_gratitude || DEFAULT_ANTI_LOOP_GRATITUDE;
+      const farewellMatches = settings.anti_loop_farewell || DEFAULT_ANTI_LOOP_FAREWELL;
+      const acknowledgeMatches = settings.anti_loop_acknowledge || DEFAULT_ANTI_LOOP_ACKNOWLEDGE;
+
+      if (gratitudeMatches.some(g => cleanText === g || cleanText.startsWith(g + ' ') || cleanText.endsWith(' ' + g))) {
+        const gratitudeReplies = [
+          '¡De nada! 🙌 Que lo disfrutes un montón. Si querés consultar la carta o volver a pedir, escribí *MENU* cuando gustes. ¡Buen provecho! 🍔🔥',
+          '¡Un placer enorme atenderte! 😊 Avisanos cualquier cosa que necesites. Escribí *MENU* cuando quieras volver a pedir. ✨',
+          '¡Muchas gracias a vos por tu compra! ❤️ Esperamos que la disfrutes. La cocina queda a tu entera disposición. 🍔'
+        ];
+        reply = gratitudeReplies[Math.floor(Math.random() * gratitudeReplies.length)];
+        return { reply, newState };
+      }
+
+      if (farewellMatches.some(f => cleanText === f || cleanText.startsWith(f + ' ') || cleanText.endsWith(' ' + f))) {
+        const farewellReplies = [
+          '¡Hasta la próxima! 👋 Gracias por contactarte con ComandaFast. ¡Que tengas un excelente descanso! ✨🍔',
+          '¡Nos vemos! Un saludo enorme de todo el equipo de ComandaFast. Escribí *MENU* cuando gustes volver a pedir. 🙌'
+        ];
+        reply = farewellReplies[Math.floor(Math.random() * farewellReplies.length)];
+        return { reply, newState };
+      }
+
+      if (acknowledgeMatches.some(a => cleanText === a)) {
+        reply = '¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido.';
         return { reply, newState };
       }
     }

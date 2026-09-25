@@ -415,7 +415,27 @@ function getBotVariablesMap() {
   return map;
 }
 
+const DEFAULT_ANTI_LOOP_GRATITUDE = [
+  'gracias', 'muchas gracias', 'muchas gracia', 'mil gracias', 'graciass', 'graciela',
+  'joya', 'genial', 'excelente', 'buenisimo', 'buenísimo', 'de diez', 'de 10',
+  'listo gracias', 'dale gracias', 'muchisimas gracias', 'gracias amigo', 'gracias genio',
+  'espectacular', 'muy rico', 'riquismo', 'riquísimo', 'tremendo'
+];
+
+const DEFAULT_ANTI_LOOP_FAREWELL = [
+  'chau', 'chau chau', 'adios', 'adiós', 'hasta luego', 'nos vemos', 'buenas noches',
+  'buen descanso', 'hasta mañana', 'que descansen'
+];
+
+const DEFAULT_ANTI_LOOP_ACKNOWLEDGE = [
+  'ok', 'oki', 'okis', 'dale', 'de una', 'perfecto', 'listo', 'entendido', 'impecable', 'barbaro', 'bárbaro'
+];
+
 const DEFAULT_SERVER_TEMPLATES = {
+  human_mode_sleep_minutes: 25,
+  anti_loop_gratitude: DEFAULT_ANTI_LOOP_GRATITUDE,
+  anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,
+  anti_loop_acknowledge: DEFAULT_ANTI_LOOP_ACKNOWLEDGE,
   template_order_preparing: `👨‍🍳🔥 *¡Buenas noticias {cliente}! Tu pedido #{pedido_id} ya está en la plancha.*
 
 Nuestros cocineros están preparando tus hamburguesas con la carne recién smashada y el cheddar fundido. ¡Te avisamos apenas esté listo! 🍔✨`,
@@ -433,6 +453,27 @@ El repartidor ya salió del local. ¡Mantenete atento para recibir tu comida bie
 💵 *Total:* \${total}
 🛵 *Entrega:* {direccion}`
 };
+
+function getHumanPauseDurationMs() {
+  const tpls = getBotTemplates();
+  const minutes = Number(tpls.human_mode_sleep_minutes) || 25;
+  return Math.max(1, minutes) * 60 * 1000;
+}
+
+function getAntiLoopWords() {
+  const tpls = getBotTemplates();
+  return {
+    gratitude: Array.isArray(tpls.anti_loop_gratitude) && tpls.anti_loop_gratitude.length > 0
+      ? tpls.anti_loop_gratitude
+      : DEFAULT_ANTI_LOOP_GRATITUDE,
+    farewell: Array.isArray(tpls.anti_loop_farewell) && tpls.anti_loop_farewell.length > 0
+      ? tpls.anti_loop_farewell
+      : DEFAULT_ANTI_LOOP_FAREWELL,
+    acknowledge: Array.isArray(tpls.anti_loop_acknowledge) && tpls.anti_loop_acknowledge.length > 0
+      ? tpls.anti_loop_acknowledge
+      : DEFAULT_ANTI_LOOP_ACKNOWLEDGE
+  };
+}
 
 /**
  * Normaliza cualquier formato telefónico a un JID válido de WhatsApp (@s.whatsapp.net)
@@ -721,14 +762,15 @@ function resetCustomerSession(jid) {
 const HUMAN_PAUSE_DURATION_MS = 25 * 60 * 1000; // 25 minutos
 const humanPausedChats = new Map(); // remoteJid -> { pausedUntil, reason, timestamp }
 
-function pauseBotForCustomer(jid, durationMs = HUMAN_PAUSE_DURATION_MS, reason = 'operador_celular') {
-  const pausedUntil = Date.now() + durationMs;
+function pauseBotForCustomer(jid, durationMs = null, reason = 'operador_celular') {
+  const actualDurationMs = durationMs !== null ? durationMs : getHumanPauseDurationMs();
+  const pausedUntil = Date.now() + actualDurationMs;
   humanPausedChats.set(jid, {
     pausedUntil,
     reason,
     timestamp: Date.now()
   });
-  console.log(`👤 [MODO HUMANO]: Operador escribió a ${jid}. Bot pausado automáticamente por ${Math.round(durationMs / 60000)} minutos.`);
+  console.log(`👤 [MODO HUMANO]: Operador escribió a ${jid}. Bot pausado automáticamente por ${Math.round(actualDurationMs / 60000)} minutos.`);
 }
 
 function resumeBotForCustomer(jid) {
@@ -1041,7 +1083,7 @@ class WhatsAppBotServer {
 
           // Si el mensaje fue enviado por el operador/dueño desde el propio teléfono físico
           if (msg.key?.fromMe) {
-            pauseBotForCustomer(remoteJid, HUMAN_PAUSE_DURATION_MS, 'operador_celular');
+            pauseBotForCustomer(remoteJid, null, 'operador_celular');
             continue;
           }
 
@@ -1557,24 +1599,9 @@ class WhatsAppBotServer {
           // -------------------------------------------------------------
           if (session.step === 'IDLE') {
             const cleanText = lower.replace(/[!¡?¿.,;:]/g, '').trim();
+            const { gratitude, farewell, acknowledge } = getAntiLoopWords();
 
-            const gratitudeMatches = [
-              'gracias', 'muchas gracias', 'muchas gracia', 'mil gracias', 'graciass', 'graciela',
-              'joya', 'genial', 'excelente', 'buenisimo', 'buenísimo', 'de diez', 'de 10',
-              'listo gracias', 'dale gracias', 'muchisimas gracias', 'gracias amigo', 'gracias genio',
-              'espectacular', 'muy rico', 'riquismo', 'riquísimo', 'tremendo'
-            ];
-
-            const farewellMatches = [
-              'chau', 'chau chau', 'adios', 'adiós', 'hasta luego', 'nos vemos', 'buenas noches',
-              'buen descanso', 'hasta mañana', 'que descansen'
-            ];
-
-            const acknowledgeMatches = [
-              'ok', 'oki', 'okis', 'dale', 'de una', 'perfecto', 'listo', 'entendido', 'impecable', 'barbaro', 'bárbaro'
-            ];
-
-            if (gratitudeMatches.some(g => cleanText === g || cleanText.startsWith(g + ' ') || cleanText.endsWith(' ' + g))) {
+            if (gratitude.some(g => cleanText === g || cleanText.startsWith(g + ' ') || cleanText.endsWith(' ' + g))) {
               const gratitudeReplies = [
                 '¡De nada! 🙌 Que lo disfrutes un montón. Si querés consultar la carta o volver a pedir, escribí *MENU* cuando gustes. ¡Buen provecho! 🍔🔥',
                 '¡Un placer enorme atenderte! 😊 Avisanos cualquier cosa que necesites. Escribí *MENU* cuando quieras volver a pedir. ✨',
@@ -1585,7 +1612,7 @@ class WhatsAppBotServer {
               continue;
             }
 
-            if (farewellMatches.some(f => cleanText === f || cleanText.startsWith(f + ' ') || cleanText.endsWith(' ' + f))) {
+            if (farewell.some(f => cleanText === f || cleanText.startsWith(f + ' ') || cleanText.endsWith(' ' + f))) {
               const farewellReplies = [
                 '¡Hasta la próxima! 👋 Gracias por contactarte con ComandaFast. ¡Que tengas un excelente descanso! ✨🍔',
                 '¡Nos vemos! Un saludo enorme de todo el equipo de ComandaFast. Escribí *MENU* cuando gustes volver a pedir. 🙌'
@@ -1595,7 +1622,7 @@ class WhatsAppBotServer {
               continue;
             }
 
-            if (acknowledgeMatches.some(a => cleanText === a)) {
+            if (acknowledge.some(a => cleanText === a)) {
               await this.safeSendMessage(remoteJid, { 
                 text: '¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido.' 
               }, msg.key);
@@ -1744,7 +1771,9 @@ app.post('/api/human-mode/resume', (req, res) => {
 app.post('/api/human-mode/pause', (req, res) => {
   const { jid, minutes } = req.body;
   if (!jid) return res.status(400).json({ error: 'jid requerido' });
-  const durationMs = (Number(minutes) || 25) * 60 * 1000;
+  const configuredMinutes = Number(getBotTemplates().human_mode_sleep_minutes) || 25;
+  const pauseMinutes = Number(minutes) || configuredMinutes;
+  const durationMs = pauseMinutes * 60 * 1000;
   const normalizedJid = jid.includes('@') ? jid : `${jid.replace(/\D/g, '')}@s.whatsapp.net`;
   pauseBotForCustomer(normalizedJid, durationMs, 'panel_administrador');
   res.json({ success: true, jid: normalizedJid, minutes: Math.round(durationMs / 60000) });
