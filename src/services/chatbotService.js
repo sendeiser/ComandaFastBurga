@@ -186,11 +186,13 @@ export const chatbotService = {
         const parsed = JSON.parse(saved);
         return {
           human_mode_sleep_minutes: 25,
+          anti_loop_enabled: true,
           anti_loop_gratitude: DEFAULT_ANTI_LOOP_GRATITUDE,
           anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,
           anti_loop_acknowledge: DEFAULT_ANTI_LOOP_ACKNOWLEDGE,
           ...DEFAULT_TEMPLATES,
           ...parsed,
+          anti_loop_enabled: parsed.anti_loop_enabled !== undefined ? Boolean(parsed.anti_loop_enabled) : true,
           human_mode_sleep_minutes: Number(parsed.human_mode_sleep_minutes) || 25,
           anti_loop_gratitude: Array.isArray(parsed.anti_loop_gratitude) ? parsed.anti_loop_gratitude : DEFAULT_ANTI_LOOP_GRATITUDE,
           anti_loop_farewell: Array.isArray(parsed.anti_loop_farewell) ? parsed.anti_loop_farewell : DEFAULT_ANTI_LOOP_FAREWELL,
@@ -214,6 +216,7 @@ export const chatbotService = {
       pickup_address: 'Av. Belgrano 1234, Centro',
       opening_hours: 'Miércoles a Domingos de 19:30 a 00:30 hs',
       store_website_url: window.location.origin,
+      anti_loop_enabled: true,
       human_mode_sleep_minutes: 25,
       anti_loop_gratitude: DEFAULT_ANTI_LOOP_GRATITUDE,
       anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,
@@ -901,7 +904,7 @@ export const chatbotService = {
     // -------------------------------------------------------------
     // FILTRO ANTI-BUCLE Y DETECCIÓN DE CORTESÍA / AGRADECIMIENTOS
     // -------------------------------------------------------------
-    if (newState.step === 'IDLE') {
+    if (newState.step === 'IDLE' && settings.anti_loop_enabled !== false) {
       const cleanText = lower.replace(/[!¡?¿.,;:]/g, '').trim();
       const gratitudeMatches = settings.anti_loop_gratitude || DEFAULT_ANTI_LOOP_GRATITUDE;
       const farewellMatches = settings.anti_loop_farewell || DEFAULT_ANTI_LOOP_FAREWELL;

@@ -34,6 +34,7 @@ export const DEFAULT_ANTI_LOOP_RESPONSES = {
 
 export const DEFAULT_TEMPLATES = {
   // Parámetros de Blindaje & Modo Humano
+  anti_loop_enabled: true,
   human_mode_sleep_minutes: 25,
   anti_loop_gratitude: DEFAULT_ANTI_LOOP_GRATITUDE,
   anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,

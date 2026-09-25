@@ -478,9 +478,29 @@ export default function AdminWhatsAppBot({ initialTab }) {
     setTimeout(() => setAntiLoopSaveMsg(''), 3000);
   };
 
+  const isAntiLoopActive = settings.anti_loop_enabled !== false;
+
+  const handleToggleAntiLoopEnabled = async () => {
+    const nextState = !isAntiLoopActive;
+    const updated = {
+      ...settings,
+      anti_loop_enabled: nextState
+    };
+    setSettings(updated);
+    setSavingAntiLoop(true);
+    await chatbotService.saveSettings(updated);
+    setSavingAntiLoop(false);
+    setAntiLoopSaveMsg(nextState 
+      ? '✅ Filtro Anti-Bucle y Respuestas activados (Guardado en BD)' 
+      : '⚠️ Filtro Anti-Bucle y Respuestas desactivados (Guardado en BD)'
+    );
+    setTimeout(() => setAntiLoopSaveMsg(''), 3500);
+  };
+
   const handleResetAntiLoopWords = async () => {
     const updated = {
       ...settings,
+      anti_loop_enabled: true,
       anti_loop_gratitude: DEFAULT_ANTI_LOOP_GRATITUDE,
       anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,
       anti_loop_acknowledge: DEFAULT_ANTI_LOOP_ACKNOWLEDGE,
@@ -1468,6 +1488,20 @@ call npm run dev
                   <MessageSquare size={18} color="#d97706" />
                   <span>Filtro Anti-Bucle de Cortesía & Respuestas Inteligentes</span>
                   <span style={{
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    background: isAntiLoopActive ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                    color: isAntiLoopActive ? '#047857' : '#b91c1c',
+                    border: `1px solid ${isAntiLoopActive ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    {isAntiLoopActive ? '● ACTIVO' : '○ DESACTIVADO'}
+                  </span>
+                  <span style={{
                     fontSize: '0.7rem',
                     fontWeight: 800,
                     background: 'rgba(245, 158, 11, 0.12)',
@@ -1494,21 +1528,70 @@ call npm run dev
                   </span>
                 </h4>
                 <div style={{ fontSize: '0.78rem', color: '#475569', marginTop: '3px' }}>
-                  Evita que el bot vuelva a disparar el menú de compras cuando un cliente simplemente da las gracias, se despide o envía un saludo cordial de cierre.
+                  {isAntiLoopActive
+                    ? 'Evita que el bot vuelva a disparar el menú de compras cuando un cliente simplemente da las gracias, se despide o envía un saludo cordial de cierre.'
+                    : '⚠️ El filtro se encuentra desactivado. El bot responderá con su menú habitual sin interceptar despedidas ni agradecimientos.'}
                 </div>
               </div>
 
-              <button
-                type="button"
-                className="cat-pill-btn"
-                onClick={handleResetAntiLoopWords}
-                style={{ height: '30px', fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '5px' }}
-                title="Restablecer el listado de palabras a los valores por defecto del sistema"
-              >
-                <RotateCcw size={12} />
-                <span>Restablecer por defecto</span>
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={handleToggleAntiLoopEnabled}
+                  disabled={savingAntiLoop}
+                  style={{
+                    height: '32px',
+                    padding: '0 12px',
+                    borderRadius: '8px',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '7px',
+                    border: isAntiLoopActive ? '1.5px solid #10b981' : '1.5px solid #cbd5e1',
+                    background: isAntiLoopActive ? 'rgba(16, 185, 129, 0.08)' : '#f1f5f9',
+                    color: isAntiLoopActive ? '#047857' : '#64748b',
+                    transition: 'all 0.2s ease'
+                  }}
+                  title={isAntiLoopActive ? 'Click para desactivar el filtro anti-bucle' : 'Click para activar el filtro anti-bucle'}
+                >
+                  <Power size={14} color={isAntiLoopActive ? '#10b981' : '#94a3b8'} />
+                  <span>{isAntiLoopActive ? 'Desactivar Filtro' : 'Activar Filtro'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="cat-pill-btn"
+                  onClick={handleResetAntiLoopWords}
+                  style={{ height: '32px', fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+                  title="Restablecer el listado de palabras a los valores por defecto del sistema"
+                >
+                  <RotateCcw size={12} />
+                  <span>Restablecer por defecto</span>
+                </button>
+              </div>
             </div>
+
+            {!isAntiLoopActive && (
+              <div style={{
+                background: '#fffbeb',
+                border: '1px solid #fef3c7',
+                borderLeft: '4px solid #f59e0b',
+                borderRadius: '8px',
+                padding: '9px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                fontSize: '0.8rem',
+                color: '#92400e'
+              }}>
+                <AlertCircle size={16} color="#d97706" style={{ flexShrink: 0 }} />
+                <div>
+                  <strong>Filtro en pausa:</strong> El bot no interceptará los agradecimientos ni saludos de cortesía con respuestas automáticas. Podés volver a activarlo en cualquier momento con el botón superior.
+                </div>
+              </div>
+            )}
 
             {/* CATEGORY TABS & SEARCH */}
             <div style={{

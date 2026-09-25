@@ -444,6 +444,7 @@ const DEFAULT_ANTI_LOOP_ACKNOWLEDGE = [
 ];
 
 const DEFAULT_SERVER_TEMPLATES = {
+  anti_loop_enabled: true,
   human_mode_sleep_minutes: 25,
   anti_loop_gratitude: DEFAULT_ANTI_LOOP_GRATITUDE,
   anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,
@@ -1630,10 +1631,12 @@ class WhatsAppBotServer {
           // FILTRO ANTI-BUCLE Y DETECCIÓN DE CORTESÍA / AGRADECIMIENTOS
           // (Evita spamear el menú completo a clientes que solo dan las gracias o se despiden)
           // -------------------------------------------------------------
-          if (session.step === 'IDLE') {
+          const tpls = getBotTemplates();
+          const isAntiLoopEnabled = tpls.anti_loop_enabled !== false;
+
+          if (session.step === 'IDLE' && isAntiLoopEnabled) {
             const cleanText = lower.replace(/[!¡?¿.,;:]/g, '').trim();
             const { gratitude, farewell, acknowledge } = getAntiLoopWords();
-            const tpls = getBotTemplates();
 
             if (gratitude.some(g => cleanText === g || cleanText.startsWith(g + ' ') || cleanText.endsWith(' ' + g))) {
               const customReply = tpls.template_anti_loop_gratitude;
