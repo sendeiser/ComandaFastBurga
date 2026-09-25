@@ -30,10 +30,9 @@ pnpm-debug.log*
 *.njsproj
 *.sln
 *.sw?
- 
+
 # WhatsApp Bot Baileys Auth session
 data/baileys_auth/
-
 data/ai_config.json
 
 # Tool / Editor skill mirrors
@@ -41,3 +40,7 @@ data/ai_config.json
 .trae/
 .windsurf/
 skills/
+
+# Bot Portatil & Zip
+ComandaFast-Bot-Portatil/
+ComandaFast-Bot-Portatil.zip
