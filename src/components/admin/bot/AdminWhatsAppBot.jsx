@@ -1739,7 +1739,7 @@ call npm run dev
                     <span>Respuestas Inteligentes de Cortesía (Editables)</span>
                   </div>
                   <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
-                    Mensajes automáticos que el bot responde cuando un cliente usa las palabras clave configuradas. Se guardan en la Base de Datos y se sincronizan con el bot en vivo.
+                    Mensajes automáticos que el bot responde cuando un cliente usa las palabras clave configuradas. Se guardan en la Base de Datos y el bot las carga al encenderse.
                   </div>
                 </div>
 

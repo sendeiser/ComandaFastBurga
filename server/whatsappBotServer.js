@@ -776,6 +776,7 @@ function resetCustomerSession(jid) {
 // Duración de pausa automática cuando el operador escribe desde el teléfono físico
 const HUMAN_PAUSE_DURATION_MS = 25 * 60 * 1000; // 25 minutos
 const humanPausedChats = new Map(); // remoteJid -> { pausedUntil, reason, timestamp }
+const botSentMessageIds = new Set(); // IDs de mensajes despachados por el propio bot (para no auto-pausarse)
 
 function pauseBotForCustomer(jid, durationMs = null, reason = 'operador_celular') {
   const actualDurationMs = durationMs !== null ? durationMs : getHumanPauseDurationMs();
@@ -875,11 +876,21 @@ class WhatsAppBotServer {
       } catch (_) {}
 
       // 5. Envío efectivo del mensaje
-      return await this.sock.sendMessage(remoteJid, content);
+      const sentMsg = await this.sock.sendMessage(remoteJid, content);
+      if (sentMsg?.key?.id) {
+        botSentMessageIds.add(sentMsg.key.id);
+        setTimeout(() => botSentMessageIds.delete(sentMsg.key.id), 120000);
+      }
+      return sentMsg;
     } catch (err) {
       console.error(`[WHATSAPP BOT] safeSendMessage error enviando a ${remoteJid}:`, err?.message || err);
       try {
-        return await this.sock.sendMessage(remoteJid, content);
+        const fallbackSent = await this.sock.sendMessage(remoteJid, content);
+        if (fallbackSent?.key?.id) {
+          botSentMessageIds.add(fallbackSent.key.id);
+          setTimeout(() => botSentMessageIds.delete(fallbackSent.key.id), 120000);
+        }
+        return fallbackSent;
       } catch (fallbackErr) {
         console.error(`[WHATSAPP BOT] Fallback sendMessage falló:`, fallbackErr?.message || fallbackErr);
         return null;
@@ -1101,6 +1112,10 @@ class WhatsAppBotServer {
 
           // Si el mensaje fue enviado por el operador/dueño desde el propio teléfono físico
           if (msg.key?.fromMe) {
+            if (msg.key?.id && botSentMessageIds.has(msg.key.id)) {
+              // Eco del propio bot: ignorar silenciosamente sin pausar la atención
+              continue;
+            }
             pauseBotForCustomer(remoteJid, null, 'operador_celular');
             continue;
           }
@@ -1778,11 +1793,11 @@ async function publishBotStatusToSupabase() {
   } catch (_) {}
 }
 
-// Latido continuo hacia Supabase Cloud cada 4 segundos
-setInterval(publishBotStatusToSupabase, 4000);
-setTimeout(publishBotStatusToSupabase, 1000);
+// Latido suave hacia Supabase Cloud cada 60 segundos (y al cambiar de estado)
+setInterval(publishBotStatusToSupabase, 60000);
+setTimeout(publishBotStatusToSupabase, 1500);
 
-// Polling de comandos remotos desde la nube (start, logout, resume_chat) cada 3.5 segundos
+// Polling suave de comandos remotos desde la nube (start, logout, resume_chat) cada 25 segundos
 async function checkRemoteCommands() {
   try {
     const cmd = await fetchBotConfigFromSupabase('server_commands');
@@ -1810,7 +1825,7 @@ async function checkRemoteCommands() {
     }
   } catch (_) {}
 }
-setInterval(checkRemoteCommands, 3500);
+setInterval(checkRemoteCommands, 25000);
 
 // Señal de apagado limpio
 process.on('SIGINT', async () => {

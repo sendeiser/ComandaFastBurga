@@ -222,21 +222,13 @@ export const chatbotService = {
     };
   },
 
-  // 2. Guardar ajustes del bot (Local + Supabase Cloud + Servidor Local)
+  // 2. Guardar ajustes del bot (Local + Supabase Cloud)
   async saveSettings(newSettings) {
     try {
       localStorage.setItem(BOT_SETTINGS_KEY, JSON.stringify(newSettings));
       if (supabaseSync.isConfigured()) {
         await supabaseSync.saveBotTemplates(newSettings);
       }
-      try {
-        const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
-        fetch(`http://${botHost}:3002/api/bot-templates`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ templates: newSettings })
-        }).catch(() => {});
-      } catch (_) {}
       return true;
     } catch (e) {
       console.error('[chatbotService] Error al guardar ajustes:', e);
