@@ -63,16 +63,20 @@ dataFiles.forEach(df => {
 
 // 4. Copiar Node.js ejecutable embebido
 console.log('[4/7] Incorporando Node.js Portable (node.exe embebido)...');
-let nodeCopied = false;
+let nodeCopied = fs.existsSync(path.join(OUTPUT_DIR, 'node.exe'));
 
-// Intentar copiar desde process.execPath actual
-if (fs.existsSync(process.execPath) && process.execPath.toLowerCase().endsWith('node.exe')) {
-  try {
-    fs.copyFileSync(process.execPath, path.join(OUTPUT_DIR, 'node.exe'));
-    console.log(`  -> [OK] node.exe embebido copiado desde: ${process.execPath}`);
-    nodeCopied = true;
-  } catch (err) {
-    console.warn('  -> No se pudo copiar directo de execPath, probando rutas alternativas:', err.message);
+if (nodeCopied) {
+  console.log('  -> [OK] node.exe embebido ya presente en la carpeta portable.');
+} else {
+  // Intentar copiar desde process.execPath actual
+  if (fs.existsSync(process.execPath) && process.execPath.toLowerCase().endsWith('node.exe')) {
+    try {
+      fs.copyFileSync(process.execPath, path.join(OUTPUT_DIR, 'node.exe'));
+      console.log(`  -> [OK] node.exe embebido copiado desde: ${process.execPath}`);
+      nodeCopied = true;
+    } catch (err) {
+      console.warn('  -> No se pudo copiar directo de execPath, probando rutas alternativas:', err.message);
+    }
   }
 }
 
@@ -320,16 +324,36 @@ Windows sin necesidad de instalar nada previo.
 
 fs.writeFileSync(path.join(OUTPUT_DIR, 'LEEME_INSTRUCCIONES.txt'), leemeContent, 'utf-8');
 
-// 7. Comprimir en archivo ZIP listo para distribución
+// 7. Comprimir en archivo ZIP listo para distribución (sin incluir sesión activa de WhatsApp)
 console.log('[7/7] Comprimiendo paquete en archivo ZIP listo para pendrive o WhatsApp...');
+const STAGING_DIR = path.join(ROOT_DIR, '.portable_staging');
 try {
-  execSync(`powershell -NoProfile -Command "Compress-Archive -Path '${OUTPUT_DIR}\\*' -DestinationPath '${ZIP_FILE}' -Force"`, {
+  if (fs.existsSync(STAGING_DIR)) {
+    fs.rmSync(STAGING_DIR, { recursive: true, force: true });
+  }
+  fs.mkdirSync(STAGING_DIR, { recursive: true });
+
+  fs.cpSync(OUTPUT_DIR, STAGING_DIR, {
+    recursive: true,
+    filter: (source) => {
+      const rel = path.relative(OUTPUT_DIR, source);
+      if (rel.startsWith('data\\baileys_auth') || rel.startsWith('data/baileys_auth')) return false;
+      return true;
+    }
+  });
+
+  execSync(`powershell -NoProfile -Command "Compress-Archive -Path '${STAGING_DIR}\\*' -DestinationPath '${ZIP_FILE}' -Force"`, {
     stdio: 'inherit'
   });
+  fs.rmSync(STAGING_DIR, { recursive: true, force: true });
+
   const zipStat = fs.statSync(ZIP_FILE);
   const zipMb = (zipStat.size / (1024 * 1024)).toFixed(2);
   console.log(`\n  -> [OK] Archivo ZIP generado: ${ZIP_FILE} (${zipMb} MB)`);
 } catch (err) {
+  if (fs.existsSync(STAGING_DIR)) {
+    try { fs.rmSync(STAGING_DIR, { recursive: true, force: true }); } catch (_) {}
+  }
   console.warn('  -> [AVISO] No se pudo comprimir automáticamente el ZIP:', err.message);
 }
 

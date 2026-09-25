@@ -2326,7 +2326,12 @@ app.get('/api/ai/config', (req, res) => {
 
 app.post('/api/ai/config', (req, res) => {
   const { enabled, mode, groqApiKey, geminiApiKey, deepseekApiKey, apiKey, model, groqModel, deepseekModel, systemPrompt } = req.body;
-  const updated = geminiBotService.saveConfig({ enabled, mode, groqApiKey, geminiApiKey, deepseekApiKey, apiKey, model, groqModel, deepseekModel, systemPrompt });
+  const rawUpdates = { enabled, mode, groqApiKey, geminiApiKey, deepseekApiKey, apiKey, model, groqModel, deepseekModel, systemPrompt };
+  const cleanUpdates = {};
+  for (const [k, v] of Object.entries(rawUpdates)) {
+    if (v !== undefined) cleanUpdates[k] = v;
+  }
+  const updated = geminiBotService.saveConfig(cleanUpdates);
   pushBotConfigToSupabase('ai_config', updated).catch(() => {});
   res.json({ success: true, config: updated });
 });

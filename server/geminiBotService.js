@@ -49,6 +49,8 @@ export class GeminiBotService {
   }
 
   saveConfig(newConfig) {
+    if (!newConfig) return this.getConfigSafe();
+
     // Si viene 'apiKey' genérica, mapear según prefijo
     if (newConfig.apiKey) {
       if (newConfig.apiKey.startsWith('gsk_') && !newConfig.groqApiKey) {
@@ -60,7 +62,15 @@ export class GeminiBotService {
       }
     }
 
-    this.config = { ...this.config, ...newConfig };
+    // Filtrar valores indefinidos para no pisar claves existentes
+    const cleanUpdates = {};
+    for (const [key, value] of Object.entries(newConfig)) {
+      if (value !== undefined) {
+        cleanUpdates[key] = value;
+      }
+    }
+
+    this.config = { ...this.config, ...cleanUpdates };
     try {
       fs.writeFileSync(AI_CONFIG_FILE, JSON.stringify(this.config, null, 2), 'utf-8');
     } catch (err) {
@@ -99,29 +109,46 @@ export class GeminiBotService {
   // --- LLAMADAS A APIS EXTERNAS ---
 
   async callGroq(apiKey, model, systemPrompt, userMessage) {
-    const targetModel = (model && model.includes('llama')) ? model : 'llama-3.3-70b-versatile';
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: targetModel,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage }
-        ],
-        temperature: 0.6,
-        max_tokens: 350
-      })
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Groq API error (${res.status}): ${err}`);
+    const candidateModels = [
+      model,
+      'qwen/qwen3.8-27b',
+      'llama-3.3-70b-versatile',
+      'openai/gpt-oss-120b',
+      'allam-2-7b'
+    ].filter(Boolean);
+
+    let lastErr = null;
+    for (const m of candidateModels) {
+      try {
+        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: m,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userMessage }
+            ],
+            temperature: 0.6,
+            max_tokens: 350
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const reply = data.choices?.[0]?.message?.content?.trim();
+          if (reply) return reply;
+        } else {
+          const errText = await res.text();
+          lastErr = new Error(`Groq (${m}): ${errText}`);
+        }
+      } catch (err) {
+        lastErr = err;
+      }
     }
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content?.trim();
+    throw lastErr || new Error('Groq no pudo procesar la solicitud.');
   }
 
   async callDeepSeek(apiKey, model, systemPrompt, userMessage) {
@@ -150,7 +177,12 @@ export class GeminiBotService {
   }
 
   async callGemini(apiKey, model, systemPrompt, userMessage) {
-    const modelsToTry = [model || 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash'];
+    const modelsToTry = [
+      model,
+      'gemini-3.6-flash',
+      'gemini-3.8-flash',
+      'gemini-3.5-flash'
+    ].filter(Boolean);
     const fullPrompt = `${systemPrompt}\n\nCliente: ${userMessage}`;
     for (const m of modelsToTry) {
       try {
@@ -176,9 +208,9 @@ export class GeminiBotService {
 
     if (key.startsWith('gsk_')) {
       try {
-        const reply = await this.callGroq(key, 'llama-3.3-70b-versatile', 'Sos un test.', 'Hola, respondé en una palabra: "Conectado"');
+        const reply = await this.callGroq(key, this.config.groqModel || 'qwen/qwen3.8-27b', 'Sos un test.', 'Hola, respondé en una palabra: "Conectado"');
         const ms = Date.now() - t0;
-        return { success: true, text: reply || 'Conectado', modelUsed: `Groq (Llama-3.3 70B - ${ms}ms)` };
+        return { success: true, text: reply || 'Conectado', modelUsed: `Groq (Ultrarrápido - ${ms}ms)` };
       } catch (err) {
         return { success: false, error: `Groq error: ${err.message}` };
       }
@@ -225,7 +257,7 @@ export class GeminiBotService {
     if (groqKey) {
       const t0 = Date.now();
       try {
-        await this.callGroq(groqKey, 'llama-3.3-70b-versatile', 'test', 'Hola');
+        await this.callGroq(groqKey, this.config.groqModel || 'qwen/qwen3.8-27b', 'test', 'Hola');
         summary.push(`⚡ Groq: ✅ ${Date.now() - t0}ms`);
         anyOk = true;
       } catch (e) {
