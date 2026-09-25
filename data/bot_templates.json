@@ -5,7 +5,7 @@
   "bank_alias": "burga.chamical.nx",
   "bank_holder": "ComandaFast Burgers S.R.L.",
   "opening_hours": "Miércoles a Domingos de 19:30 a 00:30 hs",
-  "template_menu": "¡Hola! Bienvenido a Burga's Chamical. ¿En qué podemos ayudarte hoy?",
+  "template_menu": "🍔 *¡Hola {cliente}! Bienvenido a {nombre_local}* 🔥\n\n¿En qué podemos ayudarte hoy? *Respondé con el número de opción:*\n\n1️⃣ 📋 *Consultar estado de mi pedido*\n2️⃣ 💳 *Ver datos de transferencia bancaria / Alias*\n3️⃣ 📍 *Horarios y ubicación de nuestro local*\n4️⃣ 🍔 *Ver menú completo de hamburguesas y combos*\n5️⃣ 👤 *Hablar con un encargado del local*\n\n_O escribí directamente *COMPRAR* o el número de la burger que quieras pedir._",
   "pickup_address": "Av. Belgrano 1234, Centro",
   "ignored_numbers": [],
   "menu_response_1": "📋 *Estado de tu Pedido:* #{pedido_id}\n\n• *Estado:* {estado}\n• *Total:* ${total}\n• *Destino:* {direccion}\n\n_Para volver al menú, enviá la palabra *MENU*._",

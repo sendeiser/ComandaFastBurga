@@ -617,6 +617,15 @@ const DEFAULT_SERVER_TEMPLATES = {
   template_anti_loop_gratitude: '¡De nada! 🙌 Que lo disfrutes un montón. Si querés consultar la carta o volver a pedir, escribí *MENU* cuando gustes. ¡Buen provecho! 🍔🔥',
   template_anti_loop_farewell: '¡Hasta la próxima! 👋 Gracias por contactarte con {nombre_local}. ¡Que tengas un excelente descanso! ✨🍔',
   template_anti_loop_acknowledge: '¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido.',
+  template_menu: `🍔 *¡Hola {cliente}! Bienvenido a {nombre_local}* 🔥\n\n¿En qué podemos ayudarte hoy? *Respondé con el número de opción:*\n\n1️⃣ 📋 *Consultar estado de mi pedido*\n2️⃣ 💳 *Ver datos de transferencia bancaria / Alias*\n3️⃣ 📍 *Horarios y ubicación de nuestro local*\n4️⃣ 🍔 *Ver menú completo de hamburguesas y combos*\n5️⃣ 👤 *Hablar con un encargado del local*\n\n_O escribí directamente *COMPRAR* o el número de la burger que quieras pedir._`,
+  menu_response_1: `📋 *Estado de tu Pedido:* #{pedido_id}\n\n• *Estado:* {estado}\n• *Total:* \${total}\n• *Destino:* {direccion}\n\n_Para volver al menú, enviá la palabra *MENU*._`,
+  menu_response_2: `💳 *Datos para Transferencia Bancaria:* 🏦\n\n• *Alias:* \`{alias_banco}\`\n• *Banco:* {banco}\n• *Titular:* {titular}\n• *CBU:* \`{cbu}\`\n\n📸 *Una vez realizada la transferencia, podés enviar la captura o foto del comprobante por este mismo chat para comenzar a cocinar.*\n\n_Enviá *MENU* para volver al menú principal._`,
+  menu_response_3: `📍 *Ubicación y Horarios de Atención:* 🕒\n\n🍔 *Dirección:* {direccion}\n⏰ *Horarios de Cocina:* {horarios}\n\n¡Te esperamos con las mejores burgers a la plancha! 🔥\n\n_Enviá *MENU* para volver al menú principal._`,
+  menu_response_4: `🍔 *Menú & Precios de {nombre_local}* 🔥\n\n{catalogo_lista}\n\n👉 *Respondé con el NÚMERO (1, 2, 3...) de la burger para pedir o escribí COMPRAR.*\n🌐 *Menú digital:* {catalogo_url}`,
+  menu_response_5: `👤 *¡Entendido {cliente}! Un encargado de {nombre_local} te responderá a la brevedad.* 🍔\n\nPor favor dejanos tu consulta detallada para que podamos ayudarte lo antes posible. ¡Muchas gracias!`,
+  template_buy_catalog: `🍔 *¡Vamos a armar tu pedido!* 🔥\n\n{catalogo_lista}\n\n👉 *Respondé con el NÚMERO (1, 2, 3...) de la hamburguesa o combo que quieras pedir.*`,
+  template_order_summary: `🍔 *RESUMEN DE TU PEDIDO* 🔥\n\n🛒 *Items:*\n{carrito_items}\n\n💵 *Subtotal:* \${subtotal}\n🛵 *Entrega:* {metodo_entrega}\n📍 *Dirección:* {direccion}\n👤 *Cliente:* {cliente}\n💳 *Forma de Pago:* {medio_pago}\n\n💵 *TOTAL A PAGAR:* \${total}\n\n¿Está todo perfecto para mandar a la cocina?\n👉 Respondé *SI* para confirmar tu pedido o *CANCELAR*.`,
+  template_order_cancelled: `❌ *Pedido cancelado.* ¿En qué más podemos ayudarte?\n\n{menu}`,
   template_order_preparing: `👨‍🍳🔥 *¡Buenas noticias {cliente}! Tu pedido #{pedido_id} ya está en la plancha.*
 
 Nuestros cocineros están preparando tus hamburguesas con la carne recién smashada y el cheddar fundido. ¡Te avisamos apenas esté listo! 🍔✨`,
@@ -795,6 +804,26 @@ function buildCatalogMessage(prods, page = 1, pageSize = 8, isAll = false) {
   }
 
   return `🍔 *MENÚ ${storeName.toUpperCase()}* 🔥\n📄 *Página ${currentPage} de ${totalPages}* (Opciones ${startIdx + 1} al ${startIdx + pageProds.length} de ${total})\n\n${list}\n\n───────────────────\n👉 *Para pedir:* Respondé con el NÚMERO (1 al ${total}).\n👉 *Para ver foto:* Escribí *FOTO [número]* (ej: *FOTO ${startIdx + 1}*).\n${navInstructions}👉 Escribí *VER TODO* para ver la lista completa.`;
+}
+
+function buildMainMenuMessage(customerName = '') {
+  const tpls = getBotTemplates();
+  const biz = getBusinessContext();
+  const storeName = biz.nombre_local || "Burga's Chamical";
+  const clientName = customerName ? customerName.trim() : 'amigo/a';
+
+  let rawMenu = tpls.template_menu || DEFAULT_SERVER_TEMPLATES.template_menu;
+
+  // Si la plantilla guardada está vacía, recortada o no contiene opciones numéricas básicas, asegurar la estructura completa
+  if (!rawMenu || !rawMenu.includes('1️⃣') || !rawMenu.includes('5️⃣')) {
+    rawMenu = DEFAULT_SERVER_TEMPLATES.template_menu;
+  }
+
+  return interpolateTemplate(rawMenu, {
+    cliente: clientName,
+    nombre_local: storeName,
+    ...biz
+  });
 }
 
 if (!fs.existsSync(DATA_DIR)) {
@@ -1639,19 +1668,21 @@ class WhatsAppBotServer {
                 remoteJid: remoteJid,
                 channel: 'whatsapp',
                 deliveryType: session.shippingMethod, // 'local' o 'delivery'
+                deliveryFee: Number(session.deliveryFee) || 0,
+                subtotal: Number(session.subtotal || session.total) || 0,
+                total: Number(session.total) || 0,
                 paymentMethod: session.paymentMethod, // 'efectivo' o 'transferencia'
                 paymentStatus: session.paymentMethod === 'transferencia' ? 'pendiente_comprobante' : 'pendiente_efectivo',
                 paymentConfirmed: false,
                 items: session.items.map(it => ({
                   id: it.id,
                   name: it.name,
-                  price: it.price,
-                  qty: it.qty || it.quantity || 1,
-                  quantity: it.qty || it.quantity || 1,
+                  price: Number(it.price),
+                  qty: Number(it.qty || it.quantity || 1),
+                  quantity: Number(it.qty || it.quantity || 1),
                   modifiers: it.modifiers || [],
                   notes: it.notes || ''
                 })),
-                total: session.total,
                 status: 'pendiente',
                 createdAt: new Date().toISOString(),
                 source: 'whatsapp_bot'
@@ -1676,9 +1707,14 @@ class WhatsAppBotServer {
               resetCustomerSession(remoteJid);
               await this.safeSendMessage(remoteJid, { text: confirmMsg }, msg.key);
               continue;
-            } else {
+            } else if (lower === 'cancelar' || lower === 'no' || lower === 'cancel') {
               resetCustomerSession(remoteJid);
-              await this.safeSendMessage(remoteJid, { text: '❌ *Pedido cancelado.* Escribí *MENU* para ver más opciones.' }, msg.key);
+              await this.safeSendMessage(remoteJid, { text: '❌ *Pedido cancelado.* Escribí *MENU* para ver más opciones o iniciar un nuevo pedido.' }, msg.key);
+              continue;
+            } else {
+              await this.safeSendMessage(remoteJid, {
+                text: '⚠️ ¿Deseas confirmar tu pedido? Respondé *SI* para mandarlo a la cocina o *CANCELAR* si querés anularlo.'
+              }, msg.key);
               continue;
             }
           }
@@ -1698,9 +1734,11 @@ class WhatsAppBotServer {
 
             session.step = 'CONFIRMING';
             const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
-            const shippingLabel = session.shippingMethod === 'delivery' ? '🛵 Envío a Domicilio' : '🛍️ Retiro por el Local (Mostrador)';
+            const shippingLabel = session.shippingMethod === 'delivery' 
+              ? (session.deliveryFee > 0 ? `🛵 Envío a Domicilio (+$${session.deliveryFee.toLocaleString('es-AR')})` : '🛵 Envío a Domicilio (¡Envío Gratis!)')
+              : '🛍️ Retiro por el Local (Mostrador)';
 
-            const summary = `🍔 *RESUMEN DE TU PEDIDO* 🔥\n\n🛒 *Items:*\n${itemsList}\n\n🛵 *Entrega:* ${shippingLabel}\n📍 *Dirección:* ${session.shippingAddress}\n👤 *Cliente:* ${session.customerName}\n💳 *Forma de Pago:* ${session.paymentMethod === 'efectivo' ? 'Efectivo' : 'Transferencia Bancaria'}\n\n💵 *TOTAL A PAGAR:* $${session.total.toLocaleString('es-AR')}\n\n¿Está todo perfecto para mandar a la cocina?\n👉 Respondé *SI* para confirmar tu pedido o *CANCELAR*.`;
+            const summary = `🍔 *RESUMEN DE TU PEDIDO* 🔥\n\n🛒 *Items:*\n${itemsList}\n\n💵 *Subtotal:* $${session.subtotal.toLocaleString('es-AR')}\n🛵 *Entrega:* ${shippingLabel}\n📍 *Dirección:* ${session.shippingAddress}\n👤 *Cliente:* ${session.customerName}\n💳 *Forma de Pago:* ${session.paymentMethod === 'efectivo' ? 'Efectivo' : 'Transferencia Bancaria'}\n\n💵 *TOTAL A PAGAR:* $${session.total.toLocaleString('es-AR')}\n\n¿Está todo perfecto para mandar a la cocina?\n👉 Respondé *SI* para confirmar tu pedido o *CANCELAR*.`;
             
             await this.safeSendMessage(remoteJid, { text: summary }, msg.key);
             continue;
@@ -1731,16 +1769,34 @@ class WhatsAppBotServer {
             if (lower === '1' || lower.includes('retiro') || lower.includes('local') || lower.includes('mostrador') || lower.includes('take away')) {
               session.shippingMethod = 'local';
               session.shippingAddress = 'Retiro en Local (Mostrador)';
+              session.deliveryFee = 0;
+              session.total = session.subtotal;
               session.step = 'ASK_NAME';
               await this.safeSendMessage(remoteJid, {
-                text: '🛍️ *Retiro por el local seleccionado.*\n\n👤 *¿A nombre de quién registramos el pedido?*\n(Escribí tu nombre y apellido):'
+                text: '🛍️ *Retiro por el local seleccionado.* (Sin costo de envío)\n\n👤 *¿A nombre de quién registramos el pedido?*\n(Escribí tu nombre y apellido):'
               }, msg.key);
               continue;
             } else if (lower === '2' || lower.includes('envio') || lower.includes('envío') || lower.includes('delivery') || lower.includes('domicilio')) {
               session.shippingMethod = 'delivery';
+              const biz = getBusinessContext();
+              const rawCost = String(biz.costo_envio || '').replace(/\D/g, '');
+              const costoEnvio = parseInt(rawCost, 10) || 0;
+              const rawGratis = String(biz.envio_gratis_desde || '').replace(/\D/g, '');
+              const gratisDesde = parseInt(rawGratis, 10) || 0;
+
+              if (gratisDesde > 0 && session.subtotal >= gratisDesde) {
+                session.deliveryFee = 0;
+              } else {
+                session.deliveryFee = costoEnvio;
+              }
+              session.total = session.subtotal + session.deliveryFee;
+
               session.step = 'ASK_ADDRESS';
+              const feeText = session.deliveryFee > 0 
+                ? `🛵 Costo de envío: *$${session.deliveryFee.toLocaleString('es-AR')}*`
+                : `🛵 Costo de envío: *¡GRATIS!* 🎉`;
               await this.safeSendMessage(remoteJid, {
-                text: '🛵 *Envío a domicilio seleccionado.*\n\n📍 *Por favor escribí tu dirección exacta y entrecalles para el cadete:*'
+                text: `🛵 *Envío a domicilio seleccionado.*\n${feeText}\n\n📍 *Por favor escribí tu dirección exacta y entrecalles para el cadete:*`
               }, msg.key);
               continue;
             } else {
@@ -1753,7 +1809,7 @@ class WhatsAppBotServer {
 
           // ESTADO: SELECTING (Seleccionando productos o modificadores)
           if (session.step === 'SELECTING') {
-            if (lower === 'listo' || lower === 'pedir' || lower === 'comprar' || lower === 'terminar' || lower === 'seguir' || lower === 'avanzar') {
+            if (lower === 'listo' || lower === 'pedir' || lower === 'comprar' || lower === 'terminar' || lower === 'seguir' || lower === 'avanzar' || lower === 'pagar') {
               if (session.items.length === 0) {
                 await this.safeSendMessage(remoteJid, {
                   text: '⚠️ Tu pedido está vacío. Escribí el *NÚMERO* de la burger que querés o escribí *MENU*.'
@@ -1768,7 +1824,7 @@ class WhatsAppBotServer {
             }
 
             // Detección de modificadores (ej: sin cebolla, extra cheddar)
-            if (lower.startsWith('sin ') || lower.startsWith('con ') || lower.startsWith('extra ') || lower.includes('cebolla') || lower.includes('cheddar') || lower.includes('panceta')) {
+            if (lower.startsWith('sin ') || lower.startsWith('con ') || lower.startsWith('extra ') || lower.includes('cebolla') || lower.includes('cheddar') || lower.includes('panceta') || lower.includes('bacon')) {
               if (session.items.length > 0) {
                 const lastItem = session.items[session.items.length - 1];
                 if (!lastItem.modifiers) lastItem.modifiers = [];
@@ -1780,7 +1836,7 @@ class WhatsAppBotServer {
               }
             }
 
-            // Intentar sumar otro producto
+            // Intentar sumar otro producto por número o nombre
             const numIdx = parseInt(lower.replace(/\D/g, ''), 10);
             let selectedProd = null;
             if (!isNaN(numIdx) && numIdx >= 1 && numIdx <= prods.length) {
@@ -1852,85 +1908,124 @@ class WhatsAppBotServer {
           }
 
           // -------------------------------------------------------------
-          // OPCIONES DEL MENÚ PRINCIPAL (1, 2, 3, 4, 5)
+          // MENÚ PRINCIPAL Y SALUDOS (ALTA PRIORIDAD EN MODO IDLE)
+          // Si el cliente saluda ("hola", "buenas", etc.) o solicita el menú,
+          // se envía la plantilla de menú estructurada con opciones 1 a 5
+          // (NO debe intervenir la IA en el menú principal ni en saludos)
           // -------------------------------------------------------------
-          if (lower === '1' || lower.includes('estado') || lower.includes('mi pedido') || lower.includes('mi orden')) {
-            const cleanPhone = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '');
-            const allOrders = getStoredOrders();
-            // Buscar pedido activo de este cliente (últimas 24 horas y no entregado/cancelado)
-            const activeUserOrder = allOrders.slice().reverse().find(o => {
-              const custPhone = o.customer?.phone || o.phone || '';
-              const matchesPhone = custPhone && (custPhone.includes(cleanPhone.slice(-8)) || cleanPhone.includes(custPhone.slice(-8)));
-              const matchesJid = o.remoteJid === remoteJid || o.customer?.remoteJid === remoteJid;
-              const isRecent = (Date.now() - new Date(o.createdAt || o.updatedAt || Date.now()).getTime()) < 24 * 60 * 60 * 1000;
-              const isActive = o.status !== 'cancelado';
-              return (matchesPhone || matchesJid) && isRecent && isActive;
-            });
+          const isGreetingRegex = /^(hola|buenas|buen\s*dia|buenos\s*dias|buenas\s*tardes|buenas\s*noches|que\s*tal|holis|hey|saludos)(\s.*)?$/i;
+          const isMenuCommand = [
+            'menu', 'menú', 'inicio', 'comenzar', 'start', 'opciones', 'ayuda', '#menu'
+          ].includes(lower) || isGreetingRegex.test(lower);
 
-            if (activeUserOrder) {
-              const statusMap = {
-                pendiente: '🕒 *Pendiente:* Recibido en cola de espera.',
-                cocina: '👨‍🍳🔥 *En Cocina:* Hamburguesas smashadas en la plancha.',
-                listo: '🔔 *¡Listo para retirar!* Ya podés pasar a buscarlo.',
-                entregado: '🎉 *Entregado:* Pedido despachado con éxito.'
-              };
-              const itemsList = Array.isArray(activeUserOrder.items)
-                ? activeUserOrder.items.map(it => `• ${it.name} (x${it.qty || it.quantity || 1})`).join('\n')
-                : '';
-              const orderNum = activeUserOrder.orderNumber || activeUserOrder.code || activeUserOrder.id;
+          if (isMenuCommand && session.step === 'IDLE') {
+            session.catalogPage = 1;
+            const menuReply = buildMainMenuMessage(msg.pushName);
+            await this.safeSendMessage(remoteJid, { text: menuReply }, msg.key);
+            continue;
+          }
 
-              const statusText = `📋 *SEGUIMIENTO DE TU PEDIDO* 🔥\n\n` +
-                `🍔 *Pedido:* #${orderNum}\n` +
-                `📊 *Estado actual:* ${statusMap[activeUserOrder.status] || activeUserOrder.status}\n` +
-                `💵 *Total:* $${Number(activeUserOrder.total || 0).toLocaleString('es-AR')}\n` +
-                (itemsList ? `🛒 *Items:*\n${itemsList}\n` : '') +
-                `📍 *Entrega:* ${activeUserOrder.customer?.address || 'Retiro en Local'}\n\n` +
-                `_Te avisaremos automáticamente por aquí cuando haya novedades en la cocina._`;
+          // -------------------------------------------------------------
+          // OPCIONES DEL MENÚ PRINCIPAL EN MODO IDLE (1, 2, 3, 4, 5)
+          // -------------------------------------------------------------
+          if (session.step === 'IDLE') {
+            // OPCIÓN 1: CONSULTAR ESTADO DE PEDIDO
+            if (lower === '1' || lower === 'estado' || lower === 'mi pedido' || lower === 'mi orden') {
+              const cleanPhone = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '');
+              const allOrders = getStoredOrders();
+              // Buscar pedido activo de este cliente (últimas 24 horas y no entregado/cancelado)
+              const activeUserOrder = allOrders.slice().reverse().find(o => {
+                const custPhone = o.customer?.phone || o.phone || '';
+                const matchesPhone = custPhone && (custPhone.includes(cleanPhone.slice(-8)) || cleanPhone.includes(custPhone.slice(-8)));
+                const matchesJid = o.remoteJid === remoteJid || o.customer?.remoteJid === remoteJid;
+                const isRecent = (Date.now() - new Date(o.createdAt || o.updatedAt || Date.now()).getTime()) < 24 * 60 * 60 * 1000;
+                const isActive = o.status !== 'cancelado';
+                return (matchesPhone || matchesJid) && isRecent && isActive;
+              });
 
-              await this.safeSendMessage(remoteJid, { text: statusText }, msg.key);
+              if (activeUserOrder) {
+                const statusMap = {
+                  pendiente: '🕒 *Pendiente:* Recibido en cola de espera.',
+                  cocina: '👨‍🍳🔥 *En Cocina:* Hamburguesas smashadas en la plancha.',
+                  listo: '🔔 *¡Listo para retirar!* Ya podés pasar a buscarlo.',
+                  entregado: '🎉 *Entregado:* Pedido despachado con éxito.'
+                };
+                const itemsList = Array.isArray(activeUserOrder.items)
+                  ? activeUserOrder.items.map(it => `• ${it.name} (x${it.qty || it.quantity || 1})`).join('\n')
+                  : '';
+                const orderNum = activeUserOrder.orderNumber || activeUserOrder.code || activeUserOrder.id;
+
+                const statusText = `📋 *SEGUIMIENTO DE TU PEDIDO* 🔥\n\n` +
+                  `🍔 *Pedido:* #${orderNum}\n` +
+                  `📊 *Estado actual:* ${statusMap[activeUserOrder.status] || activeUserOrder.status}\n` +
+                  `💵 *Total:* $${Number(activeUserOrder.total || 0).toLocaleString('es-AR')}\n` +
+                  (itemsList ? `🛒 *Items:*\n${itemsList}\n` : '') +
+                  `📍 *Entrega:* ${activeUserOrder.customer?.address || 'Retiro en Local'}\n\n` +
+                  `_Te avisaremos automáticamente por aquí cuando haya novedades en la cocina._\n\n_Escribí *MENU* para volver al menú principal._`;
+
+                await this.safeSendMessage(remoteJid, { text: statusText }, msg.key);
+                continue;
+              } else {
+                await this.safeSendMessage(remoteJid, {
+                  text: '📋 *Estado de Pedido:*\n\nNo encontramos ningún pedido activo asociado a tu número en este momento.\n\n👉 Para pedir unas hamburguesas recién hechas, escribí *COMPRAR* o *MENU*.'
+                }, msg.key);
+                continue;
+              }
+            }
+
+            // OPCIÓN 2: DATOS BANCARIOS / TRANSFERENCIA
+            if (lower === '2' || lower === 'alias' || lower === 'cbu' || lower === 'transferencia' || lower === 'datos banco') {
+              const biz = getBusinessContext();
+              const tpls = getBotTemplates();
+              const rawTpl = tpls.menu_response_2 || `💳 *Datos para Transferencia Bancaria:* 🏦\n\n• *Alias:* \`{alias_banco}\`\n• *Banco:* {banco}\n• *Titular:* {titular}\n• *CBU:* \`{cbu}\`\n\n📸 *Una vez realizada la transferencia, podés enviar la captura o foto del comprobante por este mismo chat.*\n\n_Enviá *MENU* para volver al menú principal._`;
+              const reply = interpolateTemplate(rawTpl, { ...biz, cliente: msg.pushName || '' });
+              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
               continue;
-            } else {
-              await this.safeSendMessage(remoteJid, {
-                text: '📋 *Estado de Pedido:*\n\nNo encontramos ningún pedido activo asociado a tu número en este momento.\n\n👉 Para pedir unas hamburguesas recién hechas, escribí *COMPRAR* o *MENU*.'
-              }, msg.key);
+            }
+
+            // OPCIÓN 3: HORARIOS Y UBICACIÓN
+            if (lower === '3' || lower === 'horario' || lower === 'horarios' || lower === 'ubicacion' || lower === 'ubicación' || lower === 'direccion' || lower === 'dirección') {
+              const biz = getBusinessContext();
+              const tpls = getBotTemplates();
+              const rawTpl = tpls.menu_response_3 || `📍 *Ubicación y Horarios de Atención:* 🕒\n\n🍔 *Dirección:* {direccion}\n⏰ *Horarios de Cocina:* {horarios}\n\n¡Te esperamos con las mejores burgers a la plancha! 🔥\n\n_Enviá *MENU* para volver al menú principal._`;
+              const reply = interpolateTemplate(rawTpl, { ...biz, cliente: msg.pushName || '' });
+              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
+              continue;
+            }
+
+            // OPCIÓN 4: VER CARTA COMPLETA / CATÁLOGO
+            if (lower === '4' || lower === 'carta' || lower === 'catalogo' || lower === 'catálogo') {
+              session.step = 'SELECTING';
+              session.catalogPage = 1;
+              const reply = buildCatalogMessage(prods, 1, 8, false);
+              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
+              continue;
+            }
+
+            // OPCIÓN 5: HABLAR CON UN ENCARGADO / HUMANO
+            if (lower === '5' || lower === 'humano' || lower === 'asesor' || lower === 'encargado' || lower === 'persona' || lower === 'operador') {
+              const biz = getBusinessContext();
+              const tpls = getBotTemplates();
+              const rawTpl = tpls.menu_response_5 || `👤 *¡Entendido {cliente}! Un encargado de {nombre_local} te responderá a la brevedad.* 🍔\n\nPor favor dejanos tu consulta detallada para que podamos ayudarte lo antes posible. ¡Muchas gracias!`;
+              const reply = interpolateTemplate(rawTpl, { ...biz, cliente: msg.pushName || 'amigo/a' });
+              pauseBotForCustomer(remoteJid, null, 'cliente_solicito_humano');
+              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
+              continue;
+            }
+
+            // INICIAR PEDIDO DIRECTO ('comprar', 'pedir', 'hacer pedido')
+            if (lower === 'comprar' || lower === 'pedir' || lower === 'hacer pedido' || lower === 'quiero pedir') {
+              session.step = 'SELECTING';
+              session.catalogPage = 1;
+              const reply = buildCatalogMessage(prods, 1, 8, false);
+              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
               continue;
             }
           }
 
-          if (lower === '2') {
-            const biz = getBusinessContext();
-            await this.safeSendMessage(remoteJid, {
-              text: `💳 *Datos para Transferencia:* 🏦\n• *Alias:* \`${biz.alias_banco}\`\n• *Banco:* ${biz.banco}\n• *Titular:* ${biz.titular}${biz.cbu ? `\n• *CBU:* \`${biz.cbu}\`` : ''}\n\n📸 *Enviá la captura o comprobante por aquí para verificar tu pago.*`
-            }, msg.key);
-            continue;
-          }
-
-          if (lower === '3') {
-            const biz = getBusinessContext();
-            await this.safeSendMessage(remoteJid, {
-              text: `📍 *Ubicación y Horarios:* 🕒\n🍔 ${biz.direccion}\n⏰ ${biz.horarios}`
-            }, msg.key);
-            continue;
-          }
-
-          if (lower === '4' || lower === 'carta' || lower === 'catalogo' || lower === 'menu') {
-            session.step = 'SELECTING';
-            session.catalogPage = 1;
-            const reply = buildCatalogMessage(prods, 1, 8, false);
-            await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
-            continue;
-          }
-
-          if (lower === '5' || lower === 'pedir' || lower === 'hacer pedido' || lower === 'comprar') {
-            session.step = 'SELECTING';
-            session.catalogPage = 1;
-            const reply = buildCatalogMessage(prods, 1, 8, false);
-            await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
-            continue;
-          }
-
           // -------------------------------------------------------------
-          // SELECCIÓN DIRECTA DE HAMBURGUESAS (POR NÚMERO 1-23 O NOMBRE)
+          // SELECCIÓN DIRECTA DE HAMBURGUESAS EN CUALQUIER MOMENTO (NÚMERO O NOMBRE)
+          // Si el cliente pide directamente "quiero la 1", "dame una 2" o un número >= 6
           // -------------------------------------------------------------
           const initialNum = parseInt(lower.replace(/\D/g, ''), 10);
           let matchedProd = null;
@@ -1940,7 +2035,7 @@ class WhatsAppBotServer {
             matchedProd = prods.find(p => lower.includes(p.name.toLowerCase()));
           }
 
-          if (matchedProd && (lower.startsWith('comprar') || lower.startsWith('pedir') || lower.startsWith('quiero') || !isNaN(initialNum) || session.step === 'SELECTING')) {
+          if (matchedProd && (lower.startsWith('comprar') || lower.startsWith('pedir') || lower.startsWith('quiero') || lower.startsWith('dame') || (initialNum >= 6 && initialNum <= prods.length) || session.step === 'SELECTING')) {
             session.step = 'SELECTING';
             if (!session.items) session.items = [];
             
@@ -1964,7 +2059,7 @@ class WhatsAppBotServer {
 
             const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
 
-            const reply = `✅ *¡Excelente elección! Sumaste ${matchedProd.name}* 🍔 (+$$${Number(matchedProd.price).toLocaleString('es-AR')})\n\n🛒 *Tu pedido actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n👉 ¿Querés sumar otra burger o bebida? *(Escribí su número)*\n👉 ¿Algún cambio? *(Ej: Sin cebolla, Extra cheddar)*\n👉 O respondé *LISTO* para elegir forma de entrega.`;
+            const reply = `✅ *¡Excelente elección! Sumaste ${matchedProd.name}* 🍔 (+$${Number(matchedProd.price).toLocaleString('es-AR')})\n\n🛒 *Tu pedido actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n👉 ¿Querés sumar otra burger o bebida? *(Escribí su número)*\n👉 ¿Algún cambio? *(Ej: Sin cebolla, Extra cheddar)*\n👉 O respondé *LISTO* para elegir forma de entrega.`;
             await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
             continue;
           }
@@ -2053,7 +2148,11 @@ class WhatsAppBotServer {
             }
           }
 
-          // CONSULTA INTELIGENTE CON GOOGLE GEMINI AI (Patrón Candy Shop)
+          // -------------------------------------------------------------
+          // CONSULTA INTELIGENTE CON IA (GEMINI / GROQ)
+          // Se activa SOLO para consultas abiertas sobre ingredientes, dudas o recomendaciones
+          // que no hayan sido capturadas por el menú ni los comandos de pedido
+          // -------------------------------------------------------------
           try {
             const biz = getBusinessContext();
             const aiReply = await geminiBotService.generateReply(text, {
@@ -2064,22 +2163,17 @@ class WhatsAppBotServer {
             });
 
             if (aiReply) {
-              console.log(`✨ [WHATSAPP IA GEMINI]: Respondiendo a ${remoteJid}`);
+              console.log(`✨ [WHATSAPP IA]: Respondiendo consulta a ${remoteJid}`);
               await this.safeSendMessage(remoteJid, { text: aiReply }, msg.key);
               continue;
             }
           } catch (aiErr) {
-            console.warn('[WHATSAPP BOT GEMINI AI ERROR]:', aiErr);
+            console.warn('[WHATSAPP BOT AI ERROR]:', aiErr);
           }
 
-          // SALUDO POR DEFECTO
-          const biz = getBusinessContext();
-          const storeName = biz.nombre_local || "Burga's Chamical";
-          const welcomeHeader = biz.mensaje_bienvenida 
-            ? interpolateTemplate(biz.mensaje_bienvenida, { cliente: msg.pushName || '', nombre_local: storeName })
-            : `🍔 *¡Hola! Bienvenido a ${storeName}* 🔥`;
-          const reply = `${welcomeHeader}\n\n¿En qué podemos ayudarte hoy?\n\n1️⃣ *Consultar estado de pedido*\n2️⃣ *Datos de transferencia / Alias*\n3️⃣ *Horarios y ubicación*\n4️⃣ *Ver carta completa y fotos (${prods.length} burgers)*\n5️⃣ *Hacer un pedido ahora* 🍔\n\n_Respondé con el número de opción o escribí tu pedido directo._`;
-          await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
+          // SALUDO POR DEFECTO CON EL MENÚ DE LA PLANTILLA SI LA IA NO RESPONDE
+          const fallbackMenu = buildMainMenuMessage(msg.pushName);
+          await this.safeSendMessage(remoteJid, { text: fallbackMenu }, msg.key);
         }
       });
 
