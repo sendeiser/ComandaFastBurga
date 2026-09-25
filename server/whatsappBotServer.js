@@ -1030,6 +1030,7 @@ class WhatsAppBotServer {
           } catch (err) {
             console.error('[WHATSAPP BOT] Error al generar código QR:', err);
           }
+          if (typeof publishBotStatusToSupabase === 'function') publishBotStatusToSupabase();
         }
 
         if (connection === 'close') {
@@ -1051,6 +1052,7 @@ class WhatsAppBotServer {
               this.start().catch(() => {});
             }, 3000);
           }
+          if (typeof publishBotStatusToSupabase === 'function') publishBotStatusToSupabase();
         } else if (connection === 'open') {
           this.status = 'connected';
           this.qrCode = null;
@@ -1061,6 +1063,7 @@ class WhatsAppBotServer {
           console.log(`👤 Dispositivo vinculado: ${this.connectedUser?.name || 'ComandaFast Bot'} (${this.connectedUser?.id || ''})`);
           console.log(`🍔 Catálogo listo con ${getStoredProducts().length} productos sincronizados con imágenes.`);
           console.log('=====================================================================\n');
+          if (typeof publishBotStatusToSupabase === 'function') publishBotStatusToSupabase();
         }
       });
 
@@ -1704,6 +1707,99 @@ if (process.argv.includes('--reset') || process.argv.includes('--new-qr')) {
 
 // Iniciar automáticamente
 botServer.start().catch(() => {});
+
+// =========================================================
+// SUPABASE CLOUD BRIDGE (Permite que Netlify y celulares vean el bot conectado)
+// =========================================================
+async function publishBotStatusToSupabase() {
+  try {
+    const now = Date.now();
+    let pausedCount = 0;
+    const humanChats = [];
+    for (const [jid, data] of humanPausedChats.entries()) {
+      if (now < data.pausedUntil) {
+        pausedCount++;
+        humanChats.push({
+          jid,
+          phone: jid.replace('@s.whatsapp.net', '').replace('@lid', ''),
+          remainingMinutes: Math.ceil((data.pausedUntil - now) / 60000),
+          reason: data.reason || 'manual',
+          pausedAt: new Date(data.timestamp).toISOString()
+        });
+      } else {
+        humanPausedChats.delete(jid);
+      }
+    }
+
+    const payload = {
+      status: botServer.status,
+      serverOnline: true,
+      qrCode: botServer.status === 'qr_ready' ? botServer.qrCode : null,
+      user: botServer.connectedUser ? {
+        id: botServer.connectedUser.id,
+        name: botServer.connectedUser.name || 'ComandaFast Bot'
+      } : null,
+      timestamp: Date.now(),
+      updatedAt: new Date().toISOString(),
+      port: PORT,
+      productsCount: getStoredProducts().length,
+      antiBanProtection: {
+        active: true,
+        pausedChatsCount: pausedCount
+      },
+      activeChats: humanChats
+    };
+
+    await pushBotConfigToSupabase('server_status', payload);
+  } catch (_) {}
+}
+
+// Latido continuo hacia Supabase Cloud cada 4 segundos
+setInterval(publishBotStatusToSupabase, 4000);
+setTimeout(publishBotStatusToSupabase, 1000);
+
+// Polling de comandos remotos desde la nube (start, logout, resume_chat) cada 3.5 segundos
+async function checkRemoteCommands() {
+  try {
+    const cmd = await fetchBotConfigFromSupabase('server_commands');
+    if (cmd && cmd.id && cmd.status === 'pending' && (Date.now() - cmd.timestamp < 60000)) {
+      console.log(`[WHATSAPP BOT] Comando remoto recibido desde Supabase: ${cmd.action}`);
+      if (cmd.action === 'start') {
+        botServer.start().catch(() => {});
+      } else if (cmd.action === 'logout') {
+        botServer.clearAuth();
+        if (botServer.sock) {
+          botServer.sock.logout().catch(() => {});
+        }
+        botServer.status = 'disconnected';
+        botServer.connectedUser = null;
+        publishBotStatusToSupabase();
+      } else if (cmd.action === 'resume_chat' && cmd.jid) {
+        resumeBotForCustomer(cmd.jid);
+        publishBotStatusToSupabase();
+      }
+      await pushBotConfigToSupabase('server_commands', {
+        ...cmd,
+        status: 'executed',
+        executedAt: new Date().toISOString()
+      });
+    }
+  } catch (_) {}
+}
+setInterval(checkRemoteCommands, 3500);
+
+// Señal de apagado limpio
+process.on('SIGINT', async () => {
+  try {
+    await pushBotConfigToSupabase('server_status', {
+      status: 'disconnected',
+      serverOnline: false,
+      timestamp: Date.now(),
+      updatedAt: new Date().toISOString()
+    });
+  } catch (_) {}
+  process.exit(0);
+});
 
 // =========================================================
 // ENDPOINTS HTTP

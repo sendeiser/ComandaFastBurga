@@ -292,11 +292,11 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout, t
             }}
             onClick={handleRefreshSystem}
             disabled={isRefreshing}
-            title="Recargar y sincronizar todos los datos del sistema en tiempo real (pedidos, turnos de caja, productos y ajustes)"
+            title="Guardar y sincronizar todos los cambios directamente en la Base de Datos (Supabase Cloud)"
           >
             <RefreshCw size={16} className={isRefreshing ? 'spin' : ''} />
             <span>
-              {isRefreshing ? 'Actualizando...' : refreshSuccess ? '¡Sistema Actualizado!' : 'Recargar'}
+              {isRefreshing ? 'Actualizando BD...' : refreshSuccess ? '¡BD Actualizada!' : 'Actualizar BD'}
             </span>
           </button>
 

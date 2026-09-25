@@ -18,6 +18,14 @@ import { audioService } from './services/audioService';
 import { printerService } from './services/printerService';
 import { supabaseSync } from './services/supabaseClient';
 
+const isLocalEnv = () => {
+  if (typeof window === 'undefined') return false;
+  const h = window.location.hostname;
+  const isLocalHost = h === 'localhost' || h === '127.0.0.1' || h.startsWith('192.168.') || h.startsWith('10.');
+  const isHttp = window.location.protocol === 'http:';
+  return isLocalHost && isHttp;
+};
+
 export default function App() {
   const [currentTab, setCurrentTab] = useState('pos'); // 'pos' | 'kds' | 'history' | 'menu'
   const [products, setProducts] = useState([]);
@@ -233,23 +241,25 @@ export default function App() {
         const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
         let localServerOnline = false;
 
-        // A. Consultar Servidor Local LAN (puerto 3002)
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 2000);
-          const res = await fetch(`http://${botHost}:3002/api/orders`, { signal: controller.signal });
-          clearTimeout(timeoutId);
-          if (res.ok) {
-            consecutiveOfflineErrors = 0;
-            localServerOnline = true;
-            const data = await res.json();
-            if (data && Array.isArray(data.orders)) {
-              for (const ord of data.orders) {
-                if (ord && ord.id) localOrders.push(ord);
+        // A. Consultar Servidor Local LAN (puerto 3002) solo en red local / HTTP
+        if (isLocalEnv()) {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000);
+            const res = await fetch(`http://${botHost}:3002/api/orders`, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (res.ok) {
+              consecutiveOfflineErrors = 0;
+              localServerOnline = true;
+              const data = await res.json();
+              if (data && Array.isArray(data.orders)) {
+                for (const ord of data.orders) {
+                  if (ord && ord.id) localOrders.push(ord);
+                }
               }
             }
-          }
-        } catch (_) {}
+          } catch (_) {}
+        }
 
         // B. Consultar Supabase Cloud (SIEMPRE — fuente de verdad global)
         if (supabaseSync.isConfigured()) {
@@ -270,7 +280,9 @@ export default function App() {
           if (!ord || !ord.id) continue;
           if (storageService.isOrderDeleted(ord.id)) {
             // Asegurar que el servidor local lo elimine si todavía lo retenía
-            fetch(`http://${botHost}:3002/api/orders/${ord.id}`, { method: 'DELETE' }).catch(() => {});
+            if (isLocalEnv()) {
+              fetch(`http://${botHost}:3002/api/orders/${ord.id}`, { method: 'DELETE' }).catch(() => {});
+            }
             continue;
           }
           mergedMap.set(ord.id, { ...ord, _source: 'local' });
@@ -519,15 +531,17 @@ export default function App() {
     // Sync to Supabase CLOUD (fuente de verdad)
     supabaseSync.createOrder(savedOrder);
 
-    // Sync to Local WhatsApp Bot / LAN Microservice (puerto 3002) para replicaciÃ³n instantÃ¡nea a celulares Android
-    try {
-      const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
-      fetch(`http://${botHost}:3002/api/orders`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(savedOrder)
-      }).catch(() => {});
-    } catch (_) {}
+    // Sync to Local WhatsApp Bot / LAN Microservice (puerto 3002) solo en red local
+    if (isLocalEnv()) {
+      try {
+        const botHost = window.location.hostname || 'localhost';
+        fetch(`http://${botHost}:3002/api/orders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(savedOrder)
+        }).catch(() => {});
+      } catch (_) {}
+    }
 
     // Audio feedback
     audioService.playOrderChime();
@@ -564,15 +578,17 @@ export default function App() {
     // Push status + timestamps directamente a Supabase
     supabaseSync.updateOrderStatus(orderId, newStatus, updatedOrder?.statusTimestamps || {});
 
-    // Sync status to Local Server (puerto 3002) para reflejar cambios en celulares conectados y notificar por WhatsApp
-    try {
-      const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
-      fetch(`http://${botHost}:3002/api/orders/${orderId}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus, order: updatedOrder })
-      }).catch(() => {});
-    } catch (_) {}
+    // Sync status to Local Server (puerto 3002) solo en red local
+    if (isLocalEnv()) {
+      try {
+        const botHost = window.location.hostname || 'localhost';
+        fetch(`http://${botHost}:3002/api/orders/${orderId}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus, order: updatedOrder })
+        }).catch(() => {});
+      } catch (_) {}
+    }
 
     if (newStatus === 'listo') {
       audioService.playReadyBell();
@@ -583,11 +599,12 @@ export default function App() {
     storageService.deleteOrder(orderId);
     setOrders(storageService.getOrders());
     // Eliminar permanentemente de Supabase Cloud y del servidor local de forma segura
-    const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
-    await Promise.allSettled([
-      supabaseSync.deleteOrder(orderId),
-      fetch(`http://${botHost}:3002/api/orders/${orderId}`, { method: 'DELETE' }).catch(() => {})
-    ]);
+    const promises = [supabaseSync.deleteOrder(orderId)];
+    if (isLocalEnv()) {
+      const botHost = window.location.hostname || 'localhost';
+      promises.push(fetch(`http://${botHost}:3002/api/orders/${orderId}`, { method: 'DELETE' }).catch(() => {}));
+    }
+    await Promise.allSettled(promises);
   };
 
   const handleSaveProducts = (newProducts) => {
@@ -627,14 +644,16 @@ export default function App() {
           await supabaseSync.pushOrderCounterState({ counter: 0, lastResetAt: nowIso });
         } catch (_) {}
       }
-      try {
-        const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
-        fetch(`http://${botHost}:3002/api/order-counter/reset`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ counter: 0, lastResetAt: nowIso })
-        }).catch(() => {});
-      } catch (_) {}
+      if (isLocalEnv()) {
+        try {
+          const botHost = window.location.hostname || 'localhost';
+          fetch(`http://${botHost}:3002/api/order-counter/reset`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ counter: 0, lastResetAt: nowIso })
+          }).catch(() => {});
+        } catch (_) {}
+      }
     }
 
     if (supabaseSync.isConfigured()) {
@@ -642,17 +661,19 @@ export default function App() {
         await supabaseSync.pushCashShift(shift);
       } catch (_) {}
     }
-    try {
-      const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
-      fetch(`http://${botHost}:3002/api/cash-shift`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cashShift: shift })
-      }).catch(() => {});
-    } catch (_) {}
+    if (isLocalEnv()) {
+      try {
+        const botHost = window.location.hostname || 'localhost';
+        fetch(`http://${botHost}:3002/api/cash-shift`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cashShift: shift })
+        }).catch(() => {});
+      } catch (_) {}
+    }
   };
 
-    const handleAddExpense = async (amount, reason) => {
+  const handleAddExpense = async (amount, reason) => {
     const shift = storageService.addCashExpense(amount, reason);
     setCashShift(shift);
     if (supabaseSync.isConfigured() && shift) {
@@ -660,14 +681,16 @@ export default function App() {
         await supabaseSync.pushCashShift(shift);
       } catch (_) {}
     }
-    try {
-      const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
-      fetch(`http://${botHost}:3002/api/cash-shift`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cashShift: shift })
-      }).catch(() => {});
-    } catch (_) {}
+    if (isLocalEnv()) {
+      try {
+        const botHost = window.location.hostname || 'localhost';
+        fetch(`http://${botHost}:3002/api/cash-shift`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cashShift: shift })
+        }).catch(() => {});
+      } catch (_) {}
+    }
   };
 
   const handleCloseShift = async (countedCash, notes) => {
@@ -678,23 +701,45 @@ export default function App() {
         await supabaseSync.pushCashShift(shift);
       } catch (_) {}
     }
-    try {
-      const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
-      fetch(`http://${botHost}:3002/api/cash-shift`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cashShift: shift })
-      }).catch(() => {});
-    } catch (_) {}
+    if (isLocalEnv()) {
+      try {
+        const botHost = window.location.hostname || 'localhost';
+        fetch(`http://${botHost}:3002/api/cash-shift`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cashShift: shift })
+        }).catch(() => {});
+      } catch (_) {}
+    }
   };
 
   const handleRefreshAllSystem = async () => {
-    // 1. Sincronizar desde Supabase CLOUD (fuente de verdad)
+    // 1. ACTUALIZAR DIRECTO A LA BASE DE DATOS (Supabase Cloud - Fuente de Verdad)
     if (supabaseSync && supabaseSync.isConfigured()) {
       try {
+        // A. PUSH: Guardar y persistir todos los cambios actuales del sistema en la Base de Datos
+        const localProds = storageService.getProducts();
+        const localOrders = storageService.getOrders();
+        const localShift = storageService.getCashShift();
+        const localSettings = storageService.getSettings();
+        const localCategories = storageService.getCategories();
+        const localBotSettings = chatbotService.getSettings();
+        const localBotVars = chatbotService.getVariables();
+
+        await Promise.allSettled([
+          Array.isArray(localProds) && localProds.length > 0 ? supabaseSync.pushProducts(localProds) : Promise.resolve(),
+          Array.isArray(localOrders) && localOrders.length > 0 ? supabaseSync.pushOrdersBatch(localOrders) : Promise.resolve(),
+          localShift ? supabaseSync.createCashShift(localShift) : Promise.resolve(),
+          localSettings ? supabaseSync.saveSettings(localSettings) : Promise.resolve(),
+          Array.isArray(localCategories) && localCategories.length > 0 ? supabaseSync.saveCategories(localCategories) : Promise.resolve(),
+          localBotSettings ? supabaseSync.saveBotTemplates(localBotSettings) : Promise.resolve(),
+          localBotVars ? supabaseSync.saveBotVariables(localBotVars) : Promise.resolve()
+        ]);
+
+        // B. PULL: Descargar el estado consolidado y fresco de la Base de Datos
         const [cloudProds, cloudOrders, cloudShift, cloudSettings, cloudCashiers, cloudBotVars, latestOrderNum, cloudShiftsHistory] = await Promise.allSettled([
           supabaseSync.fetchProducts(),
-          supabaseSync.fetchOrders(300),
+          supabaseSync.fetchOrders(500),
           supabaseSync.fetchLatestCashShift(),
           supabaseSync.fetchSettings(),
           supabaseSync.fetchCashiers(),
@@ -708,10 +753,10 @@ export default function App() {
         }
 
         if (cloudProds.status === 'fulfilled' && cloudProds.value && cloudProds.value.length > 0) {
-          const localProds = storageService.getProducts();
+          const currentProds = storageService.getProducts();
           const mergedProds = cloudProds.value.map(cp => {
             if (!cp.image) {
-              const loc = localProds.find(lp => lp.id === cp.id || (lp.name && cp.name && lp.name.toLowerCase() === cp.name.toLowerCase()));
+              const loc = currentProds.find(lp => lp.id === cp.id || (lp.name && cp.name && lp.name.toLowerCase() === cp.name.toLowerCase()));
               if (loc && loc.image) {
                 return { ...cp, image: loc.image };
               }
@@ -750,30 +795,32 @@ export default function App() {
           chatbotService.saveBotVariables(cloudBotVars.value);
         }
       } catch (err) {
-        console.warn('[handleRefreshAllSystem] Error sincronizando con Supabase:', err);
+        console.warn('[handleRefreshAllSystem] Error actualizando base de datos:', err);
       }
     }
 
-    // 2. Sincronizar desde Servidor Local LAN / WhatsApp Bot (puerto 3002)
-    try {
-      const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
-      const [ordersRes, shiftRes] = await Promise.allSettled([
-        fetch(`http://${botHost}:3002/api/orders?since=0`).then(r => r.ok ? r.json() : null),
-        fetch(`http://${botHost}:3002/api/cash-shift`).then(r => r.ok ? r.json() : null)
-      ]);
+    // 2. Sincronizar desde Servidor Local LAN (solo si estamos en red local / HTTP)
+    if (isLocalEnv()) {
+      try {
+        const botHost = window.location.hostname || 'localhost';
+        const [ordersRes, shiftRes] = await Promise.allSettled([
+          fetch(`http://${botHost}:3002/api/orders?since=0`).then(r => r.ok ? r.json() : null),
+          fetch(`http://${botHost}:3002/api/cash-shift`).then(r => r.ok ? r.json() : null)
+        ]);
 
-      if (ordersRes.status === 'fulfilled' && ordersRes.value?.orders && Array.isArray(ordersRes.value.orders)) {
-        const validOrders = ordersRes.value.orders.filter(o => o && !storageService.isOrderDeleted(o.id));
-        storageService.saveOrdersBatch(validOrders);
-      }
+        if (ordersRes.status === 'fulfilled' && ordersRes.value?.orders && Array.isArray(ordersRes.value.orders)) {
+          const validOrders = ordersRes.value.orders.filter(o => o && !storageService.isOrderDeleted(o.id));
+          storageService.saveOrdersBatch(validOrders);
+        }
 
-      if (shiftRes.status === 'fulfilled' && shiftRes.value?.cashShift) {
-        storageService.saveCashShift(shiftRes.value.cashShift);
-        setCashShift(shiftRes.value.cashShift);
-      }
-    } catch (_) {}
+        if (shiftRes.status === 'fulfilled' && shiftRes.value?.cashShift) {
+          storageService.saveCashShift(shiftRes.value.cashShift);
+          setCashShift(shiftRes.value.cashShift);
+        }
+      } catch (_) {}
+    }
 
-    // 3. Forzar actualización de estados locales de React
+    // 3. Forzar actualización de estados locales de React con los datos de BD
     setOrders(storageService.getOrders());
     setProducts(storageService.getProducts());
     setCashShift(storageService.getCashShift());

@@ -409,7 +409,10 @@ export default function AdminDatabaseTablesTab() {
   const handleSaveSettings = () => {
     try {
       storageService.saveSettings(settings);
-      showToast('✅ Parámetros de negocio guardados con éxito.');
+      if (supabaseSync && supabaseSync.isConfigured()) {
+        supabaseSync.saveSettings(settings);
+      }
+      showToast('✅ Parámetros de negocio guardados con éxito en Base de Datos.');
       loadAllData();
     } catch (err) {
       showToast('❌ Error al guardar configuraciones.', 'error');
@@ -419,7 +422,8 @@ export default function AdminDatabaseTablesTab() {
   const handleDeleteConfirmed = async () => {
     if (!itemToDelete) return;
     try {
-      const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+      const isLocal = typeof window !== 'undefined' && window.location.protocol === 'http:' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      const botHost = isLocal ? window.location.hostname : 'localhost';
       if (activeTable === 'products') {
         storageService.deleteProduct(itemToDelete.id);
         await supabaseSync.deleteProduct(itemToDelete.id);
@@ -429,10 +433,11 @@ export default function AdminDatabaseTablesTab() {
         const idToDelete = itemToDelete.id;
         storageService.deleteOrder(idToDelete);
         setOrders(prev => prev.filter(o => o.id !== idToDelete));
-        await Promise.allSettled([
-          supabaseSync.deleteOrder(idToDelete),
-          fetch(`http://${botHost}:3002/api/orders/${idToDelete}`, { method: 'DELETE' }).catch(() => {})
-        ]);
+        const promises = [supabaseSync.deleteOrder(idToDelete)];
+        if (isLocal) {
+          promises.push(fetch(`http://${botHost}:3002/api/orders/${idToDelete}`, { method: 'DELETE' }).catch(() => {}));
+        }
+        await Promise.allSettled(promises);
         showToast(`🗑️ Comanda eliminada permanentemente de la Base de Datos.`);
       } else if (activeTable === 'shifts') {
         storageService.deleteCashShiftHistoryItem(itemToDelete.id);

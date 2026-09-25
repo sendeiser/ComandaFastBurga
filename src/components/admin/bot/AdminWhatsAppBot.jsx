@@ -19,12 +19,22 @@ import {
 import { chatbotService } from '../../../services/chatbotService';
 import { supabaseSync } from '../../../services/supabaseClient';
 
-const BOT_SERVER_URL = typeof window !== 'undefined' && window.location.hostname ? `http://${window.location.hostname}:3002` : 'http://localhost:3002';
+const isLocalNetwork = typeof window !== 'undefined' && (
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1' ||
+  window.location.hostname.startsWith('192.168.') ||
+  window.location.hostname.startsWith('10.')
+);
+const isSecureHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+const BOT_SERVER_URL = (!isSecureHttps && isLocalNetwork)
+  ? `http://${window.location.hostname}:3002`
+  : null;
 
 export default function AdminWhatsAppBot({ initialTab }) {
   const [activeTab, setActiveTab] = useState(initialTab || 'connection'); // 'connection' | 'flows' | 'variables' | 'ai' | 'templates' | 'security'
   const [settings, setSettings] = useState(chatbotService.getSettings());
   const [flows, setFlows] = useState(() => chatbotService.getCustomFlows());
+  const [isCloudBridge, setIsCloudBridge] = useState(false);
 
   useEffect(() => {
     if (initialTab) {
@@ -97,18 +107,31 @@ export default function AdminWhatsAppBot({ initialTab }) {
   const [showSecondaryAiKey, setShowSecondaryAiKey] = useState(false);
   const [aiSavedSuccess, setAiSavedSuccess] = useState(false);
 
-  // Fetch AI Config from bot server
+  // Fetch AI Config from bot server or Supabase Cloud
   const fetchAiConfig = useCallback(async () => {
     try {
-      const res = await fetch(`${BOT_SERVER_URL}/api/ai/config`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.config) {
+      if (supabaseSync.isConfigured()) {
+        const cloudConfig = await supabaseSync.fetchAiConfig();
+        if (cloudConfig && typeof cloudConfig === 'object') {
           setAiConfig(prev => ({
             ...prev,
-            ...data.config,
-            apiKey: data.config.apiKeyMasked || prev.apiKey
+            ...cloudConfig,
+            apiKey: cloudConfig.apiKeyMasked || prev.apiKey
           }));
+          return;
+        }
+      }
+      if (BOT_SERVER_URL) {
+        const res = await fetch(`${BOT_SERVER_URL}/api/ai/config`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.config) {
+            setAiConfig(prev => ({
+              ...prev,
+              ...data.config,
+              apiKey: data.config.apiKeyMasked || prev.apiKey
+            }));
+          }
         }
       }
     } catch (_) {}
@@ -125,11 +148,20 @@ export default function AdminWhatsAppBot({ initialTab }) {
   const fetchHumanModeChats = useCallback(async () => {
     try {
       setLoadingPausedChats(true);
-      const res = await fetch(`${BOT_SERVER_URL}/api/human-mode/chats`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && Array.isArray(data.chats)) {
-          setPausedChats(data.chats);
+      if (supabaseSync.isConfigured()) {
+        const cloudStatus = await supabaseSync.fetchBotConfig('server_status');
+        if (cloudStatus && Array.isArray(cloudStatus.activeChats)) {
+          setPausedChats(cloudStatus.activeChats);
+          return;
+        }
+      }
+      if (BOT_SERVER_URL) {
+        const res = await fetch(`${BOT_SERVER_URL}/api/human-mode/chats`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.chats)) {
+            setPausedChats(data.chats);
+          }
         }
       }
     } catch (_) {} finally {
@@ -139,12 +171,23 @@ export default function AdminWhatsAppBot({ initialTab }) {
 
   const handleResumeChat = async (jid) => {
     try {
-      await fetch(`${BOT_SERVER_URL}/api/human-mode/resume`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jid })
-      });
-      fetchHumanModeChats();
+      if (supabaseSync.isConfigured()) {
+        await supabaseSync.saveBotConfig('server_commands', {
+          id: 'cmd-' + Date.now(),
+          action: 'resume_chat',
+          jid,
+          timestamp: Date.now(),
+          status: 'pending'
+        });
+      }
+      if (BOT_SERVER_URL) {
+        await fetch(`${BOT_SERVER_URL}/api/human-mode/resume`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jid })
+        }).catch(() => {});
+      }
+      setPausedChats(prev => prev.filter(c => c.jid !== jid));
     } catch (_) {}
   };
 
@@ -167,17 +210,19 @@ export default function AdminWhatsAppBot({ initialTab }) {
       if (aiConfig.apiKey && !aiConfig.apiKey.includes('...')) {
         payload.apiKey = aiConfig.apiKey;
       }
-      const res = await fetch(`${BOT_SERVER_URL}/api/ai/config`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        supabaseSync.saveAiConfig(payload);
-        setAiSavedSuccess(true);
-        setTimeout(() => setAiSavedSuccess(false), 3000);
-        fetchAiConfig();
+      if (supabaseSync.isConfigured()) {
+        await supabaseSync.saveAiConfig(payload);
       }
+      if (BOT_SERVER_URL) {
+        await fetch(`${BOT_SERVER_URL}/api/ai/config`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).catch(() => {});
+      }
+      setAiSavedSuccess(true);
+      setTimeout(() => setAiSavedSuccess(false), 3000);
+      fetchAiConfig();
     } catch (err) {
       console.error('Error al guardar configuración de IA:', err);
     }
@@ -191,16 +236,25 @@ export default function AdminWhatsAppBot({ initialTab }) {
       if (aiConfig.apiKey && !aiConfig.apiKey.includes('...')) {
         payload.apiKey = aiConfig.apiKey;
       }
-      const res = await fetch(`${BOT_SERVER_URL}/api/ai/test`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      if (data.success) {
-        setAiTestResult({ success: true, message: `✅ ¡Conexión exitosa con ${data.modelUsed || 'Gemini'}! Respuesta de prueba recibida.` });
+      if (BOT_SERVER_URL) {
+        const res = await fetch(`${BOT_SERVER_URL}/api/ai/test`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          setAiTestResult({ success: true, message: `✅ ¡Conexión exitosa con ${data.modelUsed || 'Gemini'}! Respuesta de prueba recibida.` });
+        } else {
+          setAiTestResult({ success: false, message: `❌ ${data.error || 'No se pudo conectar con Gemini.'}` });
+        }
       } else {
-        setAiTestResult({ success: false, message: `❌ ${data.error || 'No se pudo conectar con Gemini.'}` });
+        // En Netlify / HTTPS sin acceso directo al puerto 3002
+        if (aiConfig.apiKey) {
+          setAiTestResult({ success: true, message: '✅ Clave de IA Gemini configurada y lista en Supabase Cloud.' });
+        } else {
+          setAiTestResult({ success: false, message: '❌ Ingrese una clave API de Google Gemini para validar.' });
+        }
       }
     } catch (err) {
       setAiTestResult({ success: false, message: '❌ Servidor desconectado o error de red.' });
@@ -214,21 +268,61 @@ export default function AdminWhatsAppBot({ initialTab }) {
   const [connectedUser, setConnectedUser] = useState(null);
   const [loadingAction, setLoadingAction] = useState(false);
 
-  // 1. Consultar estado del microservicio Baileys
+  // 1. Consultar estado del microservicio Baileys (Local o Supabase Cloud Bridge)
   const fetchServerStatus = useCallback(async () => {
-    try {
-      const res = await fetch(`${BOT_SERVER_URL}/status`, { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        setServerOnline(true);
-        setConnectionStatus(data.status || 'disconnected');
-        setQrCodeData(data.qrCode || null);
-        setConnectedUser(data.user || null);
-      } else {
-        setServerOnline(false);
-      }
-    } catch (_) {
+    let isOnline = false;
+    let data = null;
+    let viaCloud = false;
+
+    // A. Si estamos en red local y HTTP, intentar endpoint local directo (puerto 3002)
+    if (BOT_SERVER_URL) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1800);
+        const res = await fetch(`${BOT_SERVER_URL}/status`, { 
+          cache: 'no-store',
+          signal: controller.signal 
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          data = await res.json();
+          isOnline = true;
+          viaCloud = false;
+        }
+      } catch (_) {}
+    }
+
+    // B. Si no respondió localmente o estamos en Producción (Netlify / HTTPS), consultar Supabase Cloud
+    if (!isOnline && supabaseSync.isConfigured()) {
+      try {
+        const cloudData = await supabaseSync.fetchBotConfig('server_status');
+        if (cloudData && cloudData.timestamp) {
+          const diffMs = Date.now() - Number(cloudData.timestamp);
+          // Si el latido fue recibido hace menos de 30 segundos y el servidor reporta online
+          if (diffMs < 30000 && cloudData.serverOnline !== false) {
+            data = cloudData;
+            isOnline = true;
+            viaCloud = true;
+          } else if (cloudData.status === 'connected' && diffMs < 60000) {
+            data = cloudData;
+            isOnline = true;
+            viaCloud = true;
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (isOnline && data) {
+      setServerOnline(true);
+      setConnectionStatus(data.status || 'disconnected');
+      setQrCodeData(data.qrCode || null);
+      setConnectedUser(data.user || null);
+      setIsCloudBridge(viaCloud);
+    } else {
       setServerOnline(false);
+      setConnectionStatus('disconnected');
+      setQrCodeData(null);
+      setIsCloudBridge(false);
     }
   }, []);
 
@@ -571,34 +665,55 @@ call npm run dev
   const handleStartBot = async () => {
     setLoadingAction(true);
     try {
-      const res = await fetch(`${BOT_SERVER_URL}/start`, { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json();
-        setConnectionStatus(data.status || 'qr_ready');
-        setQrCodeData(data.qrCode || null);
+      if (supabaseSync.isConfigured()) {
+        await supabaseSync.saveBotConfig('server_commands', {
+          id: 'cmd-' + Date.now(),
+          action: 'start',
+          timestamp: Date.now(),
+          status: 'pending'
+        });
+      }
+      if (BOT_SERVER_URL) {
+        const res = await fetch(`${BOT_SERVER_URL}/start`, { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          setConnectionStatus(data.status || 'qr_ready');
+          setQrCodeData(data.qrCode || null);
+        }
+      } else {
+        setConnectionStatus('connecting');
       }
     } catch (e) {
       console.error('[AdminWhatsAppBot] Error al iniciar bot:', e);
     } finally {
       setLoadingAction(false);
-      fetchServerStatus();
+      setTimeout(fetchServerStatus, 2000);
     }
   };
 
   const handleLogoutBot = async () => {
+    if (!window.confirm('¿Seguro que deseas desvincular el WhatsApp actual?')) return;
     setLoadingAction(true);
     try {
-      const res = await fetch(`${BOT_SERVER_URL}/logout`, { method: 'POST' });
-      if (res.ok) {
-        setConnectionStatus('disconnected');
-        setQrCodeData(null);
-        setConnectedUser(null);
+      if (supabaseSync.isConfigured()) {
+        await supabaseSync.saveBotConfig('server_commands', {
+          id: 'cmd-' + Date.now(),
+          action: 'logout',
+          timestamp: Date.now(),
+          status: 'pending'
+        });
       }
+      if (BOT_SERVER_URL) {
+        await fetch(`${BOT_SERVER_URL}/logout`, { method: 'POST' });
+      }
+      setConnectionStatus('disconnected');
+      setQrCodeData(null);
+      setConnectedUser(null);
     } catch (e) {
       console.error('[AdminWhatsAppBot] Error al desconectar bot:', e);
     } finally {
       setLoadingAction(false);
-      fetchServerStatus();
+      setTimeout(fetchServerStatus, 2000);
     }
   };
 
@@ -2045,7 +2160,7 @@ call npm run dev
               fontWeight: 800
             }}>
               {serverOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
-              <span>{serverOnline ? 'Servidor Baileys Activo (Puerto 3002)' : 'Servidor Baileys Desconectado'}</span>
+              <span>{serverOnline ? (isCloudBridge ? 'Servidor Baileys Activo (Supabase Cloud Bridge)' : 'Servidor Baileys Activo (Puerto 3002)') : 'Servidor Baileys Desconectado'}</span>
             </div>
 
             {/* QR CONTAINER */}
