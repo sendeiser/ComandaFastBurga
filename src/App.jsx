@@ -688,6 +688,106 @@ export default function App() {
     } catch (_) {}
   };
 
+  const handleRefreshAllSystem = async () => {
+    // 1. Sincronizar desde Supabase CLOUD (fuente de verdad)
+    if (supabaseSync && supabaseSync.isConfigured()) {
+      try {
+        const [cloudProds, cloudOrders, cloudShift, cloudSettings, cloudCashiers, cloudBotVars, latestOrderNum, cloudShiftsHistory] = await Promise.allSettled([
+          supabaseSync.fetchProducts(),
+          supabaseSync.fetchOrders(300),
+          supabaseSync.fetchLatestCashShift(),
+          supabaseSync.fetchSettings(),
+          supabaseSync.fetchCashiers(),
+          supabaseSync.fetchBotVariables(),
+          supabaseSync.fetchLatestOrderNumber(),
+          supabaseSync.fetchCashShifts(100)
+        ]);
+
+        if (latestOrderNum.status === 'fulfilled' && latestOrderNum.value && latestOrderNum.value > 0) {
+          storageService.updateOrderCounterIfHigher(latestOrderNum.value);
+        }
+
+        if (cloudProds.status === 'fulfilled' && cloudProds.value && cloudProds.value.length > 0) {
+          const localProds = storageService.getProducts();
+          const mergedProds = cloudProds.value.map(cp => {
+            if (!cp.image) {
+              const loc = localProds.find(lp => lp.id === cp.id || (lp.name && cp.name && lp.name.toLowerCase() === cp.name.toLowerCase()));
+              if (loc && loc.image) {
+                return { ...cp, image: loc.image };
+              }
+            }
+            return cp;
+          });
+          setProducts(mergedProds);
+          storageService.saveProducts(mergedProds);
+        }
+
+        if (cloudOrders.status === 'fulfilled' && cloudOrders.value && cloudOrders.value.length > 0) {
+          const validOrders = cloudOrders.value.filter(o => o && !storageService.isOrderDeleted(o.id));
+          storageService.saveOrdersBatch(validOrders);
+          setOrders(storageService.getOrders());
+        }
+
+        if (cloudShift.status === 'fulfilled' && cloudShift.value) {
+          storageService.saveCashShift(cloudShift.value);
+          setCashShift(cloudShift.value);
+        }
+
+        if (cloudShiftsHistory.status === 'fulfilled' && Array.isArray(cloudShiftsHistory.value) && cloudShiftsHistory.value.length > 0) {
+          storageService.syncCashShiftsFromCloud(cloudShiftsHistory.value);
+        }
+
+        if (cloudSettings.status === 'fulfilled' && cloudSettings.value) {
+          storageService.saveSettings(cloudSettings.value);
+          setSettings(cloudSettings.value);
+        }
+
+        if (cloudCashiers.status === 'fulfilled' && Array.isArray(cloudCashiers.value) && cloudCashiers.value.length > 0) {
+          authService.syncCashiersFromCloud(cloudCashiers.value);
+        }
+
+        if (cloudBotVars.status === 'fulfilled' && cloudBotVars.value) {
+          chatbotService.saveBotVariables(cloudBotVars.value);
+        }
+      } catch (err) {
+        console.warn('[handleRefreshAllSystem] Error sincronizando con Supabase:', err);
+      }
+    }
+
+    // 2. Sincronizar desde Servidor Local LAN / WhatsApp Bot (puerto 3002)
+    try {
+      const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+      const [ordersRes, shiftRes] = await Promise.allSettled([
+        fetch(`http://${botHost}:3002/api/orders?since=0`).then(r => r.ok ? r.json() : null),
+        fetch(`http://${botHost}:3002/api/cash-shift`).then(r => r.ok ? r.json() : null)
+      ]);
+
+      if (ordersRes.status === 'fulfilled' && ordersRes.value?.orders && Array.isArray(ordersRes.value.orders)) {
+        const validOrders = ordersRes.value.orders.filter(o => o && !storageService.isOrderDeleted(o.id));
+        storageService.saveOrdersBatch(validOrders);
+      }
+
+      if (shiftRes.status === 'fulfilled' && shiftRes.value?.cashShift) {
+        storageService.saveCashShift(shiftRes.value.cashShift);
+        setCashShift(shiftRes.value.cashShift);
+      }
+    } catch (_) {}
+
+    // 3. Forzar actualización de estados locales de React
+    setOrders(storageService.getOrders());
+    setProducts(storageService.getProducts());
+    setCashShift(storageService.getCashShift());
+    setSettings(storageService.getSettings());
+
+    // 4. Notificar a toda la aplicación mediante CustomEvents
+    window.dispatchEvent(new CustomEvent('comandafast:orders_updated'));
+    window.dispatchEvent(new CustomEvent('comandafast:shifts_updated'));
+    window.dispatchEvent(new CustomEvent('comandafast:cash-shift-change'));
+    window.dispatchEvent(new CustomEvent('comandafast:categories_updated'));
+    window.dispatchEvent(new CustomEvent('comandafast:products_updated'));
+    window.dispatchEvent(new CustomEvent('comandafast:system_refreshed'));
+  };
+
   if (!settings) return null;
 
   // SECRET OWNER AUDIT PORTAL (Completely independent page without POS header)
@@ -701,6 +801,7 @@ export default function App() {
             onLogout={handleOwnerLogout}
             theme={theme}
             onToggleTheme={handleToggleTheme}
+            onRefreshSystem={handleRefreshAllSystem}
           />
         ) : (
           <OwnerLogin 

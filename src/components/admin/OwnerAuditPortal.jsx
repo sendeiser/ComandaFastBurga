@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { 
   ShieldCheck, Bot, BarChart3, DollarSign, ShieldAlert, Sparkles, LogOut, 
   ArrowLeft, Download, Calendar, Printer, Database, Smartphone,
-  ChevronLeft, ChevronRight, ChevronDown, Check, Sun, Moon
+  ChevronLeft, ChevronRight, ChevronDown, Check, Sun, Moon, RefreshCw
 } from 'lucide-react';
 import AuditKpisTab from './AuditKpisTab';
 import AuditCashShiftsTab from './AuditCashShiftsTab';
@@ -16,7 +16,7 @@ import { storageService } from '../../services/storageService';
 import { supabaseSync } from '../../services/supabaseClient';
 import { authService } from '../../services/authService';
 
-export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout, theme, onToggleTheme }) {
+export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout, theme, onToggleTheme, onRefreshSystem }) {
   const portalRef = useRef(null);
   const [activeTab, setActiveTab] = useState('kpis'); // 'kpis' | 'shifts' | 'security' | 'menu' | 'settings' | 'bot' | 'database'
   const [botSubTab, setBotSubTab] = useState('connection'); // 'connection' | 'security' | 'templates' | 'flows'
@@ -60,14 +60,21 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout, t
 
   const [rangeType, setRangeType] = useState('today'); // 'today' | 'yesterday' | 'week' | 'month' | 'all'
 
-  // Turnos históricos
-  const [shifts, setShifts] = React.useState(() => storageService.getCashShiftsHistory());
-  React.useEffect(() => {
+  // Turnos históricos y pedidos cancelados reactivos
+  const [shifts, setShifts] = useState(() => storageService.getCashShiftsHistory());
+  const [cancelledOrders, setCancelledOrders] = useState(() => storageService.getCancelledOrders());
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshSuccess, setRefreshSuccess] = useState(false);
+
+  useEffect(() => {
     const handleUpdate = () => {
       setShifts(storageService.getCashShiftsHistory());
+      setCancelledOrders(storageService.getCancelledOrders());
     };
     window.addEventListener('comandafast:shifts_updated', handleUpdate);
     window.addEventListener('comandafast:cash-shift-change', handleUpdate);
+    window.addEventListener('comandafast:orders_updated', handleUpdate);
+    window.addEventListener('comandafast:system_refreshed', handleUpdate);
 
     if (supabaseSync && supabaseSync.isConfigured()) {
       supabaseSync.fetchCashShifts(50).then(cloudShifts => {
@@ -81,10 +88,41 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout, t
     return () => {
       window.removeEventListener('comandafast:shifts_updated', handleUpdate);
       window.removeEventListener('comandafast:cash-shift-change', handleUpdate);
+      window.removeEventListener('comandafast:orders_updated', handleUpdate);
+      window.removeEventListener('comandafast:system_refreshed', handleUpdate);
     };
   }, []);
-  // Pedidos cancelados
-  const cancelledOrders = useMemo(() => storageService.getCancelledOrders(), []);
+
+  const handleRefreshSystem = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    setRefreshSuccess(false);
+
+    try {
+      if (onRefreshSystem) {
+        await onRefreshSystem();
+      } else {
+        if (supabaseSync && supabaseSync.isConfigured()) {
+          const cloudShifts = await supabaseSync.fetchCashShifts(50);
+          if (Array.isArray(cloudShifts) && cloudShifts.length > 0) {
+            storageService.syncCashShiftsFromCloud(cloudShifts);
+          }
+        }
+        window.dispatchEvent(new CustomEvent('comandafast:orders_updated'));
+        window.dispatchEvent(new CustomEvent('comandafast:shifts_updated'));
+      }
+      setShifts(storageService.getCashShiftsHistory());
+      setCancelledOrders(storageService.getCancelledOrders());
+      setRefreshSuccess(true);
+      setTimeout(() => {
+        setRefreshSuccess(false);
+      }, 2500);
+    } catch (err) {
+      console.error('Error al recargar el sistema:', err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Filtrado reactivo de órdenes
   const filteredOrders = useMemo(() => {
@@ -235,6 +273,33 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout, t
 
         {/* Action Buttons */}
         <div className="executive-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="qty-btn tactile-btn"
+            style={{ 
+              width: 'auto', 
+              padding: '0.45rem 0.95rem', 
+              fontSize: '0.82rem', 
+              gap: '7px', 
+              minHeight: '38px',
+              color: refreshSuccess ? '#059669' : 'var(--accent-amber, #f59e0b)',
+              background: refreshSuccess ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.08)',
+              borderColor: refreshSuccess ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 158, 11, 0.35)',
+              fontWeight: 800,
+              boxShadow: isRefreshing ? '0 0 12px var(--accent-amber-glow)' : 'none',
+              transition: 'all 0.2s ease',
+              cursor: isRefreshing ? 'wait' : 'pointer'
+            }}
+            onClick={handleRefreshSystem}
+            disabled={isRefreshing}
+            title="Recargar y sincronizar todos los datos del sistema en tiempo real (pedidos, turnos de caja, productos y ajustes)"
+          >
+            <RefreshCw size={16} className={isRefreshing ? 'spin' : ''} />
+            <span>
+              {isRefreshing ? 'Actualizando...' : refreshSuccess ? '¡Sistema Actualizado!' : 'Recargar'}
+            </span>
+          </button>
+
           <button
             type="button"
             className="qty-btn tactile-btn"

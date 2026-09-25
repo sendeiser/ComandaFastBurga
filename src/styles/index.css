@@ -3861,3 +3861,14 @@ h1, h2, h3, h4, .brand-title {
     border: none !important;
   }
 }
+
+/* Spin animation for refresh buttons */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
