@@ -62,10 +62,13 @@ export class GeminiBotService {
       }
     }
 
-    // Filtrar valores indefinidos para no pisar claves existentes
+    // Filtrar valores indefinidos y claves enmascaradas con '...' para no pisar claves reales existentes
     const cleanUpdates = {};
     for (const [key, value] of Object.entries(newConfig)) {
       if (value !== undefined) {
+        if (typeof value === 'string' && value.includes('...')) {
+          continue;
+        }
         cleanUpdates[key] = value;
       }
     }

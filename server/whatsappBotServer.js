@@ -48,8 +48,18 @@ const TEMPLATES_FILE = path.join(DATA_DIR, 'bot_templates.json');
 // =========================================================
 // SUPABASE CLOUD INTEGRATION (Push directo a la nube)
 // =========================================================
-const SUPABASE_URL = 'https://yqynuvjpipmvurualgtg.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxeW51dmpwaXBtdnVydWFsZ3RnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5MzMyOTgsImV4cCI6MjEwNTUwOTI5OH0.mLO52rFPD384yQHdGlBasrx4QvqXiHYH3zRmJ9Bq2go';
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://yqynuvjpipmvurualgtg.supabase.co';
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxeW51dmpwaXBtdnVydWFsZ3RnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5MzMyOTgsImV4cCI6MjEwNTUwOTI5OH0.mLO52rFPD384yQHdGlBasrx4QvqXiHYH3zRmJ9Bq2go';
+
+// Registro de marcas de tiempo para sincronización bidireccional y hot-reload desde la nube
+const cloudConfigTimestamps = {
+  variables: null,
+  templates: null,
+  flows: null,
+  ai_config: null,
+  products: null,
+  product_images: null
+};
 
 async function pushOrderToSupabase(order) {
   try {
@@ -115,9 +125,10 @@ async function updateOrderStatusInSupabase(orderId, status) {
   }
 }
 
-
 async function pushBotConfigToSupabase(key, data) {
   try {
+    const updatedAt = new Date().toISOString();
+    cloudConfigTimestamps[key] = updatedAt;
     await fetch(`${SUPABASE_URL}/rest/v1/bot_config`, {
       method: 'POST',
       headers: {
@@ -129,7 +140,7 @@ async function pushBotConfigToSupabase(key, data) {
       body: JSON.stringify({
         id: key,
         data,
-        updated_at: new Date().toISOString()
+        updated_at: updatedAt
       })
     });
     if (key !== 'server_status') {
@@ -152,7 +163,10 @@ async function fetchBotConfigFromSupabase(key) {
     });
     if (res.ok) {
       const rows = await res.json();
-      if (Array.isArray(rows) && rows.length > 0 && rows[0].data) {
+      if (Array.isArray(rows) && rows.length > 0) {
+        if (rows[0].updated_at) {
+          cloudConfigTimestamps[key] = rows[0].updated_at;
+        }
         return rows[0].data;
       }
     }
@@ -162,94 +176,208 @@ async function fetchBotConfigFromSupabase(key) {
   return null;
 }
 
-// Sincronización completa desde Supabase Cloud al arrancar el bot
-async function syncAllFromSupabaseCloud() {
-  console.log('☁️ [SUPABASE CLOUD SYNC] Sincronizando datos frescos del Bot desde Supabase...');
+// Sincronización completa de productos y fotos reales desde Supabase
+async function syncAllProductsFromCloud() {
   try {
-    // 1. Variables del Bot
-    const cloudVars = await fetchBotConfigFromSupabase('variables');
-    if (Array.isArray(cloudVars) && cloudVars.length > 0) {
-      saveBotVariables(cloudVars);
-      console.log(`✅ [SUPABASE] Variables del bot sincronizadas: ${cloudVars.length} variables.`);
-    }
-
-    // 2. Flujos Conversacionales
-    const cloudFlows = await fetchBotConfigFromSupabase('flows');
-    if (Array.isArray(cloudFlows) && cloudFlows.length > 0) {
-      saveStoredFlows(cloudFlows);
-      console.log(`✅ [SUPABASE] Flujos conversacionales sincronizados: ${cloudFlows.length} flujos.`);
-    }
-
-    // 3. Plantillas y Datos Bancarios / Ubicación
-    const cloudTemplates = await fetchBotConfigFromSupabase('templates');
-    if (cloudTemplates && typeof cloudTemplates === 'object') {
-      saveBotTemplates(cloudTemplates);
-      console.log(`✅ [SUPABASE] Plantillas y datos del negocio sincronizados (Alias: ${cloudTemplates.bank_alias || 'no configurado'}).`);
-    }
-
-    // 4. Configuración de IA Gemini
-    const cloudAiConfig = await fetchBotConfigFromSupabase('ai_config');
-    if (cloudAiConfig && typeof cloudAiConfig === 'object') {
-      geminiBotService.saveConfig(cloudAiConfig);
-      console.log(`✅ [SUPABASE] Configuración de IA Gemini sincronizada.`);
-    }
-
-    // 5. Productos y Fotos Reales desde Supabase
-    try {
-      const [resProds, resImages] = await Promise.all([
-        fetch(`${SUPABASE_URL}/rest/v1/products?select=*&order=name.asc`, {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-          }
-        }),
-        fetch(`${SUPABASE_URL}/rest/v1/system_settings?id=eq.product_images`, {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-          }
-        })
-      ]);
-
-      if (resProds.ok) {
-        const cloudProds = await resProds.json();
-        let imagesMap = {};
-        if (resImages.ok) {
-          const imgRows = await resImages.json();
-          if (Array.isArray(imgRows) && imgRows.length > 0 && imgRows[0].data) {
-            imagesMap = imgRows[0].data;
-          }
+    const [resProds, resImages] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/products?select=*&order=name.asc`, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
         }
+      }),
+      fetch(`${SUPABASE_URL}/rest/v1/system_settings?id=eq.product_images&select=id,data,updated_at`, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        }
+      })
+    ]);
 
-        if (Array.isArray(cloudProds) && cloudProds.length > 0) {
-          const mergedProds = cloudProds
-            .filter(p => p && p.is_active !== false)
-            .map(p => {
-              const img = p.image || imagesMap[p.id] || '';
-              return {
-                id: p.id,
-                name: p.name,
-                category: p.category || 'Hamburguesas',
-                price: Number(p.price) || 0,
-                emoji: p.emoji || '🍔',
-                description: p.description || '',
-                modifiers: Array.isArray(p.modifiers) ? p.modifiers : [],
-                image: img
-              };
-            });
-
-          fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(mergedProds, null, 2), 'utf-8');
-          const countWithPhotos = mergedProds.filter(p => p.image).length;
-          console.log(`✅ [SUPABASE] Catálogo de productos sincronizado: ${mergedProds.length} productos (${countWithPhotos} con fotos reales).`);
+    if (resProds.ok) {
+      const cloudProds = await resProds.json();
+      let imagesMap = {};
+      if (resImages.ok) {
+        const imgRows = await resImages.json();
+        if (Array.isArray(imgRows) && imgRows.length > 0) {
+          imagesMap = imgRows[0].data || {};
+          if (imgRows[0].updated_at) {
+            cloudConfigTimestamps.product_images = imgRows[0].updated_at;
+          }
         }
       }
-    } catch (prodErr) {
-      console.warn('[SUPABASE] Error descargando productos y fotos:', prodErr.message);
+
+      if (Array.isArray(cloudProds) && cloudProds.length > 0) {
+        let latestProdTime = '';
+        cloudProds.forEach(p => {
+          if (p.updated_at && (!latestProdTime || p.updated_at > latestProdTime)) {
+            latestProdTime = p.updated_at;
+          }
+        });
+        if (latestProdTime) cloudConfigTimestamps.products = latestProdTime;
+
+        const mergedProds = cloudProds
+          .filter(p => p && p.is_active !== false)
+          .map(p => {
+            const img = p.image || imagesMap[p.id] || '';
+            return {
+              id: p.id,
+              name: p.name,
+              category: p.category || 'Hamburguesas',
+              price: Number(p.price) || 0,
+              emoji: p.emoji || '🍔',
+              description: p.description || '',
+              modifiers: Array.isArray(p.modifiers) ? p.modifiers : [],
+              image: img
+            };
+          });
+
+        fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(mergedProds, null, 2), 'utf-8');
+        const countWithPhotos = mergedProds.filter(p => p.image).length;
+        console.log(`✅ [SUPABASE] Catálogo de productos sincronizado: ${mergedProds.length} productos (${countWithPhotos} con fotos reales).`);
+        return mergedProds;
+      }
     }
+  } catch (prodErr) {
+    console.warn('[SUPABASE] Error descargando productos y fotos:', prodErr.message);
+  }
+  return null;
+}
+
+// Sincronización completa inicial desde Supabase Cloud al arrancar el bot
+async function syncAllFromSupabaseCloud() {
+  console.log('☁️ [SUPABASE CLOUD SYNC] Sincronizando datos frescos del Bot desde Supabase Cloud...');
+  try {
+    const resConfig = await fetch(`${SUPABASE_URL}/rest/v1/bot_config?select=id,data,updated_at`, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      }
+    });
+
+    if (resConfig.ok) {
+      const configRows = await resConfig.json();
+      if (Array.isArray(configRows)) {
+        for (const row of configRows) {
+          if (!row || !row.id) continue;
+          cloudConfigTimestamps[row.id] = row.updated_at;
+
+          if (row.id === 'variables' && Array.isArray(row.data) && row.data.length > 0) {
+            saveBotVariables(row.data);
+            console.log(`✅ [SUPABASE] Variables del bot sincronizadas: ${row.data.length} variables.`);
+          } else if (row.id === 'flows' && Array.isArray(row.data) && row.data.length > 0) {
+            saveStoredFlows(row.data);
+            console.log(`✅ [SUPABASE] Flujos conversacionales sincronizados: ${row.data.length} flujos.`);
+          } else if (row.id === 'templates' && row.data && typeof row.data === 'object') {
+            saveBotTemplates(row.data);
+            console.log(`✅ [SUPABASE] Seguridad Anti-Spam y Plantillas sincronizadas (Anti-Bucle: ${row.data.anti_loop_enabled !== false ? 'ACTIVO' : 'INACTIVO'}, Delay: ${row.data.bot_typing_delay_ms || 2500}ms, Pausa Humano: ${row.data.human_mode_sleep_minutes || 25}min).`);
+          } else if (row.id === 'ai_config' && row.data && typeof row.data === 'object') {
+            geminiBotService.saveConfig(row.data);
+            console.log(`✅ [SUPABASE] Configuración de IA sincronizada (Modo: ${row.data.mode || 'cascade'}).`);
+          }
+        }
+      }
+    }
+
+    // Descargar catálogo y fotos de productos
+    await syncAllProductsFromCloud();
   } catch (err) {
-    console.warn('⚠️ [SUPABASE] No se pudo completar la sincronización en la nube, usando almacenamiento local:', err.message);
+    console.warn('⚠️ [SUPABASE] No se pudo completar la sincronización inicial con la nube, usando almacenamiento local:', err.message);
   }
 }
+
+// =========================================================
+// HOT-RELOAD DINÁMICO EN TIEMPO REAL DESDE SUPABASE CLOUD
+// Detecta cualquier cambio de configuración realizado en la nube
+// (Variables, Seguridad Anti-Spam, Plantillas, IA, Flujos, Productos)
+// y lo aplica de inmediato en el Bot en ejecución sin reiniciar
+// =========================================================
+let isSyncingCloudConfig = false;
+
+async function syncCloudConfigChanges() {
+  if (isSyncingCloudConfig) return;
+  isSyncingCloudConfig = true;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/bot_config?select=id,updated_at`, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      }
+    });
+
+    if (res.ok) {
+      const rows = await res.json();
+      if (Array.isArray(rows)) {
+        for (const row of rows) {
+          const { id, updated_at } = row;
+          if (!id || !updated_at || id === 'server_status' || id === 'server_commands') continue;
+
+          if (!cloudConfigTimestamps[id]) {
+            cloudConfigTimestamps[id] = updated_at;
+            continue;
+          }
+
+          const cloudTime = new Date(updated_at).getTime();
+          const localTime = new Date(cloudConfigTimestamps[id]).getTime();
+
+          // Si el timestamp en la nube es más nuevo por más de 1.5s
+          if (cloudTime > localTime + 1500) {
+            console.log(`☁️ [SUPABASE CLOUD]: Cambio detectado en '${id}' (${updated_at}). Descargando configuración en vivo...`);
+            const cloudData = await fetchBotConfigFromSupabase(id);
+            if (cloudData) {
+              if (id === 'variables' && Array.isArray(cloudData)) {
+                saveBotVariables(cloudData);
+                cloudConfigTimestamps.variables = updated_at;
+                console.log(`✅ [SUPABASE CLOUD]: Variables del bot actualizadas automáticamente desde la nube (${cloudData.length} variables).`);
+              } else if (id === 'templates' && typeof cloudData === 'object') {
+                saveBotTemplates(cloudData);
+                cloudConfigTimestamps.templates = updated_at;
+                console.log(`✅ [SUPABASE CLOUD]: Seguridad Anti-Spam y Plantillas actualizadas desde la nube (Delay: ${cloudData.bot_typing_delay_ms || 2500}ms, Anti-Bucle: ${cloudData.anti_loop_enabled !== false ? 'ACTIVO' : 'INACTIVO'}, Pausa humana: ${cloudData.human_mode_sleep_minutes || 25}min).`);
+              } else if (id === 'flows' && Array.isArray(cloudData)) {
+                saveStoredFlows(cloudData);
+                cloudConfigTimestamps.flows = updated_at;
+                console.log(`✅ [SUPABASE CLOUD]: Flujos conversacionales actualizados desde la nube (${cloudData.length} flujos).`);
+              } else if (id === 'ai_config' && typeof cloudData === 'object') {
+                geminiBotService.saveConfig(cloudData);
+                cloudConfigTimestamps.ai_config = updated_at;
+                console.log(`✅ [SUPABASE CLOUD]: Configuración de IA actualizada desde la nube (Modo: ${cloudData.mode || 'cascade'}).`);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Revisar cambios en catálogo de productos o fotos
+    try {
+      const resLatestProd = await fetch(`${SUPABASE_URL}/rest/v1/products?select=updated_at&order=updated_at.desc&limit=1`, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        }
+      });
+      if (resLatestProd.ok) {
+        const pRows = await resLatestProd.json();
+        if (Array.isArray(pRows) && pRows.length > 0 && pRows[0].updated_at) {
+          const latestTime = new Date(pRows[0].updated_at).getTime();
+          const knownTime = cloudConfigTimestamps.products ? new Date(cloudConfigTimestamps.products).getTime() : 0;
+          if (latestTime > knownTime + 1500) {
+            console.log(`☁️ [SUPABASE CLOUD]: Cambio detectado en catálogo de productos. Sincronizando con WhatsApp...`);
+            await syncAllProductsFromCloud();
+          }
+        }
+      }
+    } catch (_) {}
+
+  } catch (err) {
+    // Red temporalmente inaccesible
+  } finally {
+    isSyncingCloudConfig = false;
+  }
+}
+
+// Polling de sincronización en tiempo real desde Supabase Cloud cada 12 segundos
+setInterval(syncCloudConfigChanges, 12000);
 
 async function deleteOrderFromSupabase(orderId) {
   try {
@@ -2070,6 +2198,9 @@ async function checkRemoteCommands() {
       } else if (cmd.action === 'resume_chat' && cmd.jid) {
         resumeBotForCustomer(cmd.jid);
         publishBotStatusToSupabase();
+      } else if (cmd.action === 'sync_config' || cmd.action === 'sync_all') {
+        console.log(`[WHATSAPP BOT] Comando remoto '${cmd.action}' recibido. Forzando sincronización completa...`);
+        await syncAllFromSupabaseCloud();
       }
       await pushBotConfigToSupabase('server_commands', {
         ...cmd,
@@ -2079,7 +2210,7 @@ async function checkRemoteCommands() {
     }
   } catch (_) {}
 }
-setInterval(checkRemoteCommands, 25000);
+setInterval(checkRemoteCommands, 15000);
 
 // Señal de apagado limpio
 process.on('SIGINT', async () => {
@@ -2463,6 +2594,24 @@ app.post('/api/cash-shift', (req, res) => {
   res.json({ success: true, cashShift: getStoredCashShift() });
 });
 
+app.get('/api/bot-templates', (req, res) => {
+  res.json({ success: true, templates: getBotTemplates() });
+});
+
+app.post('/api/bot-templates', (req, res) => {
+  const { templates } = req.body;
+  if (!templates || typeof templates !== 'object') {
+    return res.status(400).json({ success: false, error: 'Formato inválido de plantillas' });
+  }
+  const current = getBotTemplates();
+  const merged = { ...current, ...templates };
+  saveBotTemplates(merged);
+  cloudConfigTimestamps.templates = new Date().toISOString();
+  pushBotConfigToSupabase('templates', merged).catch(() => {});
+  console.log(`🛡️ [WHATSAPP BOT] Seguridad Anti-Spam y Plantillas guardadas vía API local y sincronizadas a la nube.`);
+  return res.json({ success: true, templates: merged });
+});
+
 app.get('/api/bot-variables', (req, res) => {
   res.json({ success: true, variables: getBotVariables() });
 });
@@ -2473,6 +2622,7 @@ app.post('/api/bot-variables', (req, res) => {
     return res.status(400).json({ success: false, error: 'Formato inválido de variables' });
   }
   saveBotVariables(variables);
+  cloudConfigTimestamps.variables = new Date().toISOString();
   pushBotConfigToSupabase('variables', variables).catch(() => {});
   return res.json({ success: true, count: variables.length });
 });
@@ -2485,6 +2635,7 @@ app.post('/api/flows', (req, res) => {
   const { flows } = req.body;
   if (Array.isArray(flows)) {
     saveStoredFlows(flows);
+    cloudConfigTimestamps.flows = new Date().toISOString();
     pushBotConfigToSupabase('flows', flows).catch(() => {});
     console.log(`🔀 [WHATSAPP BOT] Sincronizados ${flows.length} flujos conversacionales.`);
     return res.json({ success: true, count: flows.length });
@@ -2504,6 +2655,7 @@ app.post('/api/ai/config', (req, res) => {
     if (v !== undefined) cleanUpdates[k] = v;
   }
   const updated = geminiBotService.saveConfig(cleanUpdates);
+  cloudConfigTimestamps.ai_config = new Date().toISOString();
   pushBotConfigToSupabase('ai_config', updated).catch(() => {});
   res.json({ success: true, config: updated });
 });
