@@ -528,12 +528,15 @@ export const storageService = {
     return orders;
   },
 
-  updateOrderStatus(orderId, newStatus) {
+  updateOrderStatus(orderId, newStatus, extraData = {}) {
     const orders = this.getOrders();
     const idx = orders.findIndex(o => o.id === orderId);
     if (idx !== -1) {
       orders[idx].status = newStatus;
       orders[idx].updatedAt = Date.now();
+      if (extraData && typeof extraData === 'object') {
+        Object.assign(orders[idx], extraData);
+      }
       if (!orders[idx].statusTimestamps) {
         orders[idx].statusTimestamps = {};
       }

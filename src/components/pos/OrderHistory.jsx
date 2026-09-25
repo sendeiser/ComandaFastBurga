@@ -53,13 +53,19 @@ export default function OrderHistory({
     }
   };
 
-  const getPaymentBadge = (method) => {
+  const getPaymentBadge = (method, order = null) => {
     const m = (method || 'efectivo').toLowerCase();
     if (m === 'efectivo') {
       return { bg: 'rgba(16, 185, 129, 0.15)', text: 'var(--accent-emerald)', label: '💵 EFECTIVO' };
     }
     if (m === 'transferencia') {
-      return { bg: 'rgba(96, 165, 250, 0.15)', text: '#60a5fa', label: '💳 TRANSFERENCIA' };
+      if (order?.paymentConfirmed || order?.paymentStatus === 'pagado') {
+        return { bg: 'rgba(16, 185, 129, 0.15)', text: '#10b981', label: '💳 TRANSF. (PAGADA)' };
+      }
+      if (order?.paymentStatus === 'comprobante_recibido') {
+        return { bg: 'rgba(59, 130, 246, 0.2)', text: '#60a5fa', label: '📸 COMPROBANTE RECIBIDO' };
+      }
+      return { bg: 'rgba(245, 158, 11, 0.18)', text: '#f59e0b', label: '⏳ ESPERANDO COMPROBANTE' };
     }
     return { bg: 'rgba(192, 132, 252, 0.15)', text: '#c084fc', label: `💳 ${m.toUpperCase()}` };
   };
@@ -141,7 +147,7 @@ export default function OrderHistory({
             ) : (
               filteredOrders.map(order => {
                 const statusStyle = getStatusBadgeStyle(order.status);
-                const payStyle = getPaymentBadge(order.paymentMethod);
+                const payStyle = getPaymentBadge(order.paymentMethod, order);
 
                 return (
                   <tr key={order.id} style={{ borderBottom: '1px solid var(--border-subtle)', transition: 'background 0.15s' }}>
@@ -251,7 +257,7 @@ export default function OrderHistory({
         ) : (
           filteredOrders.map(order => {
             const statusStyle = getStatusBadgeStyle(order.status);
-            const payStyle = getPaymentBadge(order.paymentMethod);
+            const payStyle = getPaymentBadge(order.paymentMethod, order);
             const customerName = typeof order.customer === 'object' ? (order.customer?.name || 'Consumidor Final') : (order.customer || 'Consumidor Final');
             const customerAddress = typeof order.customer === 'object' ? order.customer?.address : null;
             const itemsSummary = Array.isArray(order.items) 

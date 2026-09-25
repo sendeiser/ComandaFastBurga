@@ -587,8 +587,8 @@ export default function App() {
     }
   };
 
-  const handleUpdateOrderStatus = (orderId, newStatus) => {
-    const updatedOrder = storageService.updateOrderStatus(orderId, newStatus);
+  const handleUpdateOrderStatus = (orderId, newStatus, extraData = {}) => {
+    const updatedOrder = storageService.updateOrderStatus(orderId, newStatus, extraData);
     setOrders(storageService.getOrders());
     // Push status + timestamps directamente a Supabase
     supabaseSync.updateOrderStatus(orderId, newStatus, updatedOrder?.statusTimestamps || {});
@@ -600,7 +600,7 @@ export default function App() {
         fetch(`http://${botHost}:3002/api/orders/${orderId}/status`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: newStatus, order: updatedOrder })
+          body: JSON.stringify({ status: newStatus, order: updatedOrder, extraData })
         }).catch(() => {});
       } catch (_) {}
     }

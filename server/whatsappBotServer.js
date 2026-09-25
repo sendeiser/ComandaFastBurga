@@ -487,7 +487,7 @@ const DEFAULT_SERVER_TEMPLATES = {
   anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,
   anti_loop_acknowledge: DEFAULT_ANTI_LOOP_ACKNOWLEDGE,
   template_anti_loop_gratitude: '¡De nada! 🙌 Que lo disfrutes un montón. Si querés consultar la carta o volver a pedir, escribí *MENU* cuando gustes. ¡Buen provecho! 🍔🔥',
-  template_anti_loop_farewell: '¡Hasta la próxima! 👋 Gracias por contactarte con ComandaFast. ¡Que tengas un excelente descanso! ✨🍔',
+  template_anti_loop_farewell: '¡Hasta la próxima! 👋 Gracias por contactarte con {nombre_local}. ¡Que tengas un excelente descanso! ✨🍔',
   template_anti_loop_acknowledge: '¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido.',
   template_order_preparing: `👨‍🍳🔥 *¡Buenas noticias {cliente}! Tu pedido #{pedido_id} ya está en la plancha.*
 
@@ -501,7 +501,7 @@ Destino: *{direccion}*
 El repartidor ya salió del local. ¡Mantenete atento para recibir tu comida bien caliente! 🍔🔥`,
   template_order_confirmed: `🎉 *¡PEDIDO #{pedido_id} CONFIRMADO Y ENVIADO A COCINA!* 🔥🍔
 
-¡Muchas gracias *{cliente}*, tu comanda ya ingresó al sistema de la plancha!
+¡Muchas gracias *{cliente}*, tu pedido ya ingresó al sistema de la plancha!
 
 💵 *Total:* \${total}
 🛵 *Entrega:* {direccion}`
@@ -829,41 +829,129 @@ function resetCustomerSession(jid) {
 // 1. Control de atención humana (Modo Humano / Hand-over)
 // Duración de pausa automática cuando el operador escribe desde el teléfono físico
 const HUMAN_PAUSE_DURATION_MS = 25 * 60 * 1000; // 25 minutos
-const humanPausedChats = new Map(); // remoteJid -> { pausedUntil, reason, timestamp }
+const HUMAN_PAUSE_FILE = path.join(DATA_DIR, 'human_paused_chats.json');
 const botSentMessageIds = new Set(); // IDs de mensajes despachados por el propio bot (para no auto-pausarse)
 
+function extractCleanDigits(jid) {
+  if (!jid || typeof jid !== 'string') return '';
+  const withoutDomain = jid.split('@')[0];
+  const withoutDevice = withoutDomain.split(':')[0];
+  return withoutDevice.replace(/\D/g, '');
+}
+
+function loadHumanPausedChats() {
+  const map = new Map();
+  try {
+    if (fs.existsSync(HUMAN_PAUSE_FILE)) {
+      const raw = fs.readFileSync(HUMAN_PAUSE_FILE, 'utf-8');
+      const data = JSON.parse(raw);
+      const now = Date.now();
+      for (const [k, v] of Object.entries(data)) {
+        if (v && v.pausedUntil > now) {
+          map.set(k, v);
+        }
+      }
+    }
+  } catch (_) {}
+  return map;
+}
+
+function saveHumanPausedChats(map) {
+  try {
+    const obj = {};
+    const now = Date.now();
+    for (const [k, v] of map.entries()) {
+      if (v && v.pausedUntil > now) {
+        obj[k] = v;
+      }
+    }
+    fs.writeFileSync(HUMAN_PAUSE_FILE, JSON.stringify(obj, null, 2), 'utf-8');
+  } catch (_) {}
+}
+
+const humanPausedChats = loadHumanPausedChats();
+
+function findHumanPauseEntry(jid) {
+  if (!jid) return null;
+  const cleanJid = jid.replace(/:.*@/, '@').trim().toLowerCase();
+  const now = Date.now();
+
+  // 1. Coincidencia directa por JID limpio
+  if (humanPausedChats.has(cleanJid)) {
+    const entry = humanPausedChats.get(cleanJid);
+    if (entry.pausedUntil > now) return { key: cleanJid, entry };
+    humanPausedChats.delete(cleanJid);
+    saveHumanPausedChats(humanPausedChats);
+  }
+  if (humanPausedChats.has(jid)) {
+    const entry = humanPausedChats.get(jid);
+    if (entry.pausedUntil > now) return { key: jid, entry };
+    humanPausedChats.delete(jid);
+    saveHumanPausedChats(humanPausedChats);
+  }
+
+  // 2. Coincidencia por dígitos telefónicos (últimos 8 a 10 dígitos)
+  const incomingDigits = extractCleanDigits(jid);
+  if (incomingDigits.length >= 8) {
+    const searchSuffix = incomingDigits.slice(-9);
+    for (const [storedJid, entry] of humanPausedChats.entries()) {
+      if (entry.pausedUntil <= now) {
+        humanPausedChats.delete(storedJid);
+        continue;
+      }
+      const storedDigits = entry.phoneDigits || extractCleanDigits(storedJid);
+      if (storedDigits.length >= 8) {
+        if (storedDigits.endsWith(searchSuffix) || incomingDigits.endsWith(storedDigits.slice(-9))) {
+          return { key: storedJid, entry };
+        }
+      }
+    }
+    saveHumanPausedChats(humanPausedChats);
+  }
+
+  return null;
+}
+
 function pauseBotForCustomer(jid, durationMs = null, reason = 'operador_celular') {
+  const cleanJid = jid.replace(/:.*@/, '@').trim().toLowerCase();
+  const digits = extractCleanDigits(jid);
   const actualDurationMs = durationMs !== null ? durationMs : getHumanPauseDurationMs();
   const pausedUntil = Date.now() + actualDurationMs;
-  humanPausedChats.set(jid, {
+  const entry = {
     pausedUntil,
     reason,
+    phoneDigits: digits,
     timestamp: Date.now()
-  });
-  console.log(`👤 [MODO HUMANO]: Operador escribió a ${jid}. Bot pausado automáticamente por ${Math.round(actualDurationMs / 60000)} minutos.`);
+  };
+  humanPausedChats.set(cleanJid, entry);
+  saveHumanPausedChats(humanPausedChats);
+  console.log(`👤 [MODO HUMANO]: Operador escribió a ${cleanJid} (tel: ${digits}). Bot pausado automáticamente por ${Math.round(actualDurationMs / 60000)} minutos.`);
 }
 
 function resumeBotForCustomer(jid) {
-  if (humanPausedChats.has(jid)) {
-    humanPausedChats.delete(jid);
-    console.log(`🤖 [MODO BOT REANUDADO]: Pausa humana removida para ${jid}.`);
+  const match = findHumanPauseEntry(jid);
+  if (match) {
+    humanPausedChats.delete(match.key);
+    saveHumanPausedChats(humanPausedChats);
+    console.log(`🤖 [MODO BOT REANUDADO]: Pausa humana removida para ${jid} (clave: ${match.key}).`);
     return true;
   }
   return false;
 }
 
 function getHumanPauseStatus(jid) {
-  if (!humanPausedChats.has(jid)) return { isPaused: false };
-  const info = humanPausedChats.get(jid);
+  const match = findHumanPauseEntry(jid);
+  if (!match) return { isPaused: false };
   const now = Date.now();
-  if (now >= info.pausedUntil) {
-    humanPausedChats.delete(jid);
+  if (now >= match.entry.pausedUntil) {
+    humanPausedChats.delete(match.key);
+    saveHumanPausedChats(humanPausedChats);
     return { isPaused: false };
   }
   return {
     isPaused: true,
-    remainingMs: info.pausedUntil - now,
-    reason: info.reason
+    remainingMs: match.entry.pausedUntil - now,
+    reason: match.entry.reason
   };
 }
 
@@ -1204,6 +1292,10 @@ class WhatsAppBotServer {
               // Eco del propio bot: ignorar silenciosamente sin pausar la atención
               continue;
             }
+            if (this.connectedUser?.id && remoteJid.includes(this.connectedUser.id.split(':')[0])) {
+              // Mensaje personal a sí mismo
+              continue;
+            }
             pauseBotForCustomer(remoteJid, null, 'operador_celular');
             continue;
           }
@@ -1225,25 +1317,51 @@ class WhatsAppBotServer {
           // -------------------------------------------------------------
           const humanStatus = getHumanPauseStatus(remoteJid);
           const isExplicitBotReactivation = [
-            '#bot', 'menu', 'bot', 'activar', 'reiniciar', 'volver', 'carta', 'hacer pedido', 'pedir'
-          ].includes(lower);
+            '#bot', '#activar', 'activar bot', 'reiniciar bot'
+          ].includes(lower) || lower === '#menu';
 
           if (humanStatus.isPaused) {
             if (isExplicitBotReactivation) {
               resumeBotForCustomer(remoteJid);
               console.log(`🤖 [MODO BOT REANUDADO]: Cliente ${remoteJid} reactivó el bot con comando "${text}".`);
             } else {
-              console.log(`⏸️ [MODO HUMANO ACTIVO]: Mensaje de ${remoteJid} ("${text}") ignorado por bot (atención humana activa por ${Math.ceil(humanStatus.remainingMs / 60000)} min más).`);
+              console.log(`⏸️ [MODO HUMANO ACTIVO]: Mensaje de ${remoteJid} ("${text}") BLOQUEADO por bot (atención humana activa por ${Math.ceil(humanStatus.remainingMs / 60000)} min más).`);
               continue;
             }
           }
 
-          // Si envió una imagen (ej: comprobante de pago)
+          // Si envió una imagen (ej: comprobante de pago de transferencia)
           if (isImageMsg) {
             console.log(`📸 [WHATSAPP]: Imagen/Comprobante recibido de ${remoteJid}`);
-            await this.safeSendMessage(remoteJid, {
-              text: '📸 *¡Comprobante recibido con éxito!* 🔥\n\nMuchas gracias, ya fue notificado a caja y cocina para su validación.'
-            }, msg.key);
+            const orders = getStoredOrders();
+            const customerDigits = extractCleanDigits(remoteJid);
+            const activeTransferOrder = orders.find(o => {
+              if (o.status === 'cancelado' || o.status === 'entregado') return false;
+              if (o.paymentMethod !== 'transferencia') return false;
+              const oDigits = extractCleanDigits(o.customer?.phone || o.customer?.remoteJid || o.remoteJid || '');
+              return oDigits && (oDigits.endsWith(customerDigits.slice(-8)) || customerDigits.endsWith(oDigits.slice(-8)));
+            });
+
+            if (activeTransferOrder) {
+              activeTransferOrder.paymentStatus = 'comprobante_recibido';
+              activeTransferOrder.comprobanteReceivedAt = new Date().toISOString();
+              activeTransferOrder.updatedAt = Date.now();
+              saveStoredOrder(activeTransferOrder);
+              pushOrderToSupabase(activeTransferOrder).catch(() => {});
+              const pIdx = pendingOrdersForPos.findIndex(o => o.id === activeTransferOrder.id);
+              if (pIdx !== -1) {
+                pendingOrdersForPos[pIdx].paymentStatus = 'comprobante_recibido';
+                pendingOrdersForPos[pIdx].comprobanteReceivedAt = activeTransferOrder.comprobanteReceivedAt;
+              }
+
+              const custName = activeTransferOrder.customer?.name || 'Cliente';
+              const reply = `📸 *¡Comprobante de pago recibido con éxito!* 🙌\n\nMuchas gracias *${custName}*. Nuestro equipo en caja está validando la transferencia.\n⏳ En cuanto confirmen el ingreso del dinero, tu pedido pasará inmediatamente a la cocina para su preparación. ¡Te avisamos en instantes! 🔥🍔`;
+              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
+            } else {
+              await this.safeSendMessage(remoteJid, {
+                text: '📸 *¡Comprobante / Imagen recibida con éxito!* 🙌\n\nSi es un comprobante de transferencia, el encargado de caja lo revisará a la brevedad para validar tu pedido.'
+              }, msg.key);
+            }
             continue;
           }
 
@@ -1394,6 +1512,8 @@ class WhatsAppBotServer {
                 channel: 'whatsapp',
                 deliveryType: session.shippingMethod, // 'local' o 'delivery'
                 paymentMethod: session.paymentMethod, // 'efectivo' o 'transferencia'
+                paymentStatus: session.paymentMethod === 'transferencia' ? 'pendiente_comprobante' : 'pendiente_efectivo',
+                paymentConfirmed: false,
                 items: session.items.map(it => ({
                   id: it.id,
                   name: it.name,
@@ -1413,17 +1533,16 @@ class WhatsAppBotServer {
               saveStoredOrder(newOrder);
               pushOrderToSupabase(newOrder).catch(() => {});
               pendingOrdersForPos.push(newOrder);
-              console.log(`🔔 [NUEVA COMANDA WHATSAPP]: Pedido #${orderId} de ${newOrder.customer.name} ($${newOrder.total}) inyectado.`);
+              console.log(`🔔 [NUEVO PEDIDO WHATSAPP]: Pedido #${orderId} de ${newOrder.customer.name} ($${newOrder.total}) inyectado.`);
 
               const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
               
-              let confirmMsg = `🎉 *¡PEDIDO #${orderId} CONFIRMADO Y ENVIADO A LA COCINA!* 🔥🍔\n\n¡Muchas gracias *${newOrder.customer.name}*, tu comanda ya ingresó al sistema de la plancha!\n\n📋 *Detalle:*\n${itemsList}\n\n💵 *Total:* $${newOrder.total.toLocaleString('es-AR')}\n🛵 *Modo:* ${session.shippingMethod === 'delivery' ? '🛵 Envío a Domicilio' : '🛍️ Retiro por el Local'}\n📍 *Dirección:* ${newOrder.customer.address}\n`;
-
+              let confirmMsg = '';
               if (session.paymentMethod === 'transferencia') {
                 const biz = getBusinessContext();
-                confirmMsg += `\n💳 *Datos para Transferencia:*\n• *Alias:* \`${biz.alias_banco}\`\n• *Banco:* ${biz.banco}\n• *Titular:* ${biz.titular}${biz.cbu ? `\n• *CBU:* \`${biz.cbu}\`` : ''}\n\n📸 *Enviá la captura o foto del comprobante por aquí para validar tu pago.* 🔥`;
+                confirmMsg = `🎉 *¡PEDIDO #${orderId} REGISTRADO!* 🍔🔥\n\n¡Muchas gracias *${newOrder.customer.name}*!\n\n📋 *Detalle de tu pedido:*\n${itemsList}\n\n💵 *Total a transferir:* $${newOrder.total.toLocaleString('es-AR')}\n🛵 *Modo:* ${session.shippingMethod === 'delivery' ? '🛵 Envío a Domicilio' : '🛍️ Retiro por el Local'}\n📍 *Dirección:* ${newOrder.customer.address}\n\n💳 *Datos para Transferencia:*\n• *Alias:* \`${biz.alias_banco}\`\n• *Banco:* ${biz.banco}\n• *Titular:* ${biz.titular}${biz.cbu ? `\n• *CBU:* \`${biz.cbu}\`` : ''}\n\n📸 *IMPORTANTE:* Por favor enviá la foto o captura del comprobante por aquí.\n⏳ *Tu pedido quedará pendiente hasta que una persona de nuestro equipo confirme el comprobante y lo mande a cocina.* 🔥`;
               } else {
-                confirmMsg += `\n💵 *Pago en Efectivo:* Abonás al recibir tu comida. ¡La cocina ya está marchando tu pedido! 🔥`;
+                confirmMsg = `🎉 *¡PEDIDO #${orderId} CONFIRMADO Y ENVIADO A LA COCINA!* 🔥🍔\n\n¡Muchas gracias *${newOrder.customer.name}*, tu pedido ya ingresó al sistema de la plancha!\n\n📋 *Detalle:*\n${itemsList}\n\n💵 *Total:* $${newOrder.total.toLocaleString('es-AR')}\n🛵 *Modo:* ${session.shippingMethod === 'delivery' ? '🛵 Envío a Domicilio' : '🛍️ Retiro por el Local'}\n📍 *Dirección:* ${newOrder.customer.address}\n\n💵 *Pago en Efectivo:* Abonás al recibir tu comida. ¡La cocina ya está marchando tus burgers! 🔥`;
               }
 
               resetCustomerSession(remoteJid);
@@ -1453,7 +1572,7 @@ class WhatsAppBotServer {
             const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
             const shippingLabel = session.shippingMethod === 'delivery' ? '🛵 Envío a Domicilio' : '🛍️ Retiro por el Local (Mostrador)';
 
-            const summary = `🍔 *RESUMEN DE TU COMANDA* 🔥\n\n🛒 *Items:*\n${itemsList}\n\n🛵 *Entrega:* ${shippingLabel}\n📍 *Dirección:* ${session.shippingAddress}\n👤 *Cliente:* ${session.customerName}\n💳 *Forma de Pago:* ${session.paymentMethod === 'efectivo' ? 'Efectivo' : 'Transferencia Bancaria'}\n\n💵 *TOTAL A PAGAR:* $${session.total.toLocaleString('es-AR')}\n\n¿Está todo perfecto para mandar a la cocina?\n👉 Respondé *SI* para confirmar o *CANCELAR*.`;
+            const summary = `🍔 *RESUMEN DE TU PEDIDO* 🔥\n\n🛒 *Items:*\n${itemsList}\n\n🛵 *Entrega:* ${shippingLabel}\n📍 *Dirección:* ${session.shippingAddress}\n👤 *Cliente:* ${session.customerName}\n💳 *Forma de Pago:* ${session.paymentMethod === 'efectivo' ? 'Efectivo' : 'Transferencia Bancaria'}\n\n💵 *TOTAL A PAGAR:* $${session.total.toLocaleString('es-AR')}\n\n¿Está todo perfecto para mandar a la cocina?\n👉 Respondé *SI* para confirmar tu pedido o *CANCELAR*.`;
             
             await this.safeSendMessage(remoteJid, { text: summary }, msg.key);
             continue;
@@ -1486,7 +1605,7 @@ class WhatsAppBotServer {
               session.shippingAddress = 'Retiro en Local (Mostrador)';
               session.step = 'ASK_NAME';
               await this.safeSendMessage(remoteJid, {
-                text: '🛍️ *Retiro por el local seleccionado.*\n\n👤 *¿A nombre de quién registramos la comanda?*\n(Escribí tu nombre y apellido):'
+                text: '🛍️ *Retiro por el local seleccionado.*\n\n👤 *¿A nombre de quién registramos el pedido?*\n(Escribí tu nombre y apellido):'
               }, msg.key);
               continue;
             } else if (lower === '2' || lower.includes('envio') || lower.includes('envío') || lower.includes('delivery') || lower.includes('domicilio')) {
@@ -1509,13 +1628,13 @@ class WhatsAppBotServer {
             if (lower === 'listo' || lower === 'pedir' || lower === 'comprar' || lower === 'terminar' || lower === 'seguir' || lower === 'avanzar') {
               if (session.items.length === 0) {
                 await this.safeSendMessage(remoteJid, {
-                  text: '⚠️ Tu comanda está vacía. Escribí el *NÚMERO* de la burger que querés o escribí *MENU*.'
+                  text: '⚠️ Tu pedido está vacío. Escribí el *NÚMERO* de la burger que querés o escribí *MENU*.'
                 }, msg.key);
                 continue;
               }
               session.step = 'ASK_SHIPPING_METHOD';
               await this.safeSendMessage(remoteJid, {
-                text: `🛵 *¿Cómo querés recibir tu comanda?*\n\nRespondé con el número de opción:\n1️⃣ *Retiro por el local (Take Away)* 🏷️ Sin costo\n2️⃣ *Envío a domicilio con cadete (Delivery)*`
+                text: `🛵 *¿Cómo querés recibir tu pedido?*\n\nRespondé con el número de opción:\n1️⃣ *Retiro por el local (Take Away)* 🏷️ Sin costo\n2️⃣ *Envío a domicilio con cadete (Delivery)*`
               }, msg.key);
               continue;
             }
@@ -1564,7 +1683,7 @@ class WhatsAppBotServer {
               const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
 
               await this.safeSendMessage(remoteJid, {
-                text: `✅ *¡Sumaste ${selectedProd.name}!* 🍔 (+$${Number(selectedProd.price).toLocaleString('es-AR')})\n\n🛒 *Tu comanda actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n👉 ¿Querés sumar algo más? *(Escribí otro número)*\n👉 ¿Modificaciones? *(Ej: Sin cebolla, Extra cheddar)*\n👉 O escribí *LISTO* para continuar.`
+                text: `✅ *¡Sumaste ${selectedProd.name}!* 🍔 (+$${Number(selectedProd.price).toLocaleString('es-AR')})\n\n🛒 *Tu pedido actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n👉 ¿Querés sumar algo más? *(Escribí otro número)*\n👉 ¿Modificaciones? *(Ej: Sin cebolla, Extra cheddar)*\n👉 O escribí *LISTO* para continuar.`
               }, msg.key);
               continue;
             }
@@ -1632,7 +1751,7 @@ class WhatsAppBotServer {
                 : '';
               const orderNum = activeUserOrder.orderNumber || activeUserOrder.code || activeUserOrder.id;
 
-              const statusText = `📋 *SEGUIMIENTO DE TU COMANDA* 🔥\n\n` +
+              const statusText = `📋 *SEGUIMIENTO DE TU PEDIDO* 🔥\n\n` +
                 `🍔 *Pedido:* #${orderNum}\n` +
                 `📊 *Estado actual:* ${statusMap[activeUserOrder.status] || activeUserOrder.status}\n` +
                 `💵 *Total:* $${Number(activeUserOrder.total || 0).toLocaleString('es-AR')}\n` +
@@ -1644,7 +1763,7 @@ class WhatsAppBotServer {
               continue;
             } else {
               await this.safeSendMessage(remoteJid, {
-                text: '📋 *Estado de Pedido:*\n\nNo encontramos ninguna comanda activa asociada a tu número en este momento.\n\n👉 Para pedir unas hamburguesas recién hechas, escribí *COMPRAR* o *MENU*.'
+                text: '📋 *Estado de Pedido:*\n\nNo encontramos ningún pedido activo asociado a tu número en este momento.\n\n👉 Para pedir unas hamburguesas recién hechas, escribí *COMPRAR* o *MENU*.'
               }, msg.key);
               continue;
             }
@@ -1717,7 +1836,7 @@ class WhatsAppBotServer {
 
             const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
 
-            const reply = `✅ *¡Excelente elección! Sumaste ${matchedProd.name}* 🍔 (+$$${Number(matchedProd.price).toLocaleString('es-AR')})\n\n🛒 *Tu comanda actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n👉 ¿Querés sumar otra burger o bebida? *(Escribí su número)*\n👉 ¿Algún cambio? *(Ej: Sin cebolla, Extra cheddar)*\n👉 O respondé *LISTO* para elegir forma de entrega.`;
+            const reply = `✅ *¡Excelente elección! Sumaste ${matchedProd.name}* 🍔 (+$$${Number(matchedProd.price).toLocaleString('es-AR')})\n\n🛒 *Tu pedido actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n👉 ¿Querés sumar otra burger o bebida? *(Escribí su número)*\n👉 ¿Algún cambio? *(Ej: Sin cebolla, Extra cheddar)*\n👉 O respondé *LISTO* para elegir forma de entrega.`;
             await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
             continue;
           }
@@ -1730,12 +1849,25 @@ class WhatsAppBotServer {
           const isAntiLoopEnabled = tpls.anti_loop_enabled !== false;
 
           if (session.step === 'IDLE' && isAntiLoopEnabled) {
-            const cleanText = lower.replace(/[!¡?¿.,;:]/g, '').trim();
+            const cleanText = lower.replace(/[!¡?¿.,;:\-_]/g, ' ').replace(/\s+/g, ' ').trim();
             const { gratitude, farewell, acknowledge } = getAntiLoopWords();
 
-            const isGratitude = gratitude.some(g => cleanText === g || cleanText.startsWith(g + ' ') || cleanText.endsWith(' ' + g) || cleanText.includes(g));
-            const isFarewell = farewell.some(f => cleanText === f || cleanText.startsWith(f + ' ') || cleanText.endsWith(' ' + f));
-            const isAcknowledge = acknowledge.some(a => cleanText === a || cleanText.startsWith(a + ' ') || cleanText.endsWith(' ' + a) || cleanText.includes(a));
+            const isWordMatch = (list) => {
+              if (!Array.isArray(list)) return false;
+              return list.some(item => {
+                const cleanItem = String(item).trim().toLowerCase();
+                if (!cleanItem) return false;
+                if (cleanText === cleanItem) return true;
+                if (cleanText.startsWith(cleanItem + ' ')) return true;
+                if (cleanText.endsWith(' ' + cleanItem)) return true;
+                if (cleanText.includes(' ' + cleanItem + ' ')) return true;
+                return false;
+              });
+            };
+
+            const isGratitude = isWordMatch(gratitude);
+            const isFarewell = isWordMatch(farewell);
+            const isAcknowledge = isWordMatch(acknowledge);
 
             if (isGratitude || isFarewell || isAcknowledge) {
               const now = Date.now();
@@ -2161,7 +2293,7 @@ app.post('/api/order-counter/reset', (req, res) => {
 // Endpoint para actualizar estado de un pedido desde cualquier dispositivo (Android, POS, etc.)
 app.patch('/api/orders/:id/status', async (req, res) => {
   const { id } = req.params;
-  const { status, order: payloadOrder } = req.body;
+  const { status, order: payloadOrder, extraData } = req.body;
   if (!status) return res.status(400).json({ error: 'Status requerido' });
 
   const orders = getStoredOrders();
@@ -2171,6 +2303,13 @@ app.patch('/api/orders/:id/status', async (req, res) => {
   if (idx !== -1) {
     orders[idx].status = status;
     orders[idx].updatedAt = Date.now();
+    if (extraData && typeof extraData === 'object') {
+      Object.assign(orders[idx], extraData);
+    }
+    if (payloadOrder?.paymentStatus) orders[idx].paymentStatus = payloadOrder.paymentStatus;
+    if (payloadOrder?.paymentConfirmed !== undefined) orders[idx].paymentConfirmed = payloadOrder.paymentConfirmed;
+    if (payloadOrder?.paymentConfirmedAt) orders[idx].paymentConfirmedAt = payloadOrder.paymentConfirmedAt;
+
     if (payloadOrder?.customer && !orders[idx].customer?.phone) {
       orders[idx].customer = { ...orders[idx].customer, ...payloadOrder.customer };
     }
@@ -2185,13 +2324,15 @@ app.patch('/api/orders/:id/status', async (req, res) => {
       fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf-8');
     } catch (_) {}
   } else if (payloadOrder) {
-    targetOrder = { ...payloadOrder, status, updatedAt: Date.now() };
+    targetOrder = { ...payloadOrder, status, updatedAt: Date.now(), ...(extraData || {}) };
     saveStoredOrder(targetOrder);
   }
 
   const pIdx = pendingOrdersForPos.findIndex(o => o.id === id);
   if (pIdx !== -1) {
     pendingOrdersForPos[pIdx].status = status;
+    if (targetOrder?.paymentStatus) pendingOrdersForPos[pIdx].paymentStatus = targetOrder.paymentStatus;
+    if (targetOrder?.paymentConfirmed !== undefined) pendingOrdersForPos[pIdx].paymentConfirmed = targetOrder.paymentConfirmed;
   }
 
   updateOrderStatusInSupabase(id, status).catch(() => {});
@@ -2210,6 +2351,37 @@ app.patch('/api/orders/:id/status', async (req, res) => {
     status, 
     notified: Boolean(targetOrder?.notifiedStatuses?.includes(status)) 
   });
+});
+
+// Endpoint para que un operador humano valide el comprobante de transferencia y mande el pedido a cocina
+app.post('/api/orders/:id/confirm-payment', async (req, res) => {
+  const { id } = req.params;
+  const orders = getStoredOrders();
+  const idx = orders.findIndex(o => o.id === id);
+  if (idx === -1) {
+    return res.status(404).json({ success: false, error: 'Pedido no encontrado' });
+  }
+
+  orders[idx].paymentStatus = 'pagado';
+  orders[idx].paymentConfirmed = true;
+  orders[idx].paymentConfirmedAt = new Date().toISOString();
+  orders[idx].status = 'cocina';
+  orders[idx].updatedAt = Date.now();
+  if (!orders[idx].statusTimestamps) orders[idx].statusTimestamps = {};
+  orders[idx].statusTimestamps.cookingAt = new Date().toISOString();
+
+  saveStoredOrder(orders[idx]);
+  pushOrderToSupabase(orders[idx]).catch(() => {});
+  const pIdx = pendingOrdersForPos.findIndex(o => o.id === id);
+  if (pIdx !== -1) {
+    pendingOrdersForPos[pIdx] = { ...orders[idx] };
+  }
+
+  // Notificar por WhatsApp que el pago fue aprobado y entró a la cocina
+  botServer.sendOrderStatusNotification(orders[idx], 'cocina', true).catch(() => {});
+
+  console.log(`✅ [PAGO CONFIRMADO]: Pedido ${id} validado por operador humano y enviado a cocina.`);
+  res.json({ success: true, order: orders[idx] });
 });
 
 // Endpoint para reenviar manualmente la notificación por WhatsApp desde KDS o POS

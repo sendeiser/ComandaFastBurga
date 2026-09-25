@@ -63,18 +63,18 @@ export const DEFAULT_TEMPLATES = {
   
   menu_response_5: `👤 *¡Entendido {cliente}! Un encargado de {nombre_local} te responderá a la brevedad.* 🍔\n\nPor favor dejanos tu consulta detallada para que podamos ayudarte lo antes posible. ¡Muchas gracias!`,
 
-  // 2. Flujo de Compra y Comanda
-  template_buy_catalog: `🍔 *¡Vamos a armar tu comanda!* 🔥\n\n{catalogo_lista}\n\n👉 *Respondé con el NÚMERO (1, 2, 3...) de la hamburguesa o combo que quieras pedir.*`,
+  // 2. Flujo de Compra y Pedido
+  template_buy_catalog: `🍔 *¡Vamos a armar tu pedido!* 🔥\n\n{catalogo_lista}\n\n👉 *Respondé con el NÚMERO (1, 2, 3...) de la hamburguesa o combo que quieras pedir.*`,
   
   template_product_photo: `🍔 *{producto}* 🔥\n{detalle}\n💵 *Precio:* {precio}\n\n👉 Para pedir este producto escribí *COMPRAR* o su número.\n👉 Podés agregar aclaraciones como *Sin cebolla*, *Extra cheddar*, etc.`,
   
-  template_cart_item_added: `✅ *¡Agregaste {producto}!* 🍔 (+{subtotal_item})\n\n🛒 *Tu comanda actual:*\n{carrito_items}\n\n💵 *Subtotal:* \${subtotal}\n\n👉 ¿Querés sumar otra burger, papas o bebida? *(Escribí su número)*\n👉 Podés pedir aclaraciones *(Ej: sin cebolla, extra cheddar)*\n👉 O escribí *LISTO* para avanzar con la entrega y el pago.`,
+  template_cart_item_added: `✅ *¡Agregaste {producto}!* 🍔 (+{subtotal_item})\n\n🛒 *Tu pedido actual:*\n{carrito_items}\n\n💵 *Subtotal:* \${subtotal}\n\n👉 ¿Querés sumar otra burger, papas o bebida? *(Escribí su número)*\n👉 Podés pedir aclaraciones *(Ej: sin cebolla, extra cheddar)*\n👉 O escribí *LISTO* para avanzar con la entrega y el pago.`,
   
-  template_cart_view: `🛒 *TU COMANDA ACTUAL:* 🍔\n\n{carrito_items}\n\n💵 *Subtotal:* \${subtotal}\n\n👉 Para sumar más productos, escribí su *NÚMERO*.\n👉 Para quitar un producto, escribí *QUITAR [número]* (ej: QUITAR 1).\n👉 O escribí *LISTO* para avanzar con la entrega y el pago.`,
+  template_cart_view: `🛒 *TU PEDIDO ACTUAL:* 🍔\n\n{carrito_items}\n\n💵 *Subtotal:* \${subtotal}\n\n👉 Para sumar más productos, escribí su *NÚMERO*.\n👉 Para quitar un producto, escribí *QUITAR [número]* (ej: QUITAR 1).\n👉 O escribí *LISTO* para avanzar con la entrega y el pago.`,
   
   template_empty_cart: `⚠️ Tu carrito está vacío. Escribí el *NÚMERO* del producto que querés agregar o escribí *MENU*.`,
   
-  template_shipping_prompt: `🛵 *¿Cómo querés recibir tu comanda?*\n\nRespondé con el número de opción:\n1️⃣ *Retiro por el local (Mostrador / Take Away)* 🏷️ Sin costo\n2️⃣ *Envío a domicilio con cadete (Delivery)*`,
+  template_shipping_prompt: `🛵 *¿Cómo querés recibir tu pedido?*\n\nRespondé con el número de opción:\n1️⃣ *Retiro por el local (Mostrador / Take Away)* 🏷️ Sin costo\n2️⃣ *Envío a domicilio con cadete (Delivery)*`,
   
   template_address_prompt: `📍 *Por favor escribí tu dirección exacta y entrecalles para el repartidor:*`,
   
@@ -82,11 +82,11 @@ export const DEFAULT_TEMPLATES = {
   
   template_payment_prompt: `💳 *¿Cómo preferís abonar tu pedido?*\n\nRespondé con el número:\n1️⃣ *Transferencia Bancaria* (Alias / CBU)\n2️⃣ *Efectivo contra entrega* (Al recibir o retirar)\n3️⃣ *Mercado Pago* (Link directo de pago)`,
   
-  template_order_summary: `🍔 *RESUMEN DE TU COMANDA* 🔥\n\n🛒 *Items:*\n{carrito_items}\n\n💵 *Subtotal:* \${subtotal}\n{linea_descuento}🛵 *Entrega:* {metodo_entrega}\n📍 *Dirección:* {direccion}\n👤 *Cliente:* {cliente}\n💳 *Forma de Pago:* {medio_pago}\n\n💵 *TOTAL A PAGAR:* \${total}\n\n¿Está todo correcto para mandar a la cocina?\n👉 Respondé *SI* para confirmar tu comanda o *CANCELAR*.`,
+  template_order_summary: `🍔 *RESUMEN DE TU PEDIDO* 🔥\n\n🛒 *Items:*\n{carrito_items}\n\n💵 *Subtotal:* \${subtotal}\n{linea_descuento}🛵 *Entrega:* {metodo_entrega}\n📍 *Dirección:* {direccion}\n👤 *Cliente:* {cliente}\n💳 *Forma de Pago:* {medio_pago}\n\n💵 *TOTAL A PAGAR:* \${total}\n\n¿Está todo correcto para mandar a la cocina?\n👉 Respondé *SI* para confirmar tu pedido o *CANCELAR*.`,
   
-  template_order_confirmed: `🎉 *¡PEDIDO #{pedido_id} CONFIRMADO Y ENVIADO A COCINA!* 🔥🍔\n\n¡Muchas gracias *{cliente}*, tu comanda ya ingresó al sistema de la plancha!\n\n📋 *Detalle:*\n{carrito_items}\n💵 *Total:* \${total}\n🛵 *Entrega:* {direccion}\n\n{instrucciones_pago}`,
+  template_order_confirmed: `🎉 *¡PEDIDO #{pedido_id} CONFIRMADO Y ENVIADO A COCINA!* 🔥🍔\n\n¡Muchas gracias *{cliente}*, tu pedido ya ingresó al sistema de la plancha!\n\n📋 *Detalle:*\n{carrito_items}\n💵 *Total:* \${total}\n🛵 *Entrega:* {direccion}\n\n{instrucciones_pago}`,
   
-  template_order_cancelled: `❌ *Comanda cancelada.* ¿En qué más podemos ayudarte?\n\n{menu}`,
+  template_order_cancelled: `❌ *Pedido cancelado.* ¿En qué más podemos ayudarte?\n\n{menu}`,
 
   // 3. Notificaciones KDS de Estados de Cocina
   template_order_preparing: `👨‍🍳🔥 *¡Buenas noticias {cliente}! Tu pedido #{pedido_id} ya está en la plancha.*\n\nNuestros cocineros están preparando tus hamburguesas con la carne recién smashada y el cheddar fundido. ¡Te avisamos apenas esté listo! 🍔✨`,
@@ -107,12 +107,12 @@ export const ALL_TEMPLATE_NODES = [
   { id: 'menu_response_5', label: 'Respuesta: Hablar con Asesor', category: 'menu', description: 'Mensaje de derivación al encargado humano' },
   { id: 'template_buy_catalog', label: 'Catálogo de Compras', category: 'buy_flow', description: 'Inicio del flujo de selección de productos' },
   { id: 'template_cart_item_added', label: 'Producto Agregado al Carrito', category: 'buy_flow', description: 'Confirmación cuando el cliente elige una hamburguesa' },
-  { id: 'template_cart_view', label: 'Vista de Comanda Actual', category: 'buy_flow', description: 'Desglose del carrito con opciones de modificar' },
+  { id: 'template_cart_view', label: 'Vista de Pedido Actual', category: 'buy_flow', description: 'Desglose del carrito con opciones de modificar' },
   { id: 'template_shipping_prompt', label: 'Pregunta de Entrega', category: 'buy_flow', description: 'Pregunta si es Take Away o Delivery' },
   { id: 'template_address_prompt', label: 'Pregunta de Dirección', category: 'buy_flow', description: 'Solicitud de dirección para el repartidor' },
   { id: 'template_payment_prompt', label: 'Pregunta de Medio de Pago', category: 'buy_flow', description: 'Opciones de Efectivo, Transferencia o Mercado Pago' },
-  { id: 'template_order_summary', label: 'Resumen Previo a Confirmar', category: 'buy_flow', description: 'Comanda final para que el cliente responda SI' },
-  { id: 'template_order_confirmed', label: 'Comanda Confirmada a Cocina', category: 'buy_flow', description: 'Mensaje con el código de comanda #CMD' },
+  { id: 'template_order_summary', label: 'Resumen Previo a Confirmar', category: 'buy_flow', description: 'Pedido final para que el cliente responda SI' },
+  { id: 'template_order_confirmed', label: 'Pedido Confirmado a Cocina', category: 'buy_flow', description: 'Mensaje con el código de pedido #CMD' },
   { id: 'template_order_preparing', label: 'KDS: En Preparación', category: 'notifications', description: 'Notificación cuando cocina toma el pedido' },
   { id: 'template_order_ready', label: 'KDS: Pedido Listo', category: 'notifications', description: 'Notificación para que el cliente retire' },
   { id: 'template_order_shipped', label: 'KDS: En Camino', category: 'notifications', description: 'Notificación cuando sale con el repartidor' },

@@ -175,6 +175,45 @@ export default function KitchenDisplay({
           </div>
         )}
 
+        {/* Indicador de Estado de Comprobante / Pago */}
+        {order.paymentMethod === 'transferencia' && (
+          <div style={{
+            fontSize: '0.72rem',
+            fontWeight: 700,
+            marginTop: '3px',
+            padding: '3px 8px',
+            borderRadius: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            background: order.paymentConfirmed || order.paymentStatus === 'pagado'
+              ? 'rgba(16, 185, 129, 0.15)'
+              : order.paymentStatus === 'comprobante_recibido'
+              ? 'rgba(59, 130, 246, 0.2)'
+              : 'rgba(245, 158, 11, 0.18)',
+            color: order.paymentConfirmed || order.paymentStatus === 'pagado'
+              ? '#10b981'
+              : order.paymentStatus === 'comprobante_recibido'
+              ? '#60a5fa'
+              : '#f59e0b',
+            border: `1px solid ${
+              order.paymentConfirmed || order.paymentStatus === 'pagado'
+                ? 'rgba(16, 185, 129, 0.3)'
+                : order.paymentStatus === 'comprobante_recibido'
+                ? 'rgba(59, 130, 246, 0.4)'
+                : 'rgba(245, 158, 11, 0.3)'
+            }`
+          }}>
+            {order.paymentConfirmed || order.paymentStatus === 'pagado' ? (
+              <span>✅ Transferencia Acreditada</span>
+            ) : order.paymentStatus === 'comprobante_recibido' ? (
+              <span>📸 Comprobante Recibido • Por Validar</span>
+            ) : (
+              <span>⏳ Esperando Comprobante Transferencia</span>
+            )}
+          </div>
+        )}
+
         {/* Item List */}
         <div className="kds-items-list">
           {getSafeItems(order.items).map((item, idx) => (
@@ -203,15 +242,40 @@ export default function KitchenDisplay({
         <div className="kds-card-actions">
           {order.status === 'pendiente' && (
             <>
-              <button 
-                type="button"
-                className="btn-kds-action to-cooking"
-                onClick={() => onUpdateStatus(order.id, 'cocina')}
-                title="Comenzar a Cocinar"
-              >
-                <Play size={13} />
-                <span>Cocinar</span>
-              </button>
+              {order.paymentMethod === 'transferencia' && !(order.paymentConfirmed || order.paymentStatus === 'pagado') ? (
+                <button 
+                  type="button"
+                  className="btn-kds-action"
+                  style={{
+                    background: order.paymentStatus === 'comprobante_recibido'
+                      ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                      : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                    color: '#ffffff',
+                    boxShadow: '0 2px 10px rgba(16, 185, 129, 0.35)',
+                    border: 'none',
+                    fontWeight: 700
+                  }}
+                  onClick={() => onUpdateStatus(order.id, 'cocina', {
+                    paymentConfirmed: true,
+                    paymentStatus: 'pagado',
+                    paymentConfirmedAt: new Date().toISOString()
+                  })}
+                  title="Confirmar recepción física de transferencia y enviar pedido a la cocina"
+                >
+                  <CheckCircle2 size={14} />
+                  <span>{order.paymentStatus === 'comprobante_recibido' ? 'Validar y Cocinar' : 'Confirmar Pago'}</span>
+                </button>
+              ) : (
+                <button 
+                  type="button"
+                  className="btn-kds-action to-cooking"
+                  onClick={() => onUpdateStatus(order.id, 'cocina')}
+                  title="Comenzar a Cocinar"
+                >
+                  <Play size={13} />
+                  <span>Cocinar</span>
+                </button>
+              )}
               <button 
                 type="button"
                 className="kds-btn-cancel"

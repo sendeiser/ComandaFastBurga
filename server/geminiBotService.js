@@ -354,6 +354,7 @@ REGLAS DE ATENCIÓN:
 3. Si pregunta por ingredientes, celíacos o vegetarianos, sé honesto y empático mencionando lo que tenemos.
 4. Si el cliente quiere hacer un pedido o ver fotos, recordale que puede escribir "COMPRAR", "MENU" o "FOTO [número]".
 5. Respuestas concisas y atractivas (máximo 2 a 4 párrafos cortos). No des discursos largos.
+6. TERMINOLOGÍA OBLIGATORIA: Usa SIEMPRE la palabra "pedido" o "pedidos". Está TERMINANTEMENTE PROHIBIDO usar la palabra "comanda" con el cliente (la palabra comanda es exclusivamente de uso técnico interno para la cocina). Habla siempre de "tu pedido", "armar tu pedido", "confirmar tu pedido", "seguir tu pedido".
 
 Cliente: ${context.customerName || 'Cliente'}
     `.trim();
