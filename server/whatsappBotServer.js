@@ -194,25 +194,57 @@ async function syncAllFromSupabaseCloud() {
       console.log(`✅ [SUPABASE] Configuración de IA Gemini sincronizada.`);
     }
 
-    // 5. Productos
-    if (!fs.existsSync(PRODUCTS_FILE) || getStoredProducts().length === 0) {
-      try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/products?select=*`, {
+    // 5. Productos y Fotos Reales desde Supabase
+    try {
+      const [resProds, resImages] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/products?select=*&order=name.asc`, {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
             'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
           }
-        });
-        if (res.ok) {
-          const prods = await res.json();
-          if (Array.isArray(prods) && prods.length > 0) {
-            fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(prods, null, 2), 'utf-8');
-            console.log(`✅ [SUPABASE] Catálogo de productos sincronizado: ${prods.length} productos.`);
+        }),
+        fetch(`${SUPABASE_URL}/rest/v1/system_settings?id=eq.product_images`, {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          }
+        })
+      ]);
+
+      if (resProds.ok) {
+        const cloudProds = await resProds.json();
+        let imagesMap = {};
+        if (resImages.ok) {
+          const imgRows = await resImages.json();
+          if (Array.isArray(imgRows) && imgRows.length > 0 && imgRows[0].data) {
+            imagesMap = imgRows[0].data;
           }
         }
-      } catch (prodErr) {
-        console.warn('[SUPABASE] Error descargando productos:', prodErr.message);
+
+        if (Array.isArray(cloudProds) && cloudProds.length > 0) {
+          const mergedProds = cloudProds
+            .filter(p => p && p.is_active !== false)
+            .map(p => {
+              const img = p.image || imagesMap[p.id] || '';
+              return {
+                id: p.id,
+                name: p.name,
+                category: p.category || 'Hamburguesas',
+                price: Number(p.price) || 0,
+                emoji: p.emoji || '🍔',
+                description: p.description || '',
+                modifiers: Array.isArray(p.modifiers) ? p.modifiers : [],
+                image: img
+              };
+            });
+
+          fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(mergedProds, null, 2), 'utf-8');
+          const countWithPhotos = mergedProds.filter(p => p.image).length;
+          console.log(`✅ [SUPABASE] Catálogo de productos sincronizado: ${mergedProds.length} productos (${countWithPhotos} con fotos reales).`);
+        }
       }
+    } catch (prodErr) {
+      console.warn('[SUPABASE] Error descargando productos y fotos:', prodErr.message);
     }
   } catch (err) {
     console.warn('⚠️ [SUPABASE] No se pudo completar la sincronización en la nube, usando almacenamiento local:', err.message);
@@ -1239,7 +1271,7 @@ class WhatsAppBotServer {
           // -------------------------------------------------------------
           // COMANDO: FOTO DE UN PRODUCTO ESPECÍFICO
           // -------------------------------------------------------------
-          if (lower.startsWith('foto') || lower.startsWith('ver foto')) {
+          if (lower.startsWith('foto') || lower.startsWith('ver foto') || lower === 'fotos') {
             const numIdx = parseInt(lower.replace(/\D/g, ''), 10);
             let target = null;
             if (!isNaN(numIdx) && numIdx >= 1 && numIdx <= prods.length) {
@@ -1268,6 +1300,14 @@ class WhatsAppBotServer {
               }
 
               await this.safeSendMessage(remoteJid, { text: caption }, msg.key);
+              continue;
+            } else {
+              const withPhotos = prods
+                .map((p, idx) => ({ p, idx: idx + 1 }))
+                .filter(({ p }) => p.image);
+              const previewList = withPhotos.slice(0, 8).map(({ p, idx }) => `📸 *${idx}. ${p.name}*`).join('\n');
+              const helpMsg = `📸 *GALERÍA DE FOTOS (${withPhotos.length} productos con foto)* 🔥\n\n${previewList}\n\n👉 Para ver cualquier foto, escribí *FOTO [número]* (ej: *FOTO 1*, *FOTO 4*, *FOTO 12*).`;
+              await this.safeSendMessage(remoteJid, { text: helpMsg }, msg.key);
               continue;
             }
           }
