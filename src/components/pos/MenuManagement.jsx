@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import CategoryManagementModal from './CategoryManagementModal';
+import ConfirmModal from '../common/ConfirmModal';
 import { storageService } from '../../services/storageService';
 import { 
   Plus, Edit2, Trash2, Check, UtensilsCrossed, 
@@ -13,6 +14,7 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
 
   // Estados de edición de producto
   const [editingProduct, setEditingProduct] = useState(null);
+  const [deleteProductTarget, setDeleteProductTarget] = useState(null);
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Hamburguesas');
   const [price, setPrice] = useState('');
@@ -152,10 +154,8 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
     setEditingProduct(null);
   };
 
-  const handleDelete = (id) => {
-    if (confirm('¿Eliminar este producto del menú?')) {
-      onSaveProducts(products.filter(p => p.id !== id));
-    }
+  const handleDelete = (prod) => {
+    setDeleteProductTarget(prod);
   };
 
   // Filtrado de productos
@@ -362,7 +362,7 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
                       <button
                         type="button"
                         className="btn-delete-item"
-                        onClick={() => handleDelete(prod.id)}
+                        onClick={() => handleDelete(prod)}
                         title="Eliminar Producto"
                       >
                         <Trash2 size={14} />
@@ -648,6 +648,24 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
           </div>
         </div>
       )}
+
+      {/* MODAL CONFIRMAR ELIMINACIÓN DE PRODUCTO */}
+      <ConfirmModal
+        isOpen={!!deleteProductTarget}
+        title={`¿Eliminar "${deleteProductTarget?.name || 'producto'}"?`}
+        message={`¿Estás seguro de que deseas eliminar este producto del menú? Ya no estará disponible para pedidos en mostrador, delivery ni en WhatsApp.`}
+        confirmText="Sí, Eliminar Producto"
+        cancelText="Cancelar"
+        variant="danger"
+        icon={Trash2}
+        onConfirm={() => {
+          if (deleteProductTarget) {
+            onSaveProducts(products.filter(p => p.id !== deleteProductTarget.id));
+            setDeleteProductTarget(null);
+          }
+        }}
+        onCancel={() => setDeleteProductTarget(null)}
+      />
     </div>
   );
 }

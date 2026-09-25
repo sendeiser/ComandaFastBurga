@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ChefHat, Clock, CheckCircle2, Play, AlertCircle, Printer, MessageSquare, ShoppingBag, Utensils, RefreshCw, XCircle, ArrowLeftRight, ChevronUp, ChevronDown, RotateCcw } from 'lucide-react';
+import ConfirmModal from '../common/ConfirmModal';
 
 export default function KitchenDisplay({ 
   orders, 
@@ -11,6 +12,7 @@ export default function KitchenDisplay({
   const [channelFilter, setChannelFilter] = useState('all');
   const [notifyingId, setNotifyingId] = useState(null);
   const [mobileColumnTab, setMobileColumnTab] = useState('cocina'); // 'all' | 'pendiente' | 'cocina' | 'listo'
+  const [cancelModalOrder, setCancelModalOrder] = useState(null);
 
   // Update timer tick every 10 seconds
   useEffect(() => {
@@ -214,11 +216,7 @@ export default function KitchenDisplay({
                 type="button"
                 className="kds-btn-cancel"
                 title="Cancelar Pedido"
-                onClick={() => {
-                  if (window.confirm(`¿Estás seguro de CANCELAR el pedido #${order.orderNumber}?`)) {
-                    onUpdateStatus(order.id, 'cancelado');
-                  }
-                }}
+                onClick={() => setCancelModalOrder(order)}
               >
                 <XCircle size={13} />
                 <span>Cancelar</span>
@@ -444,6 +442,24 @@ export default function KitchenDisplay({
           </div>
         </div>
       </div>
+
+      {/* MODAL DE CONFIRMACIÓN PARA CANCELAR PEDIDO */}
+      <ConfirmModal
+        isOpen={!!cancelModalOrder}
+        title={`¿Cancelar el pedido #${cancelModalOrder?.orderNumber || ''}?`}
+        message={`¿Estás seguro de que deseas cancelar la comanda de ${cancelModalOrder?.customer?.name || 'este cliente'}? Esta orden pasará a estado CANCELADO.`}
+        confirmText="Sí, Cancelar Pedido"
+        cancelText="Volver"
+        variant="danger"
+        icon={XCircle}
+        onConfirm={() => {
+          if (cancelModalOrder) {
+            onUpdateStatus(cancelModalOrder.id, 'cancelado');
+            setCancelModalOrder(null);
+          }
+        }}
+        onCancel={() => setCancelModalOrder(null)}
+      />
     </div>
   );
 }

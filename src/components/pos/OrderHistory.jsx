@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Printer, Trash2, CheckCircle2, Clock, MessageSquare, ShoppingBag, Utensils, XCircle, DollarSign, Calendar } from 'lucide-react';
+import ConfirmModal from '../common/ConfirmModal';
 
 export default function OrderHistory({ 
   orders = [], 
@@ -9,6 +10,8 @@ export default function OrderHistory({
 }) {
   const [search, setSearch] = useState('');
   const [filterChannel, setFilterChannel] = useState('all');
+  const [deleteModalOrder, setDeleteModalOrder] = useState(null);
+  const [cancelModalOrder, setCancelModalOrder] = useState(null);
 
   const filteredOrders = orders.filter(o => {
     const matchSearch = (o.orderNumber != null ? o.orderNumber.toString() : (o.id || "")).includes(search) ||
@@ -206,13 +209,7 @@ export default function OrderHistory({
                             className="qty-btn"
                             style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)', background: 'rgba(239, 68, 68, 0.08)' }}
                             title="Cancelar Orden Pendiente"
-                            onClick={() => {
-                              if (window.confirm(`¿Cancelar la orden pendiente #${order.orderNumber}?`)) {
-                                if (onUpdateStatus) {
-                                  onUpdateStatus(order.id, 'cancelado');
-                                }
-                              }
-                            }}
+                            onClick={() => setCancelModalOrder(order)}
                           >
                             <XCircle size={15} />
                           </button>
@@ -230,11 +227,7 @@ export default function OrderHistory({
                           className="qty-btn"
                           style={{ color: 'var(--accent-rose)' }}
                           title="Eliminar Registro"
-                          onClick={() => {
-                            if (confirm(`¿Eliminar la orden #${order.orderNumber}?`)) {
-                              onDeleteOrder(order.id);
-                            }
-                          }}
+                          onClick={() => setDeleteModalOrder(order)}
                         >
                           <Trash2 size={15} />
                         </button>
@@ -336,13 +329,7 @@ export default function OrderHistory({
                         className="qty-btn"
                         style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)', background: 'rgba(239, 68, 68, 0.08)', height: '34px', width: '34px' }}
                         title="Cancelar Orden"
-                        onClick={() => {
-                          if (window.confirm(`¿Cancelar la orden pendiente #${order.orderNumber}?`)) {
-                            if (onUpdateStatus) {
-                              onUpdateStatus(order.id, 'cancelado');
-                            }
-                          }
-                        }}
+                        onClick={() => setCancelModalOrder(order)}
                       >
                         <XCircle size={15} />
                       </button>
@@ -361,11 +348,7 @@ export default function OrderHistory({
                       className="qty-btn"
                       style={{ color: 'var(--accent-rose)', height: '34px', width: '34px' }}
                       title="Eliminar Registro"
-                      onClick={() => {
-                        if (confirm(`¿Eliminar la orden #${order.orderNumber}?`)) {
-                          onDeleteOrder(order.id);
-                        }
-                      }}
+                      onClick={() => setDeleteModalOrder(order)}
                     >
                       <Trash2 size={15} />
                     </button>
@@ -376,6 +359,42 @@ export default function OrderHistory({
           })
         )}
       </div>
+
+      {/* MODAL CANCELAR ORDEN */}
+      <ConfirmModal
+        isOpen={!!cancelModalOrder}
+        title={`¿Cancelar la orden #${cancelModalOrder?.orderNumber || ''}?`}
+        message={`¿Estás seguro de cancelar la orden pendiente de ${cancelModalOrder?.customer?.name || 'este cliente'}? Esta orden pasará a estado CANCELADO.`}
+        confirmText="Sí, Cancelar Orden"
+        cancelText="Volver"
+        variant="warning"
+        icon={XCircle}
+        onConfirm={() => {
+          if (cancelModalOrder && onUpdateStatus) {
+            onUpdateStatus(cancelModalOrder.id, 'cancelado');
+          }
+          setCancelModalOrder(null);
+        }}
+        onCancel={() => setCancelModalOrder(null)}
+      />
+
+      {/* MODAL ELIMINAR ORDEN */}
+      <ConfirmModal
+        isOpen={!!deleteModalOrder}
+        title={`¿Eliminar la orden #${deleteModalOrder?.orderNumber || ''}?`}
+        message={`¿Estás seguro de eliminar el registro de la orden #${deleteModalOrder?.orderNumber || ''} (${deleteModalOrder?.customer?.name || 'Cliente'})? Esta acción borrará el registro de la lista de forma permanente.`}
+        confirmText="Sí, Eliminar Registro"
+        cancelText="Cancelar"
+        variant="danger"
+        icon={Trash2}
+        onConfirm={() => {
+          if (deleteModalOrder && onDeleteOrder) {
+            onDeleteOrder(deleteModalOrder.id);
+          }
+          setDeleteModalOrder(null);
+        }}
+        onCancel={() => setDeleteModalOrder(null)}
+      />
     </div>
   );
 }
