@@ -3,7 +3,8 @@ import {
   Bot, Sparkles, Key, Download, Terminal, Settings, ShieldCheck, QrCode, 
   Smartphone, CheckCircle2, Save, RotateCcw, Plus, 
   Trash2, Copy, Check, Info, Zap, AlertCircle, RefreshCw,
-  Power, Wifi, WifiOff, ExternalLink, Clock, UserCheck, MessageSquare, Store
+  Power, Wifi, WifiOff, ExternalLink, Clock, UserCheck, MessageSquare, Store,
+  Timer, Play, Gauge
 } from 'lucide-react';
 import AdminBotFlowsTab from './AdminBotFlowsTab';
 import AdminBotVariablesTab from './AdminBotVariablesTab';
@@ -87,6 +88,12 @@ export default function AdminWhatsAppBot({ initialTab }) {
   const [antiLoopSearch, setAntiLoopSearch] = useState('');
   const [savingAntiLoop, setSavingAntiLoop] = useState(false);
   const [antiLoopSaveMsg, setAntiLoopSaveMsg] = useState('');
+
+  // Typing delay test & status states
+  const [testingTyping, setTestingTyping] = useState(false);
+  const [testProgress, setTestProgress] = useState(0);
+  const [testCompletedMsg, setTestCompletedMsg] = useState(null);
+  const [typingSaveMsg, setTypingSaveMsg] = useState('');
 
   // Live Baileys Server Connection State
   const [serverOnline, setServerOnline] = useState(false);
@@ -416,6 +423,46 @@ export default function AdminWhatsAppBot({ initialTab }) {
     };
     setSettings(updated);
     chatbotService.saveSettings(updated);
+  };
+
+  const handleUpdateTypingDelay = (val, mode = null) => {
+    const delayMs = Math.max(500, Math.min(15000, Number(val) || 2500));
+    const targetMode = mode || settings.bot_typing_mode || 'human_dynamic';
+    const updated = {
+      ...settings,
+      bot_typing_delay_ms: delayMs,
+      bot_typing_mode: targetMode
+    };
+    setSettings(updated);
+    chatbotService.saveSettings(updated);
+    setTypingSaveMsg(`✅ Guardado: ${delayMs} ms (${(delayMs / 1000).toFixed(1)}s)`);
+    setSaveSuccess(true);
+    setTimeout(() => {
+      setTypingSaveMsg('');
+      setSaveSuccess(false);
+    }, 2800);
+  };
+
+  const handleTestTyping = () => {
+    if (testingTyping) return;
+    setTestingTyping(true);
+    setTestCompletedMsg(null);
+    setTestProgress(0);
+
+    const targetMs = Number(settings.bot_typing_delay_ms) || 2500;
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const pct = Math.min(100, Math.round((elapsed / targetMs) * 100));
+      setTestProgress(pct);
+      if (elapsed >= targetMs) {
+        clearInterval(interval);
+        setTestingTyping(false);
+        setTestProgress(100);
+        setTestCompletedMsg(`¡Mensaje despachado tras ${(targetMs / 1000).toFixed(1)} segundos! (Simulación de tipeo completada)`);
+        setTimeout(() => setTestCompletedMsg(null), 5000);
+      }
+    }, 30);
   };
 
   const handleAddAntiLoopWord = async () => {
@@ -1228,11 +1275,14 @@ call npm run dev
                   <Smartphone size={16} color="#059669" />
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
-                    Presencia "Escribiendo..."
+                  <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <span>Presencia "Escribiendo..."</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '1px 6px', borderRadius: '4px' }}>
+                      ⏱️ {((Number(settings.bot_typing_delay_ms) || 2500) / 1000).toFixed(1)}s
+                    </span>
                   </div>
                   <div style={{ fontSize: '0.74rem', color: '#334155', marginTop: '3px', lineHeight: '1.35' }}>
-                    Emite el evento <code style={{ background: '#f1f5f9', color: '#0f172a', padding: '1px 5px', borderRadius: '4px', border: '1px solid #cbd5e1', fontWeight: 700 }}>composing</code> en WhatsApp antes de responder, evitando banderas de bot.
+                    Emite el evento <code style={{ background: '#f1f5f9', color: '#0f172a', padding: '1px 5px', borderRadius: '4px', border: '1px solid #cbd5e1', fontWeight: 700 }}>composing</code> durante {((Number(settings.bot_typing_delay_ms) || 2500) / 1000).toFixed(1)}s ({settings.bot_typing_mode === 'fixed' ? 'Fijo' : 'Dinámico Humano'}) antes de responder.
                   </div>
                 </div>
               </div>
@@ -1468,6 +1518,379 @@ call npm run dev
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* SECCIÓN CONFIGURACIÓN: VELOCIDAD DE RESPUESTA & RETARDO DE TIPEO HUMANO */}
+          <div 
+            id="bot-typing-delay-section"
+            style={{
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: 'var(--radius-md)',
+              padding: '1.2rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.1rem',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
+            }}
+          >
+            {/* Encabezado */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.65rem' }}>
+              <div>
+                <h4 style={{ fontSize: '1.02rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <Timer size={19} color="#059669" />
+                  <span>Velocidad de Respuesta & Retardo de Tipeo Humano</span>
+                  <span style={{
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    background: 'rgba(16, 185, 129, 0.12)',
+                    color: '#047857',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    ⏱️ {((Number(settings.bot_typing_delay_ms) || 2500) / 1000).toFixed(1)}s ({Number(settings.bot_typing_delay_ms) || 2500} ms)
+                  </span>
+                  <span style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 800,
+                    background: (settings.bot_typing_mode || 'human_dynamic') === 'fixed' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(124, 58, 237, 0.1)',
+                    color: (settings.bot_typing_mode || 'human_dynamic') === 'fixed' ? '#2563eb' : '#7c3aed',
+                    border: `1px solid ${(settings.bot_typing_mode || 'human_dynamic') === 'fixed' ? 'rgba(59, 130, 246, 0.3)' : 'rgba(124, 58, 237, 0.3)'}`,
+                    padding: '2px 8px',
+                    borderRadius: '999px'
+                  }}>
+                    {(settings.bot_typing_mode || 'human_dynamic') === 'fixed' ? '⏱️ Tiempo Fijo' : '✨ Dinámico Proporcional'}
+                  </span>
+                </h4>
+                <div style={{ fontSize: '0.78rem', color: '#475569', marginTop: '4px', lineHeight: '1.4' }}>
+                  Ajusta los milisegundos que el bot simula estar <strong>"Escribiendo..."</strong> en WhatsApp antes de responder. Un tiempo natural (2.0s a 4.0s) hace que los clientes sientan que los atiende una persona real y previene bloqueos de WhatsApp.
+                </div>
+              </div>
+
+              {typingSaveMsg && (
+                <span style={{ fontSize: '0.78rem', color: '#047857', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px', background: '#ecfdf5', padding: '4px 10px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
+                  <CheckCircle2 size={15} /> {typingSaveMsg}
+                </span>
+              )}
+            </div>
+
+            {/* BOTONES RÁPIDOS DE PREAJUSTES (1 CLIC) */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.45rem',
+              padding: '0.85rem',
+              background: '#f8fafc',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0'
+            }}>
+              <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#334155', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <Zap size={14} color="#f59e0b" />
+                <span>Preajustes Rápidos Recomendados:</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.5rem' }}>
+                {[
+                  { ms: 1200, label: '⚡ Rápido (1.2s)', desc: 'Para horas pico de alta demanda' },
+                  { ms: 2500, label: '👤 Humano (2.5s)', desc: 'Equilibrado y muy natural (Recomendado)', recommended: true },
+                  { ms: 3500, label: '💬 Gastronómico (3.5s)', desc: 'Simula tipeo real de cajero' },
+                  { ms: 5000, label: '☕ Pausado (5.0s)', desc: 'Máxima sensación de atención humana' }
+                ].map(preset => {
+                  const isCurrent = (Number(settings.bot_typing_delay_ms) || 2500) === preset.ms;
+                  return (
+                    <button
+                      key={preset.ms}
+                      type="button"
+                      onClick={() => handleUpdateTypingDelay(preset.ms)}
+                      style={{
+                        padding: '0.6rem 0.75rem',
+                        borderRadius: '6px',
+                        textAlign: 'left',
+                        background: isCurrent ? 'rgba(16, 185, 129, 0.12)' : '#ffffff',
+                        border: isCurrent ? '1.5px solid #059669' : '1px solid #cbd5e1',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        position: 'relative'
+                      }}
+                    >
+                      <div style={{ fontSize: '0.8rem', fontWeight: 800, color: isCurrent ? '#047857' : '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span>{preset.label}</span>
+                        {preset.recommended && (
+                          <span style={{ fontSize: '0.62rem', background: '#fef3c7', color: '#b45309', padding: '1px 4px', borderRadius: '3px', fontWeight: 800 }}>
+                            TOP
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: isCurrent ? '#065f46' : '#64748b', marginTop: '2px' }}>
+                        {preset.desc}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* CONTROL DUAL: SLIDER + INPUT EXACTO EN MILISEGUNDOS */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '1rem',
+              padding: '0.85rem 1rem',
+              background: '#f8fafc',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0'
+            }}>
+              <div style={{ flex: '1 1 240px', minWidth: '220px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
+                    Control Preciso por Barra Deslizante:
+                  </span>
+                  <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#059669' }}>
+                    {((Number(settings.bot_typing_delay_ms) || 2500) / 1000).toFixed(1)} segundos
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="500"
+                  max="10000"
+                  step="100"
+                  value={Number(settings.bot_typing_delay_ms) || 2500}
+                  onChange={(e) => handleUpdateTypingDelay(e.target.value)}
+                  style={{
+                    width: '100%',
+                    accentColor: '#059669',
+                    cursor: 'pointer'
+                  }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: '#64748b', marginTop: '2px' }}>
+                  <span>0.5s (500ms)</span>
+                  <span>2.5s (Normal)</span>
+                  <span>5.0s</span>
+                  <span>7.5s</span>
+                  <span>10.0s (10.000ms)</span>
+                </div>
+              </div>
+
+              {/* Input numérico directo con controles rápidos */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#ffffff', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                    Milisegundos exactos:
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateTypingDelay(Math.max(500, (Number(settings.bot_typing_delay_ms) || 2500) - 250))}
+                      style={{ width: '24px', height: '26px', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#f8fafc', fontWeight: 800, cursor: 'pointer' }}
+                      title="-250ms"
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      min="500"
+                      max="15000"
+                      step="50"
+                      value={Number(settings.bot_typing_delay_ms) || 2500}
+                      onChange={(e) => handleUpdateTypingDelay(e.target.value)}
+                      style={{
+                        width: '74px',
+                        height: '26px',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        border: '1.5px solid #059669',
+                        fontSize: '0.84rem',
+                        fontWeight: 900,
+                        textAlign: 'center',
+                        color: '#0f172a',
+                        background: '#ffffff'
+                      }}
+                    />
+                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569' }}>ms</span>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateTypingDelay(Math.min(15000, (Number(settings.bot_typing_delay_ms) || 2500) + 250))}
+                      style={{ width: '24px', height: '26px', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#f8fafc', fontWeight: 800, cursor: 'pointer' }}
+                      title="+250ms"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* MODO DE COMPORTAMIENTO: DINÁMICO VS FIJO */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem',
+              padding: '0.75rem 0.95rem',
+              background: '#f8fafc',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0'
+            }}>
+              <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#334155' }}>
+                Modo de Simulación de Tipeo:
+              </span>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.65rem' }}>
+                <div
+                  onClick={() => handleUpdateTypingDelay(settings.bot_typing_delay_ms || 2500, 'human_dynamic')}
+                  style={{
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: '6px',
+                    border: (settings.bot_typing_mode || 'human_dynamic') === 'human_dynamic' ? '1.5px solid #059669' : '1px solid #cbd5e1',
+                    background: (settings.bot_typing_mode || 'human_dynamic') === 'human_dynamic' ? 'rgba(16, 185, 129, 0.08)' : '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <input
+                    type="radio"
+                    checked={(settings.bot_typing_mode || 'human_dynamic') === 'human_dynamic'}
+                    onChange={() => {}}
+                    style={{ marginTop: '2px', accentColor: '#059669' }}
+                  />
+                  <div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a' }}>
+                      Dinámico Proporcional (Recomendado)
+                    </div>
+                    <div style={{ fontSize: '0.71rem', color: '#475569', marginTop: '2px', lineHeight: '1.3' }}>
+                      Calcula el tiempo según la cantidad de caracteres (+14ms/letra) y aplica micro-variaciones aleatorias naturales. Si el mensaje es una comanda larga, escribe más tiempo.
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => handleUpdateTypingDelay(settings.bot_typing_delay_ms || 2500, 'fixed')}
+                  style={{
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: '6px',
+                    border: (settings.bot_typing_mode || 'human_dynamic') === 'fixed' ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                    background: (settings.bot_typing_mode || 'human_dynamic') === 'fixed' ? 'rgba(37, 99, 235, 0.08)' : '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <input
+                    type="radio"
+                    checked={(settings.bot_typing_mode || 'human_dynamic') === 'fixed'}
+                    onChange={() => {}}
+                    style={{ marginTop: '2px', accentColor: '#2563eb' }}
+                  />
+                  <div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a' }}>
+                      Tiempo Fijo Exacto
+                    </div>
+                    <div style={{ fontSize: '0.71rem', color: '#475569', marginTop: '2px', lineHeight: '1.3' }}>
+                      Espera exactamente los milisegundos configurados ({((Number(settings.bot_typing_delay_ms) || 2500) / 1000).toFixed(1)}s) en cada mensaje sin importar la longitud.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* SIMULADOR EN VIVO: PROBAR CÓMO SE SIENTE EL RETARDO */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.6rem',
+              padding: '0.85rem',
+              background: '#f0fdf4',
+              borderRadius: '8px',
+              border: '1px solid #bbf7d0'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Play size={15} color="#059669" />
+                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#065f46' }}>
+                    Probador Interactivo en Vivo:
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleTestTyping}
+                  disabled={testingTyping}
+                  style={{
+                    padding: '0.35rem 0.85rem',
+                    borderRadius: '6px',
+                    fontSize: '0.76rem',
+                    fontWeight: 800,
+                    background: testingTyping ? '#cbd5e1' : '#059669',
+                    color: '#ffffff',
+                    border: 'none',
+                    cursor: testingTyping ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                  }}
+                >
+                  {testingTyping ? <RefreshCw size={13} className="spin" /> : <Play size={13} />}
+                  <span>{testingTyping ? 'Simulando tipeo...' : '▶️ Probar Tipeo en Vivo'}</span>
+                </button>
+              </div>
+
+              {/* Caja de simulación de WhatsApp */}
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                padding: '0.75rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem',
+                minHeight: '68px',
+                justifyContent: 'center'
+              }}>
+                {testingTyping ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#059669' }}>
+                        WhatsApp • ComandaFast Bot:
+                      </span>
+                      <span style={{ fontSize: '0.74rem', color: '#059669', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        escribiendo
+                        <span style={{ display: 'inline-flex', gap: '2px' }}>
+                          <span style={{ animation: 'pulse 1s infinite', fontSize: '10px' }}>●</span>
+                          <span style={{ animation: 'pulse 1s infinite 0.2s', fontSize: '10px' }}>●</span>
+                          <span style={{ animation: 'pulse 1s infinite 0.4s', fontSize: '10px' }}>●</span>
+                        </span>
+                      </span>
+                    </div>
+                    {/* Barra de progreso */}
+                    <div style={{ width: '100%', height: '5px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+                      <div style={{ width: `${testProgress}%`, height: '100%', background: '#059669', transition: 'width 0.04s linear' }} />
+                    </div>
+                  </div>
+                ) : testCompletedMsg ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <CheckCircle2 size={16} color="#059669" />
+                      <span style={{ fontSize: '0.78rem', color: '#065f46', fontWeight: 700 }}>
+                        {testCompletedMsg}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                      💬 Mensaje enviado con éxito
+                    </span>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center' }}>
+                    Toca en <strong>"▶️ Probar Tipeo en Vivo"</strong> para experimentar cómo verá el cliente los {((Number(settings.bot_typing_delay_ms) || 2500) / 1000).toFixed(1)} segundos de espera con presencia "Escribiendo...".
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

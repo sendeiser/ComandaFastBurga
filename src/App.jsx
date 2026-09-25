@@ -128,34 +128,37 @@ export default function App() {
     (async () => {
       if (!supabaseSync.isConfigured()) return;
 
-      const [cloudProds, cloudOrders, cloudShift, cloudSettings, cloudCashiers, cloudBotVars, latestOrderNum] = await Promise.all([
+      const [
+        cloudProds, 
+        cloudOrders, 
+        cloudShift, 
+        cloudSettings, 
+        cloudCashiers, 
+        cloudBotVars, 
+        latestOrderNum,
+        cloudCategories,
+        cloudTemplates,
+        cloudFlows
+      ] = await Promise.all([
         supabaseSync.fetchProducts(),
         supabaseSync.fetchOrders(300),
         supabaseSync.fetchLatestCashShift(),
         supabaseSync.fetchSettings(),
         supabaseSync.fetchCashiers(),
         supabaseSync.fetchBotVariables(),
-        supabaseSync.fetchLatestOrderNumber()
+        supabaseSync.fetchLatestOrderNumber(),
+        supabaseSync.fetchCategories(),
+        supabaseSync.fetchBotTemplates(),
+        supabaseSync.fetchBotFlows()
       ]);
 
       if (latestOrderNum && latestOrderNum > 0) {
         storageService.updateOrderCounterIfHigher(latestOrderNum);
       }
 
-      if (cloudProds && cloudProds.length > 0) {
-        // Enriquecer con fotos locales o por defecto si la nube aÃºn no las tiene
-        const localProds = storageService.getProducts();
-        const mergedProds = cloudProds.map(cp => {
-          if (!cp.image) {
-            const loc = localProds.find(lp => lp.id === cp.id || (lp.name && cp.name && lp.name.toLowerCase() === cp.name.toLowerCase()));
-            if (loc && loc.image) {
-              return { ...cp, image: loc.image };
-            }
-          }
-          return cp;
-        });
-        setProducts(mergedProds);
-        storageService.saveProducts(mergedProds);
+      if (Array.isArray(cloudProds) && cloudProds.length > 0) {
+        setProducts(cloudProds);
+        storageService.saveProducts(cloudProds);
       }
 
       if (cloudOrders && cloudOrders.length > 0) {
@@ -178,8 +181,20 @@ export default function App() {
         authService.syncCashiersFromCloud(cloudCashiers);
       }
 
+      if (Array.isArray(cloudCategories) && cloudCategories.length > 0) {
+        storageService.saveCategories(cloudCategories);
+      }
+
       if (cloudBotVars) {
         chatbotService.saveBotVariables(cloudBotVars);
+      }
+
+      if (cloudTemplates) {
+        chatbotService.saveSettings(cloudTemplates);
+      }
+
+      if (Array.isArray(cloudFlows) && cloudFlows.length > 0) {
+        chatbotService.saveCustomFlows(cloudFlows);
       }
     })();
   }, []);
@@ -607,11 +622,18 @@ export default function App() {
     await Promise.allSettled(promises);
   };
 
-  const handleSaveProducts = (newProducts) => {
+  const handleSaveProducts = async (newProducts) => {
+    // Detectar productos eliminados para purgarlos permanentemente de Supabase Cloud
+    const currentIds = new Set(newProducts.map(p => p.id));
+    const deletedProducts = products.filter(p => p && p.id && !currentIds.has(p.id));
+    for (const del of deletedProducts) {
+      supabaseSync.deleteProduct(del.id).catch(() => {});
+    }
+
     storageService.saveProducts(newProducts);
     setProducts(newProducts);
     // Upsert completo a Supabase Cloud (fuente de verdad de productos)
-    supabaseSync.pushProducts(newProducts);
+    await supabaseSync.pushProducts(newProducts);
   };
 
   const handleSaveSettings = (newSettings) => {
@@ -714,30 +736,22 @@ export default function App() {
   };
 
   const handleRefreshAllSystem = async () => {
-    // 1. ACTUALIZAR DIRECTO A LA BASE DE DATOS (Supabase Cloud - Fuente de Verdad)
+    // ACTUALIZAR DIRECTO DESDE LA BASE DE DATOS (Supabase Cloud - 100% Fuente de Verdad)
     if (supabaseSync && supabaseSync.isConfigured()) {
       try {
-        // A. PUSH: Guardar y persistir todos los cambios actuales del sistema en la Base de Datos
-        const localProds = storageService.getProducts();
-        const localOrders = storageService.getOrders();
-        const localShift = storageService.getCashShift();
-        const localSettings = storageService.getSettings();
-        const localCategories = storageService.getCategories();
-        const localBotSettings = chatbotService.getSettings();
-        const localBotVars = chatbotService.getVariables();
-
-        await Promise.allSettled([
-          Array.isArray(localProds) && localProds.length > 0 ? supabaseSync.pushProducts(localProds) : Promise.resolve(),
-          Array.isArray(localOrders) && localOrders.length > 0 ? supabaseSync.pushOrdersBatch(localOrders) : Promise.resolve(),
-          localShift ? supabaseSync.createCashShift(localShift) : Promise.resolve(),
-          localSettings ? supabaseSync.saveSettings(localSettings) : Promise.resolve(),
-          Array.isArray(localCategories) && localCategories.length > 0 ? supabaseSync.saveCategories(localCategories) : Promise.resolve(),
-          localBotSettings ? supabaseSync.saveBotTemplates(localBotSettings) : Promise.resolve(),
-          localBotVars ? supabaseSync.saveBotVariables(localBotVars) : Promise.resolve()
-        ]);
-
-        // B. PULL: Descargar el estado consolidado y fresco de la Base de Datos
-        const [cloudProds, cloudOrders, cloudShift, cloudSettings, cloudCashiers, cloudBotVars, latestOrderNum, cloudShiftsHistory] = await Promise.allSettled([
+        const [
+          cloudProds, 
+          cloudOrders, 
+          cloudShift, 
+          cloudSettings, 
+          cloudCashiers, 
+          cloudBotVars, 
+          latestOrderNum, 
+          cloudShiftsHistory,
+          cloudCategories,
+          cloudTemplates,
+          cloudFlows
+        ] = await Promise.allSettled([
           supabaseSync.fetchProducts(),
           supabaseSync.fetchOrders(500),
           supabaseSync.fetchLatestCashShift(),
@@ -745,29 +759,22 @@ export default function App() {
           supabaseSync.fetchCashiers(),
           supabaseSync.fetchBotVariables(),
           supabaseSync.fetchLatestOrderNumber(),
-          supabaseSync.fetchCashShifts(100)
+          supabaseSync.fetchCashShifts(100),
+          supabaseSync.fetchCategories(),
+          supabaseSync.fetchBotTemplates(),
+          supabaseSync.fetchBotFlows()
         ]);
 
         if (latestOrderNum.status === 'fulfilled' && latestOrderNum.value && latestOrderNum.value > 0) {
           storageService.updateOrderCounterIfHigher(latestOrderNum.value);
         }
 
-        if (cloudProds.status === 'fulfilled' && cloudProds.value && cloudProds.value.length > 0) {
-          const currentProds = storageService.getProducts();
-          const mergedProds = cloudProds.value.map(cp => {
-            if (!cp.image) {
-              const loc = currentProds.find(lp => lp.id === cp.id || (lp.name && cp.name && lp.name.toLowerCase() === cp.name.toLowerCase()));
-              if (loc && loc.image) {
-                return { ...cp, image: loc.image };
-              }
-            }
-            return cp;
-          });
-          setProducts(mergedProds);
-          storageService.saveProducts(mergedProds);
+        if (cloudProds.status === 'fulfilled' && Array.isArray(cloudProds.value) && cloudProds.value.length > 0) {
+          setProducts(cloudProds.value);
+          storageService.saveProducts(cloudProds.value);
         }
 
-        if (cloudOrders.status === 'fulfilled' && cloudOrders.value && cloudOrders.value.length > 0) {
+        if (cloudOrders.status === 'fulfilled' && Array.isArray(cloudOrders.value)) {
           const validOrders = cloudOrders.value.filter(o => o && !storageService.isOrderDeleted(o.id));
           storageService.saveOrdersBatch(validOrders);
           setOrders(storageService.getOrders());
@@ -791,8 +798,20 @@ export default function App() {
           authService.syncCashiersFromCloud(cloudCashiers.value);
         }
 
+        if (cloudCategories.status === 'fulfilled' && Array.isArray(cloudCategories.value) && cloudCategories.value.length > 0) {
+          storageService.saveCategories(cloudCategories.value);
+        }
+
         if (cloudBotVars.status === 'fulfilled' && cloudBotVars.value) {
           chatbotService.saveBotVariables(cloudBotVars.value);
+        }
+
+        if (cloudTemplates.status === 'fulfilled' && cloudTemplates.value) {
+          chatbotService.saveSettings(cloudTemplates.value);
+        }
+
+        if (cloudFlows.status === 'fulfilled' && Array.isArray(cloudFlows.value) && cloudFlows.value.length > 0) {
+          chatbotService.saveCustomFlows(cloudFlows.value);
         }
       } catch (err) {
         console.warn('[handleRefreshAllSystem] Error actualizando base de datos:', err);

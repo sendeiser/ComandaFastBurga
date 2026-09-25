@@ -57,11 +57,11 @@ export default function AdminBotVariablesTab() {
   const [newVarValue, setNewVarValue] = useState('');
   const [newVarDescription, setNewVarDescription] = useState('');
 
-  // Sync from server on mount
+  // Sync from Supabase Cloud on mount
   useEffect(() => {
-    chatbotService.fetchServerBotVariables().then(serverVars => {
-      if (Array.isArray(serverVars) && serverVars.length > 0) {
-        setVariables(serverVars);
+    chatbotService.fetchCloudBotVariables().then(cloudVars => {
+      if (Array.isArray(cloudVars) && cloudVars.length > 0) {
+        setVariables(cloudVars);
       }
     });
   }, []);

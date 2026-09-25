@@ -120,8 +120,9 @@ export default function AdminChatbotLab() {
     setInputText('');
     setIsBotTyping(true);
 
-    // Calcular demora según velocidad de simulación
-    const delayMs = simulationSpeed === 'fast' ? 300 : simulationSpeed === 'human' ? 1400 : 700;
+    // Calcular demora según velocidad de simulación (respetando tiempo configurado en panel de admin)
+    const configuredDelay = Number(chatbotService.getSettings()?.bot_typing_delay_ms) || 2500;
+    const delayMs = simulationSpeed === 'fast' ? 300 : simulationSpeed === 'human' ? configuredDelay : Math.max(500, Math.round(configuredDelay * 0.5));
     
     setTimeout(() => {
       // 2. Computar respuesta del bot

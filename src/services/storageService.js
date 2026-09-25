@@ -220,29 +220,14 @@ export const storageService = {
   getProducts() {
     const raw = localStorage.getItem(KEYS.PRODUCTS);
     if (!raw) {
-      localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(DEFAULT_PRODUCTS));
-      return DEFAULT_PRODUCTS;
+      return [];
     }
     try {
       const prods = JSON.parse(raw);
-      let updated = false;
-      const enriched = prods.map(p => {
-        if (!p.image) {
-          const match = DEFAULT_PRODUCTS.find(dp => dp.id === p.id || dp.name.toLowerCase() === p.name.toLowerCase());
-          if (match && match.image) {
-            updated = true;
-            return { ...p, image: match.image };
-          }
-        }
-        return p;
-      });
-      if (updated) {
-        localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(enriched));
-        return enriched;
-      }
+      if (!Array.isArray(prods)) return [];
       return prods;
     } catch (_) {
-      return DEFAULT_PRODUCTS;
+      return [];
     }
   },
 

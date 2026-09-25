@@ -1,7 +1,42 @@
 [
   {
-    "id": "ord-1790198170823",
-    "orderNumber": 111,
+    "id": "ord-1790304518976",
+    "orderNumber": 4,
+    "channel": "mesa",
+    "tableNumber": "3",
+    "customer": {
+      "name": "",
+      "notes": "",
+      "phone": "",
+      "address": ""
+    },
+    "items": [
+      {
+        "id": "item-1790304431851-0.6748647758363525",
+        "qty": 2,
+        "name": "CRIOLLA",
+        "unitPrice": 10000,
+        "notes": "",
+        "modifiers": []
+      }
+    ],
+    "subtotal": 20000,
+    "deliveryFee": 0,
+    "total": 20000,
+    "paymentMethod": "efectivo",
+    "status": "entregado",
+    "statusTimestamps": {
+      "readyAt": null,
+      "cookingAt": null,
+      "createdAt": "2026-09-25T02:48:38.976Z",
+      "deliveredAt": null
+    },
+    "createdAt": "2026-09-25T02:48:38.976+00:00",
+    "updatedAt": 1790304714927
+  },
+  {
+    "id": "ord-1790303797454",
+    "orderNumber": 3,
     "channel": "whatsapp",
     "tableNumber": "",
     "customer": {
@@ -12,57 +47,123 @@
     },
     "items": [
       {
-        "id": "item-1790198160386-0.4564511022576908",
+        "id": "item-1790303787424-0.5876072198070066",
         "qty": 1,
-        "name": "COMPLETA",
-        "unitPrice": 11000,
+        "name": "4x4",
+        "unitPrice": 15000,
         "notes": "",
         "modifiers": []
       }
     ],
-    "subtotal": 11000,
+    "subtotal": 15000,
     "deliveryFee": 1000,
-    "total": 12000,
+    "total": 16000,
     "paymentMethod": "efectivo",
-    "status": "cancelado",
+    "status": "entregado",
     "statusTimestamps": {
       "readyAt": null,
       "cookingAt": null,
-      "createdAt": "2026-09-23T21:16:10.823Z",
+      "createdAt": "2026-09-25T02:36:37.454Z",
       "deliveredAt": null
     },
-    "createdAt": "2026-09-23T21:16:10.823+00:00",
-    "updatedAt": 1790199478084
+    "createdAt": "2026-09-25T02:36:37.454+00:00",
+    "updatedAt": 1790304375516
   },
   {
-    "id": "ord-1790198109943-647",
-    "orderNumber": 1,
+    "id": "ord-1790303438306",
+    "orderNumber": 2,
     "channel": "mesa",
-    "tableNumber": "1",
+    "tableNumber": "2",
     "customer": {
-      "name": "Mesa 1",
+      "name": "",
+      "notes": "",
       "phone": "",
       "address": ""
     },
     "items": [
       {
-        "id": "item-0.8657133550404855",
+        "id": "item-1790303400051-0.8578795359434879",
         "qty": 1,
-        "name": "Papas Fritas Clásicas",
+        "name": "CLASICA",
         "unitPrice": 8000,
+        "notes": "",
+        "modifiers": []
+      },
+      {
+        "id": "item-1790303413573-0.4545107245631549",
+        "qty": 1,
+        "name": "Coca Cola 354ml",
+        "unitPrice": 3000,
         "notes": "",
         "modifiers": []
       }
     ],
-    "subtotal": 8000,
+    "subtotal": 11000,
     "deliveryFee": 0,
-    "total": 8000,
+    "total": 11000,
     "paymentMethod": "efectivo",
-    "status": "cancelado",
+    "status": "entregado",
     "statusTimestamps": {
-      "pendiente": 1790198111246
+      "readyAt": null,
+      "cookingAt": null,
+      "createdAt": "2026-09-25T02:30:38.307Z",
+      "deliveredAt": null
     },
-    "createdAt": "2026-09-23T18:15:09+00:00",
-    "updatedAt": 1790199479423
+    "createdAt": "2026-09-25T02:30:38.306+00:00",
+    "updatedAt": 1790304377716
+  },
+  {
+    "id": "ord-1790302230924",
+    "orderNumber": 1,
+    "channel": "whatsapp",
+    "tableNumber": "",
+    "customer": {
+      "name": "",
+      "notes": "",
+      "phone": "",
+      "address": ""
+    },
+    "items": [
+      {
+        "id": "item-1790302166437-0.023882067327170353",
+        "qty": 1,
+        "name": "BIG BURGA",
+        "unitPrice": 10000,
+        "notes": "",
+        "modifiers": [
+          "sin lechuga",
+          "con queso tybo."
+        ]
+      },
+      {
+        "id": "item-1790302171923-0.24523551320795978",
+        "qty": 1,
+        "name": "Aros de Cebolla",
+        "unitPrice": 9000,
+        "notes": "",
+        "modifiers": []
+      },
+      {
+        "id": "item-1790302176883-0.4300727486264281",
+        "qty": 1,
+        "name": "Coca Cola 354ml",
+        "unitPrice": 3000,
+        "notes": "",
+        "modifiers": []
+      }
+    ],
+    "subtotal": 22000,
+    "deliveryFee": 1000,
+    "total": 23000,
+    "paymentMethod": "efectivo",
+    "status": "entregado",
+    "statusTimestamps": {
+      "readyAt": null,
+      "cookingAt": null,
+      "createdAt": "2026-09-25T02:10:30.924Z",
+      "deliveredAt": null
+    },
+    "createdAt": "2026-09-25T02:10:30.924+00:00",
+    "updatedAt": 1790302383584
   }
 ]

@@ -36,6 +36,8 @@ export const DEFAULT_TEMPLATES = {
   // Parámetros de Blindaje & Modo Humano
   anti_loop_enabled: true,
   human_mode_sleep_minutes: 25,
+  bot_typing_delay_ms: 2500,
+  bot_typing_mode: 'human_dynamic', // 'human_dynamic' | 'fixed'
   anti_loop_gratitude: DEFAULT_ANTI_LOOP_GRATITUDE,
   anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,
   anti_loop_acknowledge: DEFAULT_ANTI_LOOP_ACKNOWLEDGE,
@@ -359,13 +361,26 @@ export const DEFAULT_CUSTOM_FLOWS = [
 ];
 
 
+const DIGIT_EMOJIS = {
+  '0': '0️⃣',
+  '1': '1️⃣',
+  '2': '2️⃣',
+  '3': '3️⃣',
+  '4': '4️⃣',
+  '5': '5️⃣',
+  '6': '6️⃣',
+  '7': '7️⃣',
+  '8': '8️⃣',
+  '9': '9️⃣'
+};
+
 export function formatItemNumber(n) {
-  const numEmojis = {
-    1: '1️⃣', 2: '2️⃣', 3: '3️⃣', 4: '4️⃣', 5: '5️⃣',
-    6: '6️⃣', 7: '7️⃣', 8: '8️⃣', 9: '9️⃣', 10: '🔟'
-  };
-  if (numEmojis[n]) return numEmojis[n];
-  return `*[${n}]*`;
+  if (n === null || n === undefined || isNaN(n)) return '';
+  const numStr = String(n).trim();
+  return numStr
+    .split('')
+    .map(digit => DIGIT_EMOJIS[digit] || digit)
+    .join('');
 }
 
 

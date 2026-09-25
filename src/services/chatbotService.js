@@ -74,6 +74,28 @@ export const chatbotService = {
     return map;
   },
 
+  getVariables() {
+    return this.getBotVariables();
+  },
+
+  async fetchCloudBotVariables() {
+    try {
+      if (supabaseSync.isConfigured()) {
+        const cloudVars = await supabaseSync.fetchBotVariables();
+        if (Array.isArray(cloudVars) && cloudVars.length > 0) {
+          localStorage.setItem(BOT_VARIABLES_KEY, JSON.stringify(cloudVars));
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('comandafast:bot_variables_updated', { detail: cloudVars }));
+          }
+          return cloudVars;
+        }
+      }
+    } catch (e) {
+      console.warn('[chatbotService] Error al cargar variables desde Supabase Cloud:', e);
+    }
+    return this.fetchServerBotVariables();
+  },
+
   async fetchServerBotVariables() {
     try {
       const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
@@ -187,11 +209,15 @@ export const chatbotService = {
         return {
           human_mode_sleep_minutes: 25,
           anti_loop_enabled: true,
+          bot_typing_delay_ms: 2500,
+          bot_typing_mode: 'human_dynamic',
           anti_loop_gratitude: DEFAULT_ANTI_LOOP_GRATITUDE,
           anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,
           anti_loop_acknowledge: DEFAULT_ANTI_LOOP_ACKNOWLEDGE,
           ...DEFAULT_TEMPLATES,
           ...parsed,
+          bot_typing_delay_ms: Math.max(500, Math.min(15000, Number(parsed.bot_typing_delay_ms) || 2500)),
+          bot_typing_mode: parsed.bot_typing_mode || 'human_dynamic',
           anti_loop_enabled: parsed.anti_loop_enabled !== undefined ? Boolean(parsed.anti_loop_enabled) : true,
           human_mode_sleep_minutes: Number(parsed.human_mode_sleep_minutes) || 25,
           anti_loop_gratitude: Array.isArray(parsed.anti_loop_gratitude) ? parsed.anti_loop_gratitude : DEFAULT_ANTI_LOOP_GRATITUDE,
@@ -218,6 +244,8 @@ export const chatbotService = {
       store_website_url: window.location.origin,
       anti_loop_enabled: true,
       human_mode_sleep_minutes: 25,
+      bot_typing_delay_ms: 2500,
+      bot_typing_mode: 'human_dynamic',
       anti_loop_gratitude: DEFAULT_ANTI_LOOP_GRATITUDE,
       anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,
       anti_loop_acknowledge: DEFAULT_ANTI_LOOP_ACKNOWLEDGE,
@@ -225,13 +253,25 @@ export const chatbotService = {
     };
   },
 
-  // 2. Guardar ajustes del bot (Local + Supabase Cloud)
+  // 2. Guardar ajustes del bot (Local + Supabase Cloud + Servidor Baileys)
   async saveSettings(newSettings) {
     try {
       localStorage.setItem(BOT_SETTINGS_KEY, JSON.stringify(newSettings));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('comandafast:bot_settings_updated', { detail: newSettings }));
+      }
       if (supabaseSync.isConfigured()) {
         await supabaseSync.saveBotTemplates(newSettings);
       }
+      // Sincronizar también con servidor local Baileys si está accesible
+      try {
+        const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+        fetch(`http://${botHost}:3002/api/bot-templates`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ templates: newSettings })
+        }).catch(() => {});
+      } catch (_) {}
       return true;
     } catch (e) {
       console.error('[chatbotService] Error al guardar ajustes:', e);
@@ -518,7 +558,7 @@ export const chatbotService = {
       if (target) {
         // PRIORIZAR FOTO SUBIDA POR EL USUARIO O DESDE BASE DE DATOS
         image = target.image || target.image_url || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80';
-        reply = `🍔 *${target.name}* 🔥\n\n💵 *Precio:* $${Number(target.price).toLocaleString('es-AR')}\n📖 *Detalle:* ${target.description || 'Elaborada en nuestra cocina con ingredientes frescos del día.'}\n${target.modifiers?.length ? '✨ *Modificadores:* ' + target.modifiers.join(', ') + '\n' : ''}\n👉 *Para agregarla a tu comanda respondé con su número (*${prods.indexOf(target) + 1}*) o escribí COMPRAR.*\n👉 Escribí *FOTO [número]* para ver otra hamburguesa.`;
+        reply = `🍔 *${target.name}* 🔥\n\n💵 *Precio:* $${Number(target.price).toLocaleString('es-AR')}\n📖 *Detalle:* ${target.description || 'Elaborada en nuestra cocina con ingredientes frescos del día.'}\n${target.modifiers?.length ? '✨ *Modificadores:* ' + target.modifiers.join(', ') + '\n' : ''}\n👉 *Para agregarla a tu comanda respondé con su número (${formatItemNumber(prods.indexOf(target) + 1)}) o escribí COMPRAR.*\n👉 Escribí *FOTO [número]* para ver otra hamburguesa.`;
         return { reply, image, newState };
       } else {
         const listText = prods.map((p, i) => {

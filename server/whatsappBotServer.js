@@ -478,6 +478,8 @@ const DEFAULT_ANTI_LOOP_ACKNOWLEDGE = [
 const DEFAULT_SERVER_TEMPLATES = {
   anti_loop_enabled: true,
   human_mode_sleep_minutes: 25,
+  bot_typing_delay_ms: 2500,
+  bot_typing_mode: 'human_dynamic',
   anti_loop_gratitude: DEFAULT_ANTI_LOOP_GRATITUDE,
   anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,
   anti_loop_acknowledge: DEFAULT_ANTI_LOOP_ACKNOWLEDGE,
@@ -598,13 +600,26 @@ function interpolateTemplate(template, vars = {}) {
   return res;
 }
 
+const DIGIT_EMOJIS = {
+  '0': '0️⃣',
+  '1': '1️⃣',
+  '2': '2️⃣',
+  '3': '3️⃣',
+  '4': '4️⃣',
+  '5': '5️⃣',
+  '6': '6️⃣',
+  '7': '7️⃣',
+  '8': '8️⃣',
+  '9': '9️⃣'
+};
+
 function formatItemNumber(n) {
-  const numEmojis = {
-    1: '1️⃣', 2: '2️⃣', 3: '3️⃣', 4: '4️⃣', 5: '5️⃣',
-    6: '6️⃣', 7: '7️⃣', 8: '8️⃣', 9: '9️⃣', 10: '🔟'
-  };
-  if (numEmojis[n]) return numEmojis[n];
-  return `*[${n}]*`;
+  if (n === null || n === undefined || isNaN(n)) return '';
+  const numStr = String(n).trim();
+  return numStr
+    .split('')
+    .map(digit => DIGIT_EMOJIS[digit] || digit)
+    .join('');
 }
 
 function buildCatalogMessage(prods, page = 1, pageSize = 8, isAll = false) {
@@ -891,20 +906,33 @@ class WhatsAppBotServer {
         await this.sock.sendPresenceUpdate('composing', remoteJid);
       } catch (_) {}
 
-      // 3. Calcular retardo humano natural
-      let delayMs = 1500;
+      // 3. Calcular retardo humano según configuración del Administrador
+      const tpls = getBotTemplates();
+      const configuredBaseMs = Number(tpls.bot_typing_delay_ms) || 2500;
+      const typingMode = tpls.bot_typing_mode || 'human_dynamic';
+
+      let delayMs = configuredBaseMs;
       if (typeof customDelay === 'number') {
         delayMs = customDelay;
       } else if (content?.image) {
-        // Subida y despacho de fotos: 2.2s a 3.4s
-        delayMs = Math.floor(Math.random() * 1200) + 2200;
+        // Subida y despacho de fotos: tiempo base configurado + 600ms-1400ms por procesamiento de imagen
+        delayMs = Math.max(configuredBaseMs, 1800) + Math.floor(Math.random() * 800);
       } else if (typeof content?.text === 'string') {
-        const charCount = content.text.length;
-        // ~12ms por caracter + jitter aleatorio (mínimo 1.4s, máximo 3.6s)
-        delayMs = Math.min(3600, Math.max(1400, Math.floor(charCount * 12) + Math.floor(Math.random() * 600)));
+        if (typingMode === 'fixed') {
+          // Modo tiempo fijo: milisegundos configurados con micro-variación sutil (±120ms)
+          const microJitter = Math.floor(Math.random() * 240) - 120;
+          delayMs = Math.max(400, configuredBaseMs + microJitter);
+        } else {
+          // Modo dinámico humano (Recomendado):
+          // Tiempo base configurado + ~14ms por carácter + variación aleatoria humana (±250ms)
+          const charCount = content.text.length;
+          const charFactor = Math.floor(charCount * 14);
+          const jitter = Math.floor(Math.random() * 500) - 250;
+          delayMs = Math.max(600, configuredBaseMs + charFactor + jitter);
+        }
       }
 
-      console.log(`✍️ [RETARDO TIPEO]: Simulando "Escribiendo..." (${(delayMs / 1000).toFixed(1)}s) para ${remoteJid}`);
+      console.log(`✍️ [RETARDO TIPEO]: Simulando "Escribiendo..." (${(delayMs / 1000).toFixed(1)}s [${delayMs}ms] - Modo: ${typingMode}) para ${remoteJid}`);
       await new Promise(r => setTimeout(r, delayMs));
 
       // 4. Pausar "Escribiendo..." justo antes del despacho
@@ -1309,7 +1337,7 @@ class WhatsAppBotServer {
               const withPhotos = prods
                 .map((p, idx) => ({ p, idx: idx + 1 }))
                 .filter(({ p }) => p.image);
-              const previewList = withPhotos.slice(0, 8).map(({ p, idx }) => `📸 *${idx}. ${p.name}*`).join('\n');
+              const previewList = withPhotos.slice(0, 8).map(({ p, idx }) => `${formatItemNumber(idx)} *${p.name}* 📸`).join('\n');
               const helpMsg = `📸 *GALERÍA DE FOTOS (${withPhotos.length} productos con foto)* 🔥\n\n${previewList}\n\n👉 Para ver cualquier foto, escribí *FOTO [número]* (ej: *FOTO 1*, *FOTO 4*, *FOTO 12*).`;
               await this.safeSendMessage(remoteJid, { text: helpMsg }, msg.key);
               continue;
