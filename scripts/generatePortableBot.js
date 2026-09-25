@@ -10,10 +10,10 @@ console.log('===================================================================
 console.log('   🍔 [COMANDAFAST] - GENERADOR DE BOT PORTABLE CON NODE EMBEBIDO');
 console.log('=====================================================================\n');
 
-// 1. Limpieza de carpetas previas
+// 1. Limpieza y preparación de carpetas
 console.log('[1/7] Preparando directorio de salida...');
-if (fs.existsSync(OUTPUT_DIR)) {
-  console.log('  -> Eliminando version anterior de ComandaFast-Bot-Portatil...');
+if (process.argv.includes('--fresh') && fs.existsSync(OUTPUT_DIR)) {
+  console.log('  -> Eliminando version anterior completa (--fresh)...');
   fs.rmSync(OUTPUT_DIR, { recursive: true, force: true });
 }
 if (fs.existsSync(ZIP_FILE)) {
@@ -125,12 +125,17 @@ const portablePkg = {
 
 fs.writeFileSync(path.join(OUTPUT_DIR, 'package.json'), JSON.stringify(portablePkg, null, 2), 'utf-8');
 
-console.log('  -> Ejecutando npm install en la carpeta portable (solo dependencias necesarias)...');
-execSync('npm install --omit=dev --no-audit --no-fund', {
-  cwd: OUTPUT_DIR,
-  stdio: 'inherit'
-});
-console.log('  -> [OK] Dependencias instaladas en node_modules del paquete.');
+const nodeModulesExists = fs.existsSync(path.join(OUTPUT_DIR, 'node_modules'));
+if (!nodeModulesExists || process.argv.includes('--fresh')) {
+  console.log('  -> Ejecutando npm install en la carpeta portable (solo dependencias necesarias)...');
+  execSync('npm install --omit=dev --no-audit --no-fund', {
+    cwd: OUTPUT_DIR,
+    stdio: 'inherit'
+  });
+  console.log('  -> [OK] Dependencias instaladas en node_modules del paquete.');
+} else {
+  console.log('  -> [OK] node_modules ya existente y verificado.');
+}
 
 // 6. Generar scripts lanzadores .bat y LEEME
 console.log('[6/7] Creando scripts lanzadores y manual de uso...');
@@ -143,51 +148,54 @@ cls
 
 cd /d "%~dp0"
 
-set NODE_BIN=node.exe
+:: 1. Comprobar Node.js
 if exist "%~dp0node.exe" (
-    set NODE_BIN="%~dp0node.exe"
+    set "NODE_BIN=%~dp0node.exe"
     echo [OK] Utilizando Node.js Portable Embebido.
-) else (
-    where node >nul 2>nul
-    if %errorlevel% equ 0 (
-        set NODE_BIN=node
-        echo [OK] Utilizando Node.js instalado en el sistema.
-    ) else (
-        color 0C
-        echo =====================================================================
-        echo [ERROR] No se encontro node.exe en esta carpeta ni en el sistema.
-        echo =====================================================================
-        pause
-        exit /b 1
-    )
+    goto CHECK_PORT
 )
 
-echo.
-echo =====================================================================
-echo    🍔 [COMANDAFAST] - BOT DE WHATSAPP PORTATIL (AUTONOMO)
-echo    Conectado a la nube Supabase para sincronizar pedidos con el POS
-echo =====================================================================
-echo.
+where node >nul 2>nul
+if %errorlevel% equ 0 (
+    set "NODE_BIN=node"
+    echo [OK] Utilizando Node.js instalado en el sistema.
+    goto CHECK_PORT
+)
 
-:: Comprobar si el puerto 3002 ya esta ocupado
+color 0C
+echo =====================================================================
+echo [ERROR] No se encontro node.exe en esta carpeta ni en el sistema.
+echo =====================================================================
+pause
+exit /b 1
+
+:CHECK_PORT
+:: 2. Comprobar si el puerto 3002 ya esta ocupado
 set OCCUPIED_PID=
 for /f "tokens=5" %%p in ('netstat -aon ^| findstr :3002 ^| findstr LISTENING 2^>nul') do (
     set OCCUPIED_PID=%%p
 )
 
-if defined OCCUPIED_PID (
-    echo [AVISO] Ya hay un bot o proceso ejecutandose en el puerto 3002 (PID %OCCUPIED_PID%).
-    set /p RESTART="¿Deseas cerrar el proceso anterior y reiniciar el bot? (S/N): "
-    if /i "%RESTART%"=="S" (
-        taskkill /F /PID %OCCUPIED_PID% >nul 2>nul
-        timeout /t 2 /nobreak >nul
-    ) else (
-        echo Operacion cancelada.
-        pause
-        exit /b 0
-    )
-)
+if "%OCCUPIED_PID%"=="" goto MENU
 
+echo.
+echo [AVISO] Ya hay un bot o proceso ejecutandose en el puerto 3002 (PID %OCCUPIED_PID%).
+set /p RESTART="¿Deseas cerrar el proceso anterior y reiniciar el bot? (S/N): "
+if /i "%RESTART%"=="S" (
+    taskkill /F /PID %OCCUPIED_PID% >nul 2>nul
+    timeout /t 2 /nobreak >nul
+    goto MENU
+)
+echo Operacion cancelada.
+pause
+exit /b 0
+
+:MENU
+cls
+echo =====================================================================
+echo    🍔 [COMANDAFAST] - BOT DE WHATSAPP PORTATIL (AUTONOMO)
+echo    Conectado a la nube Supabase para sincronizar pedidos con el POS
+echo =====================================================================
 echo.
 echo ¿Como deseas iniciar el bot?
 echo.
@@ -198,31 +206,36 @@ echo.
 set OP=1
 set /p OP="Elige 1, 2 o 3 (Por defecto 1): "
 
-if "%OP%"=="2" (
-    cls
-    echo =====================================================================
-    echo    📲 [VINCULACION] ESCANEA ESTE CODIGO QR CON TU WHATSAPP
-    echo =====================================================================
-    echo.
-    echo 1. Abre WhatsApp en tu celular.
-    echo 2. Ve a Ajustes / Menu (3 puntitos) ^> Dispositivos vinculados ^> Vincular dispositivo.
-    echo 3. Apunta tu camara al codigo QR que aparecera a continuacion:
-    echo.
-    %NODE_BIN% server\\whatsappBotServer.js --reset
-) else if "%OP%"=="3" (
-    exit /b 0
-) else (
-    cls
-    echo =====================================================================
-    echo    🚀 INICIANDO BOT EN MODO NORMAL (CONEXION CLOUD CON SUPABASE)
-    echo =====================================================================
-    echo.
-    %NODE_BIN% server\\whatsappBotServer.js
-)
+if "%OP%"=="2" goto MODO_QR
+if "%OP%"=="3" exit /b 0
+goto MODO_NORMAL
 
+:MODO_QR
+cls
+echo =====================================================================
+echo    📲 [VINCULACION] ESCANEA ESTE CODIGO QR CON TU WHATSAPP
+echo =====================================================================
+echo.
+echo 1. Abre WhatsApp en tu celular.
+echo 2. Ve a Ajustes / Menu (3 puntitos) ^> Dispositivos vinculados ^> Vincular dispositivo.
+echo 3. Apunta tu camara al codigo QR que aparecera a continuacion:
+echo.
+"%NODE_BIN%" server\\whatsappBotServer.js --reset
+goto FIN
+
+:MODO_NORMAL
+cls
+echo =====================================================================
+echo    🚀 INICIANDO BOT EN MODO NORMAL (CONEXION CLOUD CON SUPABASE)
+echo =====================================================================
+echo.
+"%NODE_BIN%" server\\whatsappBotServer.js
+goto FIN
+
+:FIN
 echo.
 pause
-`;
+`.replace(/\r?\n/g, '\r\n');
 
 fs.writeFileSync(path.join(OUTPUT_DIR, 'INICIAR_BOT.bat'), iniciarBatContent, 'utf-8');
 
@@ -255,7 +268,7 @@ if "%KILLED%"=="1" (
 echo.
 echo =====================================================================
 timeout /t 3 /nobreak >nul
-`;
+`.replace(/\r?\n/g, '\r\n');
 
 fs.writeFileSync(path.join(OUTPUT_DIR, 'DETENER_BOT.bat'), detenerBatContent, 'utf-8');
 
@@ -303,7 +316,7 @@ Windows sin necesidad de instalar nada previo.
   en "DETENER_BOT.bat".
 
 =====================================================================
-`;
+`.replace(/\r?\n/g, '\r\n');
 
 fs.writeFileSync(path.join(OUTPUT_DIR, 'LEEME_INSTRUCCIONES.txt'), leemeContent, 'utf-8');
 
