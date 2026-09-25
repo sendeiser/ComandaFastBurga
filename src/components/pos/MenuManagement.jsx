@@ -18,6 +18,9 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Hamburguesas');
   const [price, setPrice] = useState('');
+  const [originalPrice, setOriginalPrice] = useState('');
+  const [discountBadge, setDiscountBadge] = useState('');
+  const [freeShipping, setFreeShipping] = useState(false);
   const [emoji, setEmoji] = useState('🍔');
   const [image, setImage] = useState('');
   const [imageMode, setImageMode] = useState('upload'); // 'upload' | 'url'
@@ -41,10 +44,13 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
   const openNew = () => {
     setEditingProduct({ id: null });
     setName('');
-    const defaultCat = availableCategories[0]?.name || 'Hamburguesas';
-    const defaultEmoji = availableCategories[0]?.emoji || '🍔';
+    const defaultCat = availableCategories[0]?.name || 'Promos';
+    const defaultEmoji = availableCategories[0]?.emoji || '🏷️';
     setCategory(defaultCat);
     setPrice('');
+    setOriginalPrice('');
+    setDiscountBadge('');
+    setFreeShipping(false);
     setEmoji(defaultEmoji);
     setImage('');
     setDescription('');
@@ -57,6 +63,9 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
     setName(p.name);
     setCategory(p.category);
     setPrice(p.price.toString());
+    setOriginalPrice(p.originalPrice ? p.originalPrice.toString() : '');
+    setDiscountBadge(p.discountBadge || '');
+    setFreeShipping(Boolean(p.freeShipping));
     setEmoji(p.emoji || '🍔');
     setImage(p.image || '');
     setDescription(p.description || '');
@@ -140,6 +149,9 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
       name: name.trim(),
       category,
       price: parseFloat(price) || 0,
+      originalPrice: originalPrice ? parseFloat(originalPrice) : null,
+      discountBadge: discountBadge.trim() || null,
+      freeShipping: Boolean(freeShipping),
       emoji: emoji || '🍔',
       image: image.trim(),
       description: description.trim(),
@@ -334,6 +346,16 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
                       <div className="menu-card-cat">
                         {prod.category}
                       </div>
+                      {(prod.freeShipping || prod.discountBadge) && (
+                        <div className="product-card-promo-tags">
+                          {prod.freeShipping && (
+                            <span className="badge-promo-free-shipping">🛵 Envío Gratis</span>
+                          )}
+                          {prod.discountBadge && (
+                            <span className="badge-promo-tag">🏷️ {prod.discountBadge}</span>
+                          )}
+                        </div>
+                      )}
                       <div className="menu-card-desc">
                         {prod.description || 'Sin descripción'}
                       </div>
@@ -347,9 +369,16 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
                   )}
 
                   <div className="menu-card-footer">
-                    <span className="menu-card-price">
-                      ${Number(prod.price || 0).toLocaleString('es-AR')}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                      {prod.originalPrice && Number(prod.originalPrice) > Number(prod.price) && (
+                        <span style={{ textDecoration: 'line-through', opacity: 0.55, fontSize: '0.85rem' }}>
+                          ${Number(prod.originalPrice).toLocaleString('es-AR')}
+                        </span>
+                      )}
+                      <span className="menu-card-price">
+                        ${Number(prod.price || 0).toLocaleString('es-AR')}
+                      </span>
+                    </div>
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <button
                         type="button"
@@ -612,6 +641,68 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
                     onChange={e => setPrice(e.target.value)}
                   />
                 </div>
+              </div>
+
+              {/* SECCIÓN CONFIGURACIÓN DE PROMO Y DESCUENTOS */}
+              <div style={{
+                background: 'rgba(245, 158, 11, 0.05)',
+                border: '1px solid rgba(245, 158, 11, 0.25)',
+                borderRadius: 'var(--radius-md)',
+                padding: '0.75rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.65rem'
+              }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--accent-amber)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span>🏷️ Configuración de Promoción / Descuento (Opcional)</span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+                      Precio antes / Tachado ($):
+                    </label>
+                    <input
+                      type="number"
+                      className="custom-input-sm"
+                      placeholder="Ej: 18500"
+                      value={originalPrice}
+                      onChange={e => setOriginalPrice(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+                      Etiqueta Promo:
+                    </label>
+                    <input
+                      type="text"
+                      className="custom-input-sm"
+                      placeholder="Ej: 25% OFF, 2x1..."
+                      value={discountBadge}
+                      onChange={e => setDiscountBadge(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <label style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px', 
+                  cursor: 'pointer',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  color: 'var(--text-primary)',
+                  paddingTop: '2px'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={freeShipping}
+                    onChange={e => setFreeShipping(e.target.checked)}
+                    style={{ width: '16px', height: '16px', accentColor: '#10b981', cursor: 'pointer' }}
+                  />
+                  <span>🛵 <strong>Incluye Envío Gratis</strong> (Bonifica el delivery a $0 en POS y WhatsApp)</span>
+                </label>
               </div>
 
               <div>

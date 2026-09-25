@@ -225,6 +225,9 @@ async function syncAllProductsFromCloud() {
               name: p.name,
               category: p.category || 'Hamburguesas',
               price: Number(p.price) || 0,
+              originalPrice: p.originalPrice || p.original_price ? Number(p.originalPrice || p.original_price) : null,
+              discountBadge: p.discountBadge || p.discount_badge || null,
+              freeShipping: Boolean(p.freeShipping || p.free_shipping),
               emoji: p.emoji || '🍔',
               description: p.description || '',
               modifiers: Array.isArray(p.modifiers) ? p.modifiers : [],
@@ -774,7 +777,13 @@ function buildCatalogMessage(prods, page = 1, pageSize = 8, isAll = false) {
     const list = prods.map((p, i) => {
       const numBadge = formatItemNumber(i + 1);
       const photoBadge = p.image ? '📸' : '';
-      return `${numBadge} *${p.name}* — $${Number(p.price).toLocaleString('es-AR')} ${photoBadge}`;
+      let priceStr = `$${Number(p.price).toLocaleString('es-AR')}`;
+      if (p.originalPrice && Number(p.originalPrice) > Number(p.price)) {
+        priceStr = `~${Number(p.originalPrice).toLocaleString('es-AR')}~ $${Number(p.price).toLocaleString('es-AR')}`;
+      }
+      const promoBadge = p.discountBadge ? ` [🏷️ ${p.discountBadge}]` : '';
+      const freeShippingBadge = p.freeShipping ? ' [🛵 Envío Gratis]' : '';
+      return `${numBadge} *${p.name}* — ${priceStr}${promoBadge}${freeShippingBadge} ${photoBadge}`;
     }).join('\n');
 
     return `🍔 *CARTA COMPLETA DE ${storeName.toUpperCase()} (${total} opciones)* 🔥\n\n${list}\n\n👉 *Para pedir:* Respondé con el número (ej: *1*, *12*, *18*) o *COMPRAR*.\n👉 *Para ver foto:* Escribí *FOTO [número]* (ej: *FOTO 12*).`;
@@ -789,7 +798,13 @@ function buildCatalogMessage(prods, page = 1, pageSize = 8, isAll = false) {
     const globalIdx = startIdx + i + 1;
     const numBadge = formatItemNumber(globalIdx);
     const photoBadge = p.image ? '📸' : '';
-    return `${numBadge} *${p.name}* — $${Number(p.price).toLocaleString('es-AR')} ${photoBadge}`;
+    let priceStr = `$${Number(p.price).toLocaleString('es-AR')}`;
+    if (p.originalPrice && Number(p.originalPrice) > Number(p.price)) {
+      priceStr = `~${Number(p.originalPrice).toLocaleString('es-AR')}~ $${Number(p.price).toLocaleString('es-AR')}`;
+    }
+    const promoBadge = p.discountBadge ? ` [🏷️ ${p.discountBadge}]` : '';
+    const freeShippingBadge = p.freeShipping ? ' [🛵 Envío Gratis]' : '';
+    return `${numBadge} *${p.name}* — ${priceStr}${promoBadge}${freeShippingBadge} ${photoBadge}`;
   }).join('\n');
 
   let navInstructions = '';
@@ -1680,6 +1695,7 @@ class WhatsAppBotServer {
                   price: Number(it.price),
                   qty: Number(it.qty || it.quantity || 1),
                   quantity: Number(it.qty || it.quantity || 1),
+                  freeShipping: Boolean(it.freeShipping),
                   modifiers: it.modifiers || [],
                   notes: it.notes || ''
                 })),
@@ -1734,8 +1750,11 @@ class WhatsAppBotServer {
 
             session.step = 'CONFIRMING';
             const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
+            const hasFreeShippingItem = (session.items || []).some(it => it.freeShipping);
             const shippingLabel = session.shippingMethod === 'delivery' 
-              ? (session.deliveryFee > 0 ? `🛵 Envío a Domicilio (+$${session.deliveryFee.toLocaleString('es-AR')})` : '🛵 Envío a Domicilio (¡Envío Gratis!)')
+              ? (session.deliveryFee > 0 
+                  ? `🛵 Envío a Domicilio (+$${session.deliveryFee.toLocaleString('es-AR')})` 
+                  : (hasFreeShippingItem ? '🛵 Envío a Domicilio (¡Envío Gratis por Promo!)' : '🛵 Envío a Domicilio (¡Envío Gratis!)'))
               : '🛍️ Retiro por el Local (Mostrador)';
 
             const summary = `🍔 *RESUMEN DE TU PEDIDO* 🔥\n\n🛒 *Items:*\n${itemsList}\n\n💵 *Subtotal:* $${session.subtotal.toLocaleString('es-AR')}\n🛵 *Entrega:* ${shippingLabel}\n📍 *Dirección:* ${session.shippingAddress}\n👤 *Cliente:* ${session.customerName}\n💳 *Forma de Pago:* ${session.paymentMethod === 'efectivo' ? 'Efectivo' : 'Transferencia Bancaria'}\n\n💵 *TOTAL A PAGAR:* $${session.total.toLocaleString('es-AR')}\n\n¿Está todo perfecto para mandar a la cocina?\n👉 Respondé *SI* para confirmar tu pedido o *CANCELAR*.`;
@@ -1784,7 +1803,11 @@ class WhatsAppBotServer {
               const rawGratis = String(biz.envio_gratis_desde || '').replace(/\D/g, '');
               const gratisDesde = parseInt(rawGratis, 10) || 0;
 
-              if (gratisDesde > 0 && session.subtotal >= gratisDesde) {
+              const hasFreeShippingItem = (session.items || []).some(it => it.freeShipping);
+
+              if (hasFreeShippingItem) {
+                session.deliveryFee = 0;
+              } else if (gratisDesde > 0 && session.subtotal >= gratisDesde) {
                 session.deliveryFee = 0;
               } else {
                 session.deliveryFee = costoEnvio;
@@ -1794,7 +1817,7 @@ class WhatsAppBotServer {
               session.step = 'ASK_ADDRESS';
               const feeText = session.deliveryFee > 0 
                 ? `🛵 Costo de envío: *$${session.deliveryFee.toLocaleString('es-AR')}*`
-                : `🛵 Costo de envío: *¡GRATIS!* 🎉`;
+                : (hasFreeShippingItem ? `🛵 Costo de envío: *¡GRATIS POR PROMO!* 🎁🛵` : `🛵 Costo de envío: *¡GRATIS!* 🎉`);
               await this.safeSendMessage(remoteJid, {
                 text: `🛵 *Envío a domicilio seleccionado.*\n${feeText}\n\n📍 *Por favor escribí tu dirección exacta y entrecalles para el cadete:*`
               }, msg.key);
@@ -1855,6 +1878,7 @@ class WhatsAppBotServer {
                   id: selectedProd.id,
                   name: selectedProd.name,
                   price: Number(selectedProd.price),
+                  freeShipping: Boolean(selectedProd.freeShipping),
                   qty: 1,
                   quantity: 1,
                   modifiers: []
@@ -2048,6 +2072,7 @@ class WhatsAppBotServer {
                 id: matchedProd.id,
                 name: matchedProd.name,
                 price: Number(matchedProd.price),
+                freeShipping: Boolean(matchedProd.freeShipping),
                 qty: 1,
                 quantity: 1,
                 modifiers: []

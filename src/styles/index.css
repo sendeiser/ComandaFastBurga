@@ -4421,3 +4421,44 @@ h1, h2, h3, h4, .brand-title {
   animation: spin 1s linear infinite;
 }
 
+/* =========================================================
+   PROMOS & DISCOUNT BADGES (Menu & POS Cards)
+   ========================================================= */
+.badge-promo-free-shipping {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.28));
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.badge-promo-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.28));
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.product-card-promo-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+  margin-bottom: 2px;
+}
+

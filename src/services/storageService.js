@@ -4,6 +4,7 @@
 
 
 const DEFAULT_CATEGORIES = [
+  { id: 'cat-promos', name: 'Promos', emoji: '🏷️' },
   { id: 'cat-hamburguesas', name: 'Hamburguesas', emoji: '🍔' },
   { id: 'cat-agregados', name: 'Agregados', emoji: '🍟' },
   { id: 'cat-bebidas', name: 'Bebidas', emoji: '🥤' },
@@ -12,6 +13,58 @@ const DEFAULT_CATEGORIES = [
 ];
 
 const DEFAULT_PRODUCTS = [
+  {
+    id: 'prod-promo-duo-smash',
+    name: 'Promo Dúo Smash + Papas (Envío Gratis)',
+    category: 'Promos',
+    price: 15500,
+    originalPrice: 18500,
+    discountBadge: 'Envío Gratis',
+    freeShipping: true,
+    emoji: '🛵',
+    image: 'https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?w=800&auto=format&fit=crop&q=80',
+    description: '2 Hamburguesas Clásicas + Papas Fritas Grandes + ¡ENVÍO GRATIS INCLUIDO! Ahorrás $5.000.',
+    modifiers: ['Sin cebolla', 'Extra Cheddar (+$800)', 'Doble Carne (+$2000)', 'Bebida 1.5L (+$2000)']
+  },
+  {
+    id: 'prod-promo-4-cheese',
+    name: 'Promo 4 Cheeseburgers (25% OFF)',
+    category: 'Promos',
+    price: 24000,
+    originalPrice: 32000,
+    discountBadge: '25% OFF',
+    freeShipping: true,
+    emoji: '🍔',
+    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format&fit=crop&q=80',
+    description: '4 Cheeseburgers con doble cheddar y carne smash + 2 Papas Grandes. ¡Super precio promo para amigos!',
+    modifiers: ['Sin cebolla', 'Extra Bacon (+$1200)', 'Salsas extras']
+  },
+  {
+    id: 'prod-promo-pareja-cheddar',
+    name: 'Promo Pareja Doble Cheddar + 2 Papas',
+    category: 'Promos',
+    price: 16900,
+    originalPrice: 20400,
+    discountBadge: '18% OFF',
+    freeShipping: false,
+    emoji: '🧀',
+    image: 'https://images.unsplash.com/photo-1586190848861-99aa4a171e90?w=800&auto=format&fit=crop&q=80',
+    description: '2 Dobles Cuarto Cheddar + 2 Papas Fritas con salsa cheddar. ¡Descuento imperdible!',
+    modifiers: ['Sin cebolla', 'Extra Bacon (+$900)', 'Papas con Cheddar & Bacon (+$1500)']
+  },
+  {
+    id: 'prod-promo-familiar-triple',
+    name: 'Mega Promo 3 Triples Bacon + Envío Gratis',
+    category: 'Promos',
+    price: 28900,
+    originalPrice: 36000,
+    discountBadge: 'Envío Gratis + 20% OFF',
+    freeShipping: true,
+    emoji: '👑',
+    image: 'https://images.unsplash.com/photo-1553979459-d2229ba7433b?w=800&auto=format&fit=crop&q=80',
+    description: '3 Triples Bacon BBQ + 3 Porciones de Papas Grandes + ¡ENVÍO A DOMICILIO BONIFICADO 100%! 🛵',
+    modifiers: ['Sin cebolla', 'Sin salsa BBQ', 'Gaseosa 2.25L (+$2500)']
+  },
   {
     id: 'prod-1',
     name: 'Burger Clásica',
@@ -602,10 +655,16 @@ export const storageService = {
     if (!Array.isArray(cats) || cats.length === 0) {
       cats = [...DEFAULT_CATEGORIES];
     }
-    // Asegurar que categorías existentes en productos estén contempladas
-    const prods = this.getProducts();
+    // Asegurar que Promos esté siempre presente al frente
     const existingNames = new Set(cats.map(c => typeof c === 'string' ? c.toLowerCase() : c.name.toLowerCase()));
     let hasNew = false;
+    if (!existingNames.has('promos')) {
+      cats.unshift({ id: 'cat-promos', name: 'Promos', emoji: '🏷️' });
+      existingNames.add('promos');
+      hasNew = true;
+    }
+    // Asegurar que categorías existentes en productos estén contempladas
+    const prods = this.getProducts();
     for (const p of prods) {
       if (p.category && !existingNames.has(p.category.toLowerCase())) {
         cats.push({

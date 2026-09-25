@@ -21,6 +21,7 @@ export default function ItemModifierModal({ product, onAddToCart, onClose }) {
       productId: product.id,
       name: product.name,
       unitPrice: product.price,
+      freeShipping: Boolean(product.freeShipping),
       qty: qty,
       modifiers: selectedModifiers,
       notes: notes.trim(),

@@ -188,7 +188,11 @@ export default function FastOrderPad({
     return cartItems.reduce((acc, item) => acc + (item.unitPrice * item.qty), 0);
   }, [cartItems]);
 
-  const effectiveDelivery = channel === 'whatsapp' ? (Number(deliveryFee) || 0) : 0;
+  const hasFreeShippingPromo = useMemo(() => {
+    return cartItems.some(item => item.freeShipping);
+  }, [cartItems]);
+
+  const effectiveDelivery = channel === 'whatsapp' ? (hasFreeShippingPromo ? 0 : (Number(deliveryFee) || 0)) : 0;
   const total = subtotal + effectiveDelivery;
   const totalItemsCount = useMemo(() => cartItems.reduce((acc, i) => acc + i.qty, 0), [cartItems]);
 
@@ -280,6 +284,7 @@ export default function FastOrderPad({
       const match = products.find(p => p.id === it.productId);
       return { 
         ...it, 
+        freeShipping: Boolean(it.freeShipping ?? match?.freeShipping),
         image: it.image || match?.image || '',
         emoji: it.emoji || match?.emoji || '🍔',
         id: 'item-' + Date.now() + '-' + Math.random() 
@@ -447,11 +452,29 @@ export default function FastOrderPad({
                   <div className="product-emoji-icon">{prod.emoji || '🍔'}</div>
                 )}
 
+                {(prod.freeShipping || prod.discountBadge) && (
+                  <div className="product-card-promo-tags" style={{ padding: '0 0.5rem' }}>
+                    {prod.freeShipping && (
+                      <span className="badge-promo-free-shipping">🛵 Envío Gratis</span>
+                    )}
+                    {prod.discountBadge && (
+                      <span className="badge-promo-tag">🏷️ {prod.discountBadge}</span>
+                    )}
+                  </div>
+                )}
+
                 <div className="product-name">{prod.name}</div>
                 <div className="product-desc">{prod.description}</div>
               </div>
               <div className="product-footer">
-                <div className="product-price">${prod.price.toLocaleString('es-AR')}</div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {prod.originalPrice && Number(prod.originalPrice) > Number(prod.price) && (
+                    <span style={{ textDecoration: 'line-through', opacity: 0.55, fontSize: '0.78rem' }}>
+                      ${Number(prod.originalPrice).toLocaleString('es-AR')}
+                    </span>
+                  )}
+                  <div className="product-price">${prod.price.toLocaleString('es-AR')}</div>
+                </div>
                 <div className="product-add-badge">
                   <Plus size={18} />
                 </div>
@@ -733,10 +756,12 @@ export default function FastOrderPad({
               <span>Subtotal:</span>
               <span style={{ fontWeight: 700 }}>${subtotal.toLocaleString('es-AR')}</span>
             </div>
-            {channel === 'whatsapp' && effectiveDelivery > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#60a5fa' }}>
+            {channel === 'whatsapp' && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: hasFreeShippingPromo ? '#34d399' : '#60a5fa' }}>
                 <span>Costo de Envío:</span>
-                <span style={{ fontWeight: 700 }}>+${effectiveDelivery.toLocaleString('es-AR')}</span>
+                <span style={{ fontWeight: 700 }}>
+                  {hasFreeShippingPromo ? '¡GRATIS POR PROMO! 🛵' : `+$${effectiveDelivery.toLocaleString('es-AR')}`}
+                </span>
               </div>
             )}
             <div className="total-row-highlight">
