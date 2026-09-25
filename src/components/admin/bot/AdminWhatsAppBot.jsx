@@ -99,21 +99,27 @@ export default function AdminWhatsAppBot({ initialTab }) {
 
   // AI Gemini State
     // AI Gemini State (Con soporte Dual Key & Auto-Failover)
+  // AI Multi-Provider State (Groq + Gemini + DeepSeek con Cascada y Modo Individual)
   const [aiConfig, setAiConfig] = useState({
     enabled: true,
-    model: 'gemini-3.6-flash',
-    apiKey: (typeof atob === 'function' ? atob('QVEuQWI4Uk42S2wyVXEzaEtEUjZubnljV3BTc1l4SjJGbXhWUTRDQVg5TjhxbFVZaDVkR0E=') : ''),
-    hasApiKey: true,
-    apiKeyMasked: 'AQ.Ab8...5dGA',
-    secondaryApiKey: (typeof atob === 'function' ? atob('QVEuQWI4Uk42S1pNWmJTTENxMDhNNVVXbVVJdXp3RWdWZkxadVFMdHJJeFJOMnRYdXNCeEE=') : ''),
-    hasSecondaryApiKey: true,
-    secondaryApiKeyMasked: 'AQ.Ab8...sBxA',
+    mode: 'cascade', // 'cascade' | 'only_groq' | 'only_gemini' | 'only_deepseek'
+    model: 'gemini-2.0-flash',
+    groqApiKey: '',
+    hasGroq: false,
+    groqApiKeyMasked: '',
+    geminiApiKey: (typeof atob === 'function' ? atob('QVEuQWI4Uk42S1pNWmJTTENxMDhNNVVXbVVJdXp3RWdWZkxadVFMdHJJeFJOMnRYdXNCeEE=') : ''),
+    hasGemini: true,
+    geminiApiKeyMasked: 'AQ.Ab8...sBxA',
+    deepseekApiKey: '',
+    hasDeepSeek: false,
+    deepseekApiKeyMasked: '',
     systemPrompt: ''
   });
   const [aiTestLoading, setAiTestLoading] = useState(false);
   const [aiTestResult, setAiTestResult] = useState(null);
-  const [showAiKey, setShowAiKey] = useState(false);
-  const [showSecondaryAiKey, setShowSecondaryAiKey] = useState(false);
+  const [showGroqKey, setShowGroqKey] = useState(false);
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
+  const [showDeepSeekKey, setShowDeepSeekKey] = useState(false);
   const [aiSavedSuccess, setAiSavedSuccess] = useState(false);
 
   // Fetch AI Config from bot server or Supabase Cloud
@@ -125,7 +131,10 @@ export default function AdminWhatsAppBot({ initialTab }) {
           setAiConfig(prev => ({
             ...prev,
             ...cloudConfig,
-            apiKey: cloudConfig.apiKeyMasked || prev.apiKey
+            groqApiKey: cloudConfig.groqApiKeyMasked || cloudConfig.groqApiKey || prev.groqApiKey,
+            geminiApiKey: cloudConfig.geminiApiKeyMasked || cloudConfig.geminiApiKey || cloudConfig.apiKeyMasked || prev.geminiApiKey,
+            deepseekApiKey: cloudConfig.deepseekApiKeyMasked || cloudConfig.deepseekApiKey || prev.deepseekApiKey,
+            mode: cloudConfig.mode || 'cascade'
           }));
           return;
         }
@@ -138,7 +147,10 @@ export default function AdminWhatsAppBot({ initialTab }) {
             setAiConfig(prev => ({
               ...prev,
               ...data.config,
-              apiKey: data.config.apiKeyMasked || prev.apiKey
+              groqApiKey: data.config.groqApiKeyMasked || data.config.groqApiKey || prev.groqApiKey,
+              geminiApiKey: data.config.geminiApiKeyMasked || data.config.geminiApiKey || prev.geminiApiKey,
+              deepseekApiKey: data.config.deepseekApiKeyMasked || data.config.deepseekApiKey || prev.deepseekApiKey,
+              mode: data.config.mode || 'cascade'
             }));
           }
         }
@@ -212,13 +224,20 @@ export default function AdminWhatsAppBot({ initialTab }) {
     try {
       const payload = {
         enabled: aiConfig.enabled,
+        mode: aiConfig.mode || 'cascade',
         model: aiConfig.model,
         systemPrompt: aiConfig.systemPrompt
       };
-      // Solo enviar apiKey si el usuario escribió una nueva
-      if (aiConfig.apiKey && !aiConfig.apiKey.includes('...')) {
-        payload.apiKey = aiConfig.apiKey;
+      if (aiConfig.groqApiKey && !aiConfig.groqApiKey.includes('...')) {
+        payload.groqApiKey = aiConfig.groqApiKey;
       }
+      if (aiConfig.geminiApiKey && !aiConfig.geminiApiKey.includes('...')) {
+        payload.geminiApiKey = aiConfig.geminiApiKey;
+      }
+      if (aiConfig.deepseekApiKey && !aiConfig.deepseekApiKey.includes('...')) {
+        payload.deepseekApiKey = aiConfig.deepseekApiKey;
+      }
+
       if (supabaseSync.isConfigured()) {
         await supabaseSync.saveAiConfig(payload);
       }
@@ -241,10 +260,9 @@ export default function AdminWhatsAppBot({ initialTab }) {
     setAiTestLoading(true);
     setAiTestResult(null);
     try {
-      const payload = {};
-      if (aiConfig.apiKey && !aiConfig.apiKey.includes('...')) {
-        payload.apiKey = aiConfig.apiKey;
-      }
+      const payload = {
+        target: aiConfig.mode || 'cascade'
+      };
       if (BOT_SERVER_URL) {
         const res = await fetch(`${BOT_SERVER_URL}/api/ai/test`, {
           method: 'POST',
@@ -253,17 +271,12 @@ export default function AdminWhatsAppBot({ initialTab }) {
         });
         const data = await res.json();
         if (data.success) {
-          setAiTestResult({ success: true, message: `✅ ¡Conexión exitosa con ${data.modelUsed || 'Gemini'}! Respuesta de prueba recibida.` });
+          setAiTestResult({ success: true, message: data.message || `✅ ¡Conexión exitosa con la IA!` });
         } else {
-          setAiTestResult({ success: false, message: `❌ ${data.error || 'No se pudo conectar con Gemini.'}` });
+          setAiTestResult({ success: false, message: `❌ ${data.error || data.message || 'No se pudo conectar con la IA.'}` });
         }
       } else {
-        // En Netlify / HTTPS sin acceso directo al puerto 3002
-        if (aiConfig.apiKey) {
-          setAiTestResult({ success: true, message: '✅ Clave de IA Gemini configurada y lista en Supabase Cloud.' });
-        } else {
-          setAiTestResult({ success: false, message: '❌ Ingrese una clave API de Google Gemini para validar.' });
-        }
+        setAiTestResult({ success: true, message: '✅ Ajustes listos en Supabase Cloud. El bot los sincronizará automáticamente.' });
       }
     } catch (err) {
       setAiTestResult({ success: false, message: '❌ Servidor desconectado o error de red.' });
@@ -2646,7 +2659,7 @@ call npm run dev
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>
-                    Asistente Inteligente con Google Gemini AI
+                    Asistente Inteligente Multi-IA (Groq + Gemini + DeepSeek)
                   </h3>
                   <span style={{
                     fontSize: '0.7rem',
@@ -2660,7 +2673,7 @@ call npm run dev
                   </span>
                 </div>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-                  Responde automáticamente dudas abiertas de clientes, recomienda hamburguesas smash, asesora sobre ingredientes y combos en tiempo real.
+                  Motor de alta disponibilidad con failover automático o selección exclusiva: responde preguntas de la carta, horarios, promociones y consultas sin saturarse.
                 </p>
               </div>
             </div>
@@ -2691,95 +2704,185 @@ call npm run dev
               flexDirection: 'column',
               gap: '1rem'
             }}>
-              <div style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Key size={16} style={{ color: '#a855f7' }} />
-                <span>Credenciales & Modelo</span>
+              <div style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Key size={16} style={{ color: '#a855f7' }} />
+                  <span>Motores de IA & Estrategia</span>
+                </div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent-purple)', background: 'rgba(168, 85, 247, 0.1)', padding: '2px 8px', borderRadius: '12px' }}>
+                  3 Motores Integrados
+                </span>
               </div>
 
-                            {/* API KEY PRINCIPAL */}
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
-                    🔑 Google Gemini API Key (Principal):
-                  </label>
-                  {aiConfig.hasApiKey && (
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--accent-emerald)', background: 'rgba(16, 185, 129, 0.12)', padding: '2px 8px', borderRadius: '12px' }}>
-                      🟢 Precargada
-                    </span>
+              {/* SELECTOR DE MODO DE OPERACIÓN */}
+              <div style={{ background: 'var(--bg-card-subtle, rgba(0,0,0,0.02))', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '10px 12px' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                  <Zap size={14} style={{ color: '#eab308' }} />
+                  <span>Modo de Operación:</span>
+                </label>
+                <select
+                  value={aiConfig.mode || 'cascade'}
+                  onChange={(e) => setAiConfig(prev => ({ ...prev, mode: e.target.value }))}
+                  className="search-input"
+                  style={{ width: '100%', height: '36px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  <option value="cascade">⚡ Cascada Inteligente (Groq ➔ Gemini ➔ DeepSeek con Auto-Failover)</option>
+                  <option value="only_groq">🚀 Solo Groq Cloud (Llama 3.3 70B - Ultrarrápido y Gratis)</option>
+                  <option value="only_gemini">🔮 Solo Google Gemini (2.0 Flash - Gratis)</option>
+                  <option value="only_deepseek">🧠 Solo DeepSeek (V3 / Chat - Económico)</option>
+                </select>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '6px', lineHeight: '1.3' }}>
+                  {(!aiConfig.mode || aiConfig.mode === 'cascade') && (
+                    <span>🛡️ <strong>Modo Cascada (Recomendado):</strong> Prueba primero con Groq (0.3s). Si se satura o arroja error de límite (429/503), conmuta en tiempo real a Google Gemini. Si este también se congestiona, pasa a DeepSeek.</span>
+                  )}
+                  {aiConfig.mode === 'only_groq' && (
+                    <span>⚡ <strong>Solo Groq Cloud:</strong> Usa exclusivamente Groq con Llama 3.3 70B (30 req/min gratis). Si se satura, no consulta a otros motores.</span>
+                  )}
+                  {aiConfig.mode === 'only_gemini' && (
+                    <span>🔮 <strong>Solo Google Gemini:</strong> Usa exclusivamente Google Gemini (15 req/min gratis). Si se satura, no conmuta.</span>
+                  )}
+                  {aiConfig.mode === 'only_deepseek' && (
+                    <span>🧠 <strong>Solo DeepSeek:</strong> Usa exclusivamente DeepSeek-V3 oficial con modelo deepseek-chat.</span>
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <input
-                    type={showAiKey ? 'text' : 'password'}
-                    placeholder="Clave primaria de Google Gemini..."
-                    value={aiConfig.apiKey}
-                    onChange={(e) => setAiConfig(prev => ({ ...prev, apiKey: e.target.value }))}
-                    className="search-input"
-                    style={{ flex: 1, height: '36px', fontSize: '0.8rem', fontFamily: 'monospace' }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowAiKey(!showAiKey)}
-                    className="qty-btn"
-                    style={{ height: '36px', padding: '0 10px', fontSize: '0.72rem' }}
-                    title={showAiKey ? 'Ocultar clave' : 'Mostrar clave'}
-                  >
-                    {showAiKey ? 'Ocultar' : 'Ver'}
-                  </button>
-                </div>
               </div>
 
-              {/* API KEY SECUNDARIA DE RESPALDO (AUTO-FAILOVER) */}
+              {/* 1. GROQ CLOUD */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <ShieldCheck size={14} style={{ color: 'var(--accent-emerald)' }} />
-                    <span>API Key Secundaria (Respaldo / Failover):</span>
+                    <span>⚡ 1. Groq Cloud API Key (Llama 3.3 70B):</span>
                   </label>
-                  {aiConfig.hasSecondaryApiKey && (
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--accent-emerald)', background: 'rgba(16, 185, 129, 0.12)', padding: '2px 8px', borderRadius: '12px' }}>
-                      🟢 Respaldo Listo
-                    </span>
-                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <a 
+                      href="https://console.groq.com/keys" 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      style={{ fontSize: '0.7rem', color: '#a855f7', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '2px', fontWeight: 700 }}
+                    >
+                      Obtener gratis <ExternalLink size={11} />
+                    </a>
+                    {aiConfig.hasGroq && (
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--accent-emerald)', background: 'rgba(16, 185, 129, 0.12)', padding: '2px 8px', borderRadius: '12px' }}>
+                        🟢 Lista
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <input
-                    type={showSecondaryAiKey ? 'text' : 'password'}
-                    placeholder="Segunda clave de respaldo si la primaria se satura..."
-                    value={aiConfig.secondaryApiKey || ''}
-                    onChange={(e) => setAiConfig(prev => ({ ...prev, secondaryApiKey: e.target.value }))}
+                    type={showGroqKey ? 'text' : 'password'}
+                    placeholder="gsk_..."
+                    value={aiConfig.groqApiKey || ''}
+                    onChange={(e) => setAiConfig(prev => ({ ...prev, groqApiKey: e.target.value }))}
                     className="search-input"
                     style={{ flex: 1, height: '36px', fontSize: '0.8rem', fontFamily: 'monospace' }}
                   />
                   <button
                     type="button"
-                    onClick={() => setShowSecondaryAiKey(!showSecondaryAiKey)}
+                    onClick={() => setShowGroqKey(!showGroqKey)}
                     className="qty-btn"
                     style={{ height: '36px', padding: '0 10px', fontSize: '0.72rem' }}
-                    title={showSecondaryAiKey ? 'Ocultar clave' : 'Mostrar clave'}
+                    title={showGroqKey ? 'Ocultar clave' : 'Mostrar clave'}
                   >
-                    {showSecondaryAiKey ? 'Ocultar' : 'Ver'}
+                    {showGroqKey ? 'Ocultar' : 'Ver'}
                   </button>
                 </div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', lineHeight: '1.3' }}>
-                  🛡️ <strong>Auto-Failover Activo:</strong> Si la clave principal se satura por límite de mensajes por minuto (Error 429) o agota su cuota, el bot conmuta instantáneamente a esta segunda clave sin interrupciones.
+                <div style={{ fontSize: '0.69rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                  🚀 100% Gratis, 30 peticiones/min y latencia casi instantánea (~0.3s).
                 </div>
               </div>
 
-{/* MODEL SELECTOR */}
+              {/* 2. GOOGLE GEMINI */}
               <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
-                  Modelo de Inteligencia Artificial:
-                </label>
-                <select
-                  value={aiConfig.model}
-                  onChange={(e) => setAiConfig(prev => ({ ...prev, model: e.target.value }))}
-                  className="search-input"
-                  style={{ width: '100%', height: '36px', fontSize: '0.8rem', cursor: 'pointer' }}
-                >
-                  <option value="gemini-3.6-flash">gemini-3.6-flash (Recomendado - Ultra rápido y contextual)</option>
-                  <option value="gemini-3.5-flash">gemini-3.5-flash (Alta velocidad)</option>
-                </select>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>🔮 2. Google Gemini API Key:</span>
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <a 
+                      href="https://aistudio.google.com/app/apikey" 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      style={{ fontSize: '0.7rem', color: '#a855f7', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '2px', fontWeight: 700 }}
+                    >
+                      Obtener gratis <ExternalLink size={11} />
+                    </a>
+                    {aiConfig.hasGemini && (
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--accent-emerald)', background: 'rgba(16, 185, 129, 0.12)', padding: '2px 8px', borderRadius: '12px' }}>
+                        🟢 Lista
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <input
+                    type={showGeminiKey ? 'text' : 'password'}
+                    placeholder="AIzaSy... o AQ.Ab8..."
+                    value={aiConfig.geminiApiKey || ''}
+                    onChange={(e) => setAiConfig(prev => ({ ...prev, geminiApiKey: e.target.value }))}
+                    className="search-input"
+                    style={{ flex: 1, height: '36px', fontSize: '0.8rem', fontFamily: 'monospace' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowGeminiKey(!showGeminiKey)}
+                    className="qty-btn"
+                    style={{ height: '36px', padding: '0 10px', fontSize: '0.72rem' }}
+                    title={showGeminiKey ? 'Ocultar clave' : 'Mostrar clave'}
+                  >
+                    {showGeminiKey ? 'Ocultar' : 'Ver'}
+                  </button>
+                </div>
+                <div style={{ fontSize: '0.69rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                  ✨ Gratis con 15 peticiones/min. Gran capacidad contextual y recomendaciones.
+                </div>
+              </div>
+
+              {/* 3. DEEPSEEK */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>🧠 3. DeepSeek API Key (Opcional):</span>
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <a 
+                      href="https://platform.deepseek.com/api_keys" 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      style={{ fontSize: '0.7rem', color: '#a855f7', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '2px', fontWeight: 700 }}
+                    >
+                      Obtener clave <ExternalLink size={11} />
+                    </a>
+                    {aiConfig.hasDeepSeek && (
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--accent-emerald)', background: 'rgba(16, 185, 129, 0.12)', padding: '2px 8px', borderRadius: '12px' }}>
+                        🟢 Lista
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <input
+                    type={showDeepSeekKey ? 'text' : 'password'}
+                    placeholder="sk-..."
+                    value={aiConfig.deepseekApiKey || ''}
+                    onChange={(e) => setAiConfig(prev => ({ ...prev, deepseekApiKey: e.target.value }))}
+                    className="search-input"
+                    style={{ flex: 1, height: '36px', fontSize: '0.8rem', fontFamily: 'monospace' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowDeepSeekKey(!showDeepSeekKey)}
+                    className="qty-btn"
+                    style={{ height: '36px', padding: '0 10px', fontSize: '0.72rem' }}
+                    title={showDeepSeekKey ? 'Ocultar clave' : 'Mostrar clave'}
+                  >
+                    {showDeepSeekKey ? 'Ocultar' : 'Ver'}
+                  </button>
+                </div>
+                <div style={{ fontSize: '0.69rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                  🛡️ Pago por consumo ultra accesible (~$0.02 USD / noche de 200 pedidos).
+                </div>
               </div>
 
               {/* TEST CONNECTION BUTTON */}
@@ -2791,7 +2894,7 @@ call npm run dev
                   className="cat-pill-btn"
                   style={{
                     width: '100%',
-                    height: '36px',
+                    height: '38px',
                     fontSize: '0.8rem',
                     gap: '6px',
                     justifyContent: 'center',
@@ -2802,7 +2905,14 @@ call npm run dev
                   }}
                 >
                   <RefreshCw size={14} className={aiTestLoading ? 'spin-slow' : ''} />
-                  <span>{aiTestLoading ? 'Probando conexión con Gemini...' : 'Probar Conexión con Gemini'}</span>
+                  <span>
+                    {aiTestLoading 
+                      ? 'Probando conexión...' 
+                      : (!aiConfig.mode || aiConfig.mode === 'cascade')
+                        ? '⚡ Probar Cascada Multi-IA'
+                        : `Probar ${aiConfig.mode === 'only_groq' ? 'Groq' : aiConfig.mode === 'only_gemini' ? 'Gemini' : 'DeepSeek'}`
+                    }
+                  </span>
                 </button>
 
                 {aiTestResult && (

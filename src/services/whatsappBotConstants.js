@@ -14,7 +14,8 @@ export const DEFAULT_ANTI_LOOP_GRATITUDE = [
   'gracias', 'muchas gracias', 'muchas gracia', 'mil gracias', 'graciass', 'graciela',
   'joya', 'genial', 'excelente', 'buenisimo', 'buenísimo', 'de diez', 'de 10',
   'listo gracias', 'dale gracias', 'muchisimas gracias', 'gracias amigo', 'gracias genio',
-  'espectacular', 'muy rico', 'riquismo', 'riquísimo', 'tremendo'
+  'gracias chicos', 'gracias capo', 'gracias crack', 'gracias a vos', 'gracias a ustedes',
+  'espectacular', 'muy rico', 'riquismo', 'riquísimo', 'tremendo', 'todo de diez', 'todo joya'
 ];
 
 export const DEFAULT_ANTI_LOOP_FAREWELL = [
@@ -23,7 +24,9 @@ export const DEFAULT_ANTI_LOOP_FAREWELL = [
 ];
 
 export const DEFAULT_ANTI_LOOP_ACKNOWLEDGE = [
-  'ok', 'oki', 'okis', 'dale', 'de una', 'perfecto', 'listo', 'entendido', 'impecable', 'barbaro', 'bárbaro'
+  'ok', 'oki', 'okis', 'dale', 'de una', 'perfecto', 'listo', 'entendido', 'impecable', 'barbaro', 'bárbaro',
+  'dale joya', 'ok dale', 'dale gracias', 'joya dale', 'dale de una', 'listo dale', 'bueno', 'bueno dale',
+  'ya llego', 'ya llegó', 'ahi voy', 'ahí voy', '👍', '👌', '👏', '🙏', '❤️', '🙌', '😊', '😁'
 ];
 
 export const DEFAULT_ANTI_LOOP_RESPONSES = {

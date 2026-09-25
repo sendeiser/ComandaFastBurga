@@ -463,7 +463,8 @@ const DEFAULT_ANTI_LOOP_GRATITUDE = [
   'gracias', 'muchas gracias', 'muchas gracia', 'mil gracias', 'graciass', 'graciela',
   'joya', 'genial', 'excelente', 'buenisimo', 'buenísimo', 'de diez', 'de 10',
   'listo gracias', 'dale gracias', 'muchisimas gracias', 'gracias amigo', 'gracias genio',
-  'espectacular', 'muy rico', 'riquismo', 'riquísimo', 'tremendo'
+  'gracias chicos', 'gracias capo', 'gracias crack', 'gracias a vos', 'gracias a ustedes',
+  'espectacular', 'muy rico', 'riquismo', 'riquísimo', 'tremendo', 'todo de diez', 'todo joya'
 ];
 
 const DEFAULT_ANTI_LOOP_FAREWELL = [
@@ -472,7 +473,9 @@ const DEFAULT_ANTI_LOOP_FAREWELL = [
 ];
 
 const DEFAULT_ANTI_LOOP_ACKNOWLEDGE = [
-  'ok', 'oki', 'okis', 'dale', 'de una', 'perfecto', 'listo', 'entendido', 'impecable', 'barbaro', 'bárbaro'
+  'ok', 'oki', 'okis', 'dale', 'de una', 'perfecto', 'listo', 'entendido', 'impecable', 'barbaro', 'bárbaro',
+  'dale joya', 'ok dale', 'dale gracias', 'joya dale', 'dale de una', 'listo dale', 'bueno', 'bueno dale',
+  'ya llego', 'ya llegó', 'ahi voy', 'ahí voy', '👍', '👌', '👏', '🙏', '❤️', '🙌', '😊', '😁'
 ];
 
 const DEFAULT_SERVER_TEMPLATES = {
@@ -1012,15 +1015,35 @@ class WhatsAppBotServer {
     const vars = getBusinessContext();
     const customerName = customerObj.name || (typeof order.customer === 'string' ? order.customer : 'Cliente') || 'Cliente';
     const orderNum = order.orderNumber || order.code || (order.id ? String(order.id).slice(-4) : 'Comanda');
-    const address = customerObj.address || order.address || vars.direccion || 'Nuestro Local';
+
+    // Detección precisa de modo Delivery
+    const isDelivery = order.deliveryType === 'delivery' || 
+                       order.channel === 'delivery' || 
+                       order.shippingMethod === 'delivery' ||
+                       customerObj.deliveryType === 'delivery' ||
+                       customerObj.shippingMethod === 'delivery' ||
+                       Number(order.deliveryFee || 0) > 0 ||
+                       (customerObj.address && !['retiro en local', 'mostrador', 'local', 'en el local'].includes(customerObj.address.toLowerCase().trim()) && customerObj.address.length > 2 && !order.tableNumber);
+
+    // Dirección adecuada según contexto:
+    // - Para Retiro en Local: siempre es la dirección física de la hamburguesería (vars.direccion)
+    // - Para Envíos a Domicilio: es el domicilio del cliente
+    const storeAddress = vars.direccion || 'Nuestro Local (Av. Perón 145)';
+    const customerDeliveryAddress = customerObj.address || order.address || 'tu domicilio';
+    const addressToUse = (normalizedStatus === 'listo') ? storeAddress : customerDeliveryAddress;
 
     let templateText = '';
     if (normalizedStatus === 'cocina') {
       templateText = tpls.template_order_preparing || DEFAULT_SERVER_TEMPLATES.template_order_preparing;
     } else if (normalizedStatus === 'listo') {
+      if (isDelivery) {
+        // En pedidos para DELIVERY: El cliente NO debe recibir el aviso de retirar por el local.
+        console.log(`ℹ️ [NOTIF WHATSAPP]: Pedido #${orderNum} es para DELIVERY. Se omite notificación de 'Retiro en Local' en estado 'listo'. Se notificará cuando el cadete salga ('despachar'/'entregado').`);
+        return { success: false, reason: 'delivery_order_skip_pickup_notice' };
+      }
       templateText = tpls.template_order_ready || DEFAULT_SERVER_TEMPLATES.template_order_ready;
     } else if (normalizedStatus === 'entregado') {
-      if (order.deliveryType === 'delivery' || order.channel === 'delivery') {
+      if (isDelivery) {
         templateText = tpls.template_order_shipped || DEFAULT_SERVER_TEMPLATES.template_order_shipped;
       } else {
         return { success: false, reason: 'takeaway_delivered_no_notify' };
@@ -1032,12 +1055,12 @@ class WhatsAppBotServer {
     const finalMessage = templateText
       .replace(/{cliente}/gi, customerName)
       .replace(/{pedido_id}/gi, orderNum)
-      .replace(/{direccion}/gi, address)
+      .replace(/{direccion}/gi, addressToUse)
       .replace(/{total}/gi, Number(order.total || 0).toLocaleString('es-AR'))
       .replace(/{horarios}/gi, vars.horarios)
       .replace(/{demora}/gi, vars.demora || '30 a 45 min');
 
-    console.log(`🚀 [NOTIF WHATSAPP]: Enviando aviso de estado '${normalizedStatus}' a ${targetJid} (Pedido #${orderNum})...`);
+    console.log(`🚀 [NOTIF WHATSAPP]: Enviando aviso de estado '${normalizedStatus}' (${isDelivery ? 'Delivery' : 'Take Away'}) a ${targetJid} (Pedido #${orderNum})...`);
 
     const sendResult = await this.safeSendMessage(targetJid, { text: finalMessage });
 
@@ -1710,42 +1733,63 @@ class WhatsAppBotServer {
             const cleanText = lower.replace(/[!¡?¿.,;:]/g, '').trim();
             const { gratitude, farewell, acknowledge } = getAntiLoopWords();
 
-            if (gratitude.some(g => cleanText === g || cleanText.startsWith(g + ' ') || cleanText.endsWith(' ' + g))) {
-              const customReply = tpls.template_anti_loop_gratitude;
-              const defaultReplies = [
-                '¡De nada! 🙌 Que lo disfrutes un montón. Si querés consultar la carta o volver a pedir, escribí *MENU* cuando gustes. ¡Buen provecho! 🍔🔥',
-                '¡Un placer enorme atenderte! 😊 Avisanos cualquier cosa que necesites. Escribí *MENU* cuando quieras volver a pedir. ✨',
-                '¡Muchas gracias a vos por tu compra! ❤️ Esperamos que la disfrutes. La cocina queda a tu entera disposición. 🍔'
-              ];
-              const reply = (customReply && customReply.trim())
-                ? customReply
-                : defaultReplies[Math.floor(Math.random() * defaultReplies.length)];
-              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
-              continue;
-            }
+            const isGratitude = gratitude.some(g => cleanText === g || cleanText.startsWith(g + ' ') || cleanText.endsWith(' ' + g) || cleanText.includes(g));
+            const isFarewell = farewell.some(f => cleanText === f || cleanText.startsWith(f + ' ') || cleanText.endsWith(' ' + f));
+            const isAcknowledge = acknowledge.some(a => cleanText === a || cleanText.startsWith(a + ' ') || cleanText.endsWith(' ' + a) || cleanText.includes(a));
 
-            if (farewell.some(f => cleanText === f || cleanText.startsWith(f + ' ') || cleanText.endsWith(' ' + f))) {
-              const biz = getBusinessContext();
-              const storeName = biz.nombre_local || "Burga's Chamical";
-              const customReply = tpls.template_anti_loop_farewell;
-              const defaultReplies = [
-                `¡Hasta la próxima! 👋 Gracias por contactarte con ${storeName}. ¡Que tengas un excelente descanso! ✨🍔`,
-                `¡Nos vemos! Un saludo enorme de todo el equipo de ${storeName}. Escribí *MENU* cuando gustes volver a pedir. 🙌`
-              ];
-              const reply = (customReply && customReply.trim())
-                ? interpolateTemplate(customReply, { nombre_local: storeName })
-                : defaultReplies[Math.floor(Math.random() * defaultReplies.length)];
-              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
-              continue;
-            }
+            if (isGratitude || isFarewell || isAcknowledge) {
+              const now = Date.now();
+              const lastCourtesyTime = session.lastCourtesyReplyAt || 0;
+              const isRecentCourtesy = (now - lastCourtesyTime) < 10 * 60 * 1000; // 10 minutos de memoria
 
-            if (acknowledge.some(a => cleanText === a)) {
-              const customReply = tpls.template_anti_loop_acknowledge;
-              const reply = (customReply && customReply.trim())
-                ? customReply
-                : '¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido.';
-              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
-              continue;
+              // Si ya respondimos cortesía recientemente, reaccionamos con emoji en lugar de spamear otro texto o bucle
+              if (isRecentCourtesy) {
+                try {
+                  await this.sock.sendMessage(remoteJid, { react: { text: '❤️', key: msg.key } });
+                } catch (_) {}
+                console.log(`🛡️ [ANTI-BUCLE]: Mensaje de cortesía de ${remoteJid} reaccionado con ❤️ para no generar bucle repetitivo.`);
+                continue;
+              }
+
+              session.lastCourtesyReplyAt = now;
+
+              if (isGratitude) {
+                const customReply = tpls.template_anti_loop_gratitude;
+                const defaultReplies = [
+                  '¡De nada! 🙌 Que lo disfrutes un montón. Si querés consultar la carta o volver a pedir, escribí *MENU* cuando gustes. ¡Buen provecho! 🍔🔥',
+                  '¡Un placer enorme atenderte! 😊 Avisanos cualquier cosa que necesites. Escribí *MENU* cuando quieras volver a pedir. ✨',
+                  '¡Muchas gracias a vos por tu compra! ❤️ Esperamos que la disfrutes. La cocina queda a tu entera disposición. 🍔'
+                ];
+                const reply = (customReply && customReply.trim())
+                  ? customReply
+                  : defaultReplies[Math.floor(Math.random() * defaultReplies.length)];
+                await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
+                continue;
+              }
+
+              if (isFarewell) {
+                const biz = getBusinessContext();
+                const storeName = biz.nombre_local || "Burga's Chamical";
+                const customReply = tpls.template_anti_loop_farewell;
+                const defaultReplies = [
+                  `¡Hasta la próxima! 👋 Gracias por contactarte con ${storeName}. ¡Que tengas un excelente descanso! ✨🍔`,
+                  `¡Nos vemos! Un saludo enorme de todo el equipo de ${storeName}. Escribí *MENU* cuando gustes volver a pedir. 🙌`
+                ];
+                const reply = (customReply && customReply.trim())
+                  ? interpolateTemplate(customReply, { nombre_local: storeName })
+                  : defaultReplies[Math.floor(Math.random() * defaultReplies.length)];
+                await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
+                continue;
+              }
+
+              if (isAcknowledge) {
+                const customReply = tpls.template_anti_loop_acknowledge;
+                const reply = (customReply && customReply.trim())
+                  ? customReply
+                  : '¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido.';
+                await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
+                continue;
+              }
             }
           }
 
@@ -2281,15 +2325,15 @@ app.get('/api/ai/config', (req, res) => {
 });
 
 app.post('/api/ai/config', (req, res) => {
-  const { enabled, model, apiKey, secondaryApiKey, systemPrompt } = req.body;
-  const updated = geminiBotService.saveConfig({ enabled, model, apiKey, secondaryApiKey, systemPrompt });
+  const { enabled, mode, groqApiKey, geminiApiKey, deepseekApiKey, apiKey, model, groqModel, deepseekModel, systemPrompt } = req.body;
+  const updated = geminiBotService.saveConfig({ enabled, mode, groqApiKey, geminiApiKey, deepseekApiKey, apiKey, model, groqModel, deepseekModel, systemPrompt });
   pushBotConfigToSupabase('ai_config', updated).catch(() => {});
   res.json({ success: true, config: updated });
 });
 
 app.post('/api/ai/test', async (req, res) => {
-  const { apiKey } = req.body;
-  const result = await geminiBotService.testConnection(apiKey);
+  const { target, provider, apiKey } = req.body;
+  const result = await geminiBotService.testConnection(target || provider || apiKey || 'cascade');
   res.json(result);
 });
 
