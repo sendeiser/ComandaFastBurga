@@ -2029,6 +2029,8 @@ class WhatsAppBotServer {
               session.subtotal = session.items.reduce((acc, it) => acc + (it.price * (it.qty || 1)), 0);
               session.total = session.subtotal;
 
+              const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
+
               const modsHint = selectedProd.modifiers && selectedProd.modifiers.length > 0 
                 ? `\n👉 *Modificadores disponibles:* ${selectedProd.modifiers.join(', ')}`
                 : `\n👉 *¿Modificaciones?* (Ej: Sin cebolla, Extra cheddar)`;
