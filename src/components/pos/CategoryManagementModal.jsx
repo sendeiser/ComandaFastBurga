@@ -341,10 +341,10 @@ export default function CategoryManagementModal({ products = [], onProductsUpdat
                           height: '34px',
                           textAlign: 'center',
                           fontSize: '1.2rem',
-                          background: 'var(--bg-card, #1e293b)',
-                          border: '1px solid var(--border-subtle, rgba(255,255,255,0.2))',
+                          background: 'var(--bg-card, #ffffff)',
+                          border: '1px solid var(--border-subtle, #cbd5e1)',
                           borderRadius: '6px',
-                          color: '#fff'
+                          color: 'var(--text-primary, #0f172a)'
                         }}
                       />
                       <input
@@ -356,10 +356,11 @@ export default function CategoryManagementModal({ products = [], onProductsUpdat
                           height: '34px',
                           padding: '0 10px',
                           fontSize: '0.9rem',
-                          background: 'var(--bg-card, #1e293b)',
-                          border: '1px solid var(--border-subtle, rgba(255,255,255,0.2))',
+                          background: 'var(--bg-card, #ffffff)',
+                          border: '1px solid var(--border-subtle, #cbd5e1)',
                           borderRadius: '6px',
-                          color: '#fff'
+                          color: 'var(--text-primary, #0f172a)',
+                          fontWeight: 600
                         }}
                         autoFocus
                       />
@@ -385,13 +386,14 @@ export default function CategoryManagementModal({ products = [], onProductsUpdat
                       <button
                         onClick={() => setEditingId(null)}
                         style={{
-                          background: 'rgba(255,255,255,0.1)',
-                          color: '#fff',
-                          border: 'none',
+                          background: 'var(--bg-subtle, rgba(0,0,0,0.06))',
+                          color: 'var(--text-secondary, #475569)',
+                          border: '1px solid var(--border-subtle, #cbd5e1)',
                           borderRadius: '6px',
                           padding: '6px 10px',
                           cursor: 'pointer',
-                          fontSize: '0.8rem'
+                          fontSize: '0.8rem',
+                          fontWeight: 600
                         }}
                       >
                         Cancelar
@@ -527,9 +529,9 @@ export default function CategoryManagementModal({ products = [], onProductsUpdat
                         height: '36px',
                         padding: '0 10px',
                         borderRadius: '8px',
-                        background: 'var(--bg-main, #0f172a)',
-                        color: '#fff',
-                        border: '1px solid var(--border-subtle, rgba(255,255,255,0.2))',
+                        background: 'var(--bg-card, #ffffff)',
+                        color: 'var(--text-primary, #0f172a)',
+                        border: '1px solid var(--border-subtle, #cbd5e1)',
                         fontSize: '0.85rem',
                         fontWeight: 700
                       }}
@@ -554,9 +556,9 @@ export default function CategoryManagementModal({ products = [], onProductsUpdat
                   style={{
                     padding: '8px 16px',
                     borderRadius: '8px',
-                    background: 'rgba(255,255,255,0.08)',
-                    color: '#fff',
-                    border: 'none',
+                    background: 'var(--bg-subtle, rgba(0,0,0,0.06))',
+                    color: 'var(--text-secondary, #475569)',
+                    border: '1px solid var(--border-subtle, #cbd5e1)',
                     fontWeight: 700,
                     fontSize: '0.85rem',
                     cursor: 'pointer'
