@@ -901,6 +901,7 @@ class WhatsAppBotServer {
         delayMs = Math.min(3600, Math.max(1400, Math.floor(charCount * 12) + Math.floor(Math.random() * 600)));
       }
 
+      console.log(`✍️ [RETARDO TIPEO]: Simulando "Escribiendo..." (${(delayMs / 1000).toFixed(1)}s) para ${remoteJid}`);
       await new Promise(r => setTimeout(r, delayMs));
 
       // 4. Pausar "Escribiendo..." justo antes del despacho
