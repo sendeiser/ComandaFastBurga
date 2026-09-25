@@ -132,9 +132,13 @@ async function pushBotConfigToSupabase(key, data) {
         updated_at: new Date().toISOString()
       })
     });
-    console.log(`[SUPABASE] Bot config '${key}' sincronizado a la nube.`);
+    if (key !== 'server_status') {
+      console.log(`[SUPABASE] Bot config '${key}' sincronizado a la nube.`);
+    }
   } catch (e) {
-    console.warn(`[SUPABASE] pushBotConfigToSupabase '${key}' error:`, e.message);
+    if (key !== 'server_status') {
+      console.warn(`[SUPABASE] pushBotConfigToSupabase '${key}' error:`, e.message);
+    }
   }
 }
 
@@ -1797,12 +1801,6 @@ async function checkRemoteCommands() {
       } else if (cmd.action === 'resume_chat' && cmd.jid) {
         resumeBotForCustomer(cmd.jid);
         publishBotStatusToSupabase();
-      } else if (cmd.action === 'sync_templates') {
-        const cloudTemplates = await fetchBotConfigFromSupabase('templates');
-        if (cloudTemplates && typeof cloudTemplates === 'object') {
-          saveBotTemplates(cloudTemplates);
-          console.log(`⚡ [WHATSAPP BOT] Plantillas, Filtro Anti-Bucle y Respuestas Inteligentes sincronizados en tiempo real desde Supabase!`);
-        }
       }
       await pushBotConfigToSupabase('server_commands', {
         ...cmd,
@@ -1813,34 +1811,6 @@ async function checkRemoteCommands() {
   } catch (_) {}
 }
 setInterval(checkRemoteCommands, 3500);
-
-// Sincronización periódica automática de plantillas, frases anti-bucle y respuestas desde Supabase Cloud
-let lastCloudTemplatesSyncTimestamp = null;
-async function syncTemplatesFromCloudPeriodically() {
-  try {
-    const queryUrl = `${SUPABASE_URL}/rest/v1/bot_config?id=eq.templates&select=updated_at,data`;
-    const res = await fetch(queryUrl, {
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-      }
-    });
-    if (res.ok) {
-      const rows = await res.json();
-      if (Array.isArray(rows) && rows.length > 0) {
-        const row = rows[0];
-        if (row.updated_at && row.updated_at !== lastCloudTemplatesSyncTimestamp) {
-          lastCloudTemplatesSyncTimestamp = row.updated_at;
-          if (row.data && typeof row.data === 'object') {
-            saveBotTemplates(row.data);
-            console.log(`🔄 [WHATSAPP BOT] Plantillas & Filtro Anti-Bucle actualizados automáticamente desde la Base de Datos (${row.updated_at}).`);
-          }
-        }
-      }
-    }
-  } catch (_) {}
-}
-setInterval(syncTemplatesFromCloudPeriodically, 5000);
 
 // Señal de apagado limpio
 process.on('SIGINT', async () => {

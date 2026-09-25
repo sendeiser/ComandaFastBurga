@@ -445,7 +445,7 @@ export default function AdminWhatsAppBot({ initialTab }) {
       setSavingAntiLoop(true);
       await chatbotService.saveSettings(updated);
       setSavingAntiLoop(false);
-      setAntiLoopSaveMsg(`Palabra "${word}" sincronizada con la BD & Bot`);
+      setAntiLoopSaveMsg(`Palabra "${word}" guardada en la Base de Datos`);
       setTimeout(() => setAntiLoopSaveMsg(''), 3000);
     }
     setNewAntiLoopWord('');
@@ -474,7 +474,7 @@ export default function AdminWhatsAppBot({ initialTab }) {
     setSavingAntiLoop(true);
     await chatbotService.saveSettings(updated);
     setSavingAntiLoop(false);
-    setAntiLoopSaveMsg(`Palabra eliminada y sincronizada en BD & Bot`);
+    setAntiLoopSaveMsg(`Palabra eliminada y guardada en la Base de Datos`);
     setTimeout(() => setAntiLoopSaveMsg(''), 3000);
   };
 
@@ -492,7 +492,7 @@ export default function AdminWhatsAppBot({ initialTab }) {
     setSavingAntiLoop(true);
     await chatbotService.saveSettings(updated);
     setSavingAntiLoop(false);
-    setAntiLoopSaveMsg('Filtro y respuestas restablecidos por defecto en BD & Bot');
+    setAntiLoopSaveMsg('Filtro y respuestas restablecidos por defecto en la Base de Datos');
     setTimeout(() => setAntiLoopSaveMsg(''), 3000);
   };
 
@@ -507,7 +507,7 @@ export default function AdminWhatsAppBot({ initialTab }) {
     setSavingAntiLoop(true);
     await chatbotService.saveSettings(settings);
     setSavingAntiLoop(false);
-    setAntiLoopSaveMsg('✅ Frases y Respuestas Inteligentes sincronizadas con la BD y el Bot');
+    setAntiLoopSaveMsg('✅ Frases y Respuestas Inteligentes guardadas en la Base de Datos');
     setTimeout(() => setAntiLoopSaveMsg(''), 3500);
   };
 
@@ -1490,7 +1490,7 @@ call npm run dev
                     alignItems: 'center',
                     gap: '4px'
                   }}>
-                    <Wifi size={11} /> Sync BD & Bot en Vivo
+                    <Wifi size={11} /> Base de Datos Cloud
                   </span>
                 </h4>
                 <div style={{ fontSize: '0.78rem', color: '#475569', marginTop: '3px' }}>

@@ -228,13 +228,6 @@ export const chatbotService = {
       localStorage.setItem(BOT_SETTINGS_KEY, JSON.stringify(newSettings));
       if (supabaseSync.isConfigured()) {
         await supabaseSync.saveBotTemplates(newSettings);
-        // Notificar en tiempo real al servidor Baileys / bot de WhatsApp
-        await supabaseSync.saveBotConfig('server_commands', {
-          id: 'cmd_' + Date.now(),
-          action: 'sync_templates',
-          status: 'pending',
-          timestamp: Date.now()
-        }).catch(() => {});
       }
       try {
         const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
