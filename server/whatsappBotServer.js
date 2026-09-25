@@ -25,6 +25,14 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '25mb' })); // Para recibir fotos en Base64 sin problemas
 
+process.on('uncaughtException', (err) => {
+  console.error('⚠️ [WHATSAPP BOT - UNCAUGHT EXCEPTION]:', err?.message || err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.warn('⚠️ [WHATSAPP BOT - UNHANDLED REJECTION]:', reason?.message || reason);
+});
+
 const PORT = 3002;
 
 
