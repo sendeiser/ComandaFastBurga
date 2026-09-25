@@ -314,7 +314,14 @@ export class GeminiBotService {
     if (!groqKey && !geminiKey && !deepseekKey) return null;
 
     const availableProds = context.availableProducts || [];
-    const prodsSummary = availableProds.slice(0, 15).map((p, idx) => 
+    const promoProds = availableProds.filter(p => (p.category || '').toLowerCase() === 'promos');
+    const regularProds = availableProds.filter(p => (p.category || '').toLowerCase() !== 'promos');
+
+    const promosSummary = promoProds.length > 0 
+      ? promoProds.map((p, idx) => `• [PROMO #${idx + 1}] ${p.name}: $${Number(p.price).toLocaleString('es-AR')}${p.originalPrice ? ` (Antes: $${p.originalPrice.toLocaleString('es-AR')})` : ''}${p.freeShipping ? ' [Incluye Envío Gratis]' : ''} - ${p.description || 'Elaborada artesanalmente'}${p.modifiers?.length ? ` (Modificadores: ${p.modifiers.join(', ')})` : ''}`).join('\n')
+      : 'No hay promociones especiales cargadas en este momento.';
+
+    const prodsSummary = regularProds.slice(0, 18).map((p, idx) => 
       `${idx + 1}. ${p.name} ($${Number(p.price).toLocaleString('es-AR')}) - ${p.description || 'Artesanal'}`
     ).join('\n');
 
@@ -348,16 +355,20 @@ INFORMACIÓN DEL LOCAL:
 - Medios de Pago: Transferencias bancarias (Alias: ${alias}${bank}${cbu}), Efectivo al recibir, Mercado Pago.
 - Modalidades: Delivery propio en moto y Retiro en Mostrador (Take Away)${shipping}.
 
-CARTA ACTUAL DE HAMBURGUESAS:
+PROMOCIONES Y COMBOS ACTIVOS:
+${promosSummary}
+
+CARTA DE HAMBURGUESAS Y PRODUCTOS:
 ${prodsSummary || 'Hamburguesas clásicas, dobles, triples, smash, crispy y opciones veggie.'}
 
 REGLAS DE ATENCIÓN:
 1. Si el cliente saluda (hola, buenas noches, etc.), dale la bienvenida cordial en nombre de "${storeName}" y recuérdale que puede escribir *MENU* para ver la carta o *COMPRAR* para pedir.
-2. Si el cliente pregunta qué comer, qué le recomendás o qué opciones hay, recomendale 2 o 3 opciones tentadoras con su precio y descripción real.
-3. Si pregunta por ingredientes, celíacos o vegetarianos, sé honesto y empático mencionando lo que tenemos.
-4. Si el cliente quiere hacer un pedido o ver fotos, recordale que puede escribir "COMPRAR", "MENU" o "FOTO [número]".
-5. Respuestas concisas y atractivas (máximo 2 a 4 párrafos cortos). No des discursos largos.
-6. TERMINOLOGÍA OBLIGATORIA: Usa SIEMPRE la palabra "pedido" o "pedidos". Está TERMINANTEMENTE PROHIBIDO usar la palabra "comanda" con el cliente (la palabra comanda es exclusivamente de uso técnico interno para la cocina). Habla siempre de "tu pedido", "armar tu pedido", "confirmar tu pedido", "seguir tu pedido".
+2. Si el cliente pregunta por promociones, ofertas o qué promos hay, detalle con entusiasmo las PROMOCIONES ACTIVAS mencionadas arriba con sus nombres, precios y agregados, y recuérdale que puede pedirlas respondiendo con el nombre de la promo o *COMPRAR*.
+3. Si el cliente pregunta qué comer, qué le recomendás o qué opciones hay, recomendale 2 o 3 opciones tentadoras con su precio y descripción real.
+4. Si pregunta por ingredientes, celíacos o vegetarianos, sé honesto y empático mencionando lo que tenemos.
+5. Si el cliente quiere hacer un pedido o ver fotos, recordale que puede escribir "COMPRAR", "MENU", "PROMOS" o "FOTO [número]".
+6. Respuestas concisas y atractivas (máximo 2 a 4 párrafos cortos). No des discursos largos.
+7. TERMINOLOGÍA OBLIGATORIA: Usa SIEMPRE la palabra "pedido" o "pedidos". Está TERMINANTEMENTE PROHIBIDO usar la palabra "comanda" con el cliente (la palabra comanda es exclusivamente de uso técnico interno para la cocina). Habla siempre de "tu pedido", "armar tu pedido", "confirmar tu pedido", "seguir tu pedido".
 
 Cliente: ${context.customerName || 'Cliente'}
     `.trim();

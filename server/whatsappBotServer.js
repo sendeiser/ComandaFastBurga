@@ -218,6 +218,12 @@ async function syncAllProductsFromCloud() {
 
         const mergedProds = cloudProds
           .filter(p => p && p.is_active !== false)
+          .sort((a, b) => {
+            const isPromoA = (a.category || '').toLowerCase() === 'promos' ? 0 : 1;
+            const isPromoB = (b.category || '').toLowerCase() === 'promos' ? 0 : 1;
+            if (isPromoA !== isPromoB) return isPromoA - isPromoB;
+            return (a.name || '').localeCompare(b.name || '');
+          })
           .map(p => {
             const img = p.image || imagesMap[p.id] || '';
             return {
@@ -821,6 +827,86 @@ function buildCatalogMessage(prods, page = 1, pageSize = 8, isAll = false) {
   return `🍔 *MENÚ ${storeName.toUpperCase()}* 🔥\n📄 *Página ${currentPage} de ${totalPages}* (Opciones ${startIdx + 1} al ${startIdx + pageProds.length} de ${total})\n\n${list}\n\n───────────────────\n👉 *Para pedir:* Respondé con el NÚMERO (1 al ${total}).\n👉 *Para ver foto:* Escribí *FOTO [número]* (ej: *FOTO ${startIdx + 1}*).\n${navInstructions}👉 Escribí *VER TODO* para ver la lista completa.`;
 }
 
+function buildPromosMessage(prods) {
+  const promoProds = prods.filter(p => (p.category || '').toLowerCase() === 'promos');
+  const biz = getBusinessContext();
+  const storeName = biz.nombre_local || "Burga's Chamical";
+
+  if (promoProds.length === 0) {
+    return `🏷️ *PROMOCIONES DE ${storeName.toUpperCase()}* 🔥\n\nEn este momento no hay promociones activas cargadas en el sistema.\n👉 Escribí *4* o *MENU* para ver toda nuestra carta de hamburguesas.`;
+  }
+
+  const list = promoProds.map((p) => {
+    const globalIdx = prods.indexOf(p) + 1;
+    const numBadge = formatItemNumber(globalIdx);
+    const photoBadge = p.image ? '📸' : '';
+    let priceStr = `$${Number(p.price).toLocaleString('es-AR')}`;
+    if (p.originalPrice && Number(p.originalPrice) > Number(p.price)) {
+      priceStr = `~${Number(p.originalPrice).toLocaleString('es-AR')}~ $${Number(p.price).toLocaleString('es-AR')}`;
+    }
+    const promoBadge = p.discountBadge ? ` [🏷️ ${p.discountBadge}]` : '';
+    const freeShippingBadge = p.freeShipping ? ' [🛵 Envío Gratis]' : '';
+    const desc = p.description ? `\n   _${p.description}_` : '';
+    const mods = p.modifiers && p.modifiers.length > 0 ? `\n   ✨ Modificadores: ${p.modifiers.join(', ')}` : '';
+    return `${numBadge} *${p.name}* — ${priceStr}${promoBadge}${freeShippingBadge} ${photoBadge}${desc}${mods}`;
+  }).join('\n\n');
+
+  return `🏷️ *PROMOCIONES & COMBOS DE ${storeName.toUpperCase()}* 🔥\n\n${list}\n\n───────────────────\n👉 *Para pedir una promo:* Respondé con el NÚMERO (ej: *${prods.indexOf(promoProds[0]) + 1}*) o escribí su nombre.\n👉 Escribí *COMPRAR* o *MENU* para ver todas las opciones.`;
+}
+
+function findProductByText(lowerText, prodsList) {
+  if (!lowerText || !Array.isArray(prodsList)) return null;
+  const cleanLower = lowerText.toLowerCase().trim();
+  const isPromoSearch = cleanLower.includes('promo') || cleanLower.includes('oferta') || cleanLower.includes('descuento') || cleanLower.includes('combo');
+
+  // 1. Si el texto incluye "promo", buscar prioritariamente en la categoría Promos
+  if (isPromoSearch) {
+    const promoProds = prodsList.filter(p => (p.category || '').toLowerCase() === 'promos');
+    const strippedText = cleanLower
+      .replace(/\b(promos?|promocion(es)?|ofertas?|descuentos?|combos?)\b/gi, '')
+      .replace(/\b(quiero|dame|pedir|comprar|la|el|un|una|de|con)\b/gi, '')
+      .trim();
+
+    if (strippedText) {
+      const promoMatch = promoProds.find(p => {
+        const pName = p.name.toLowerCase();
+        return pName === strippedText || strippedText.includes(pName) || pName.includes(strippedText);
+      });
+      if (promoMatch) return promoMatch;
+    }
+  }
+
+  // 2. Si NO es búsqueda de promo, buscar coincidencia exacta en productos regulares primero
+  if (!isPromoSearch) {
+    const regularExact = prodsList.find(p => (p.category || '').toLowerCase() !== 'promos' && cleanLower === p.name.toLowerCase());
+    if (regularExact) return regularExact;
+  }
+
+  // 3. Coincidencia exacta de nombre o con prefijo "promo"
+  const exactMatch = prodsList.find(p => {
+    const pName = p.name.toLowerCase();
+    return cleanLower === pName || cleanLower === `promo ${pName}` || cleanLower === `la ${pName}`;
+  });
+  if (exactMatch) return exactMatch;
+
+  // 3. Buscar si el texto del cliente contiene el nombre de algún producto
+  const candidates = prodsList.filter(p => {
+    const pName = p.name.toLowerCase();
+    return cleanLower.includes(pName) || (pName.length >= 4 && cleanLower.includes(pName.slice(0, -1)));
+  });
+
+  if (candidates.length > 0) {
+    if (isPromoSearch) {
+      const promoCand = candidates.find(p => (p.category || '').toLowerCase() === 'promos');
+      if (promoCand) return promoCand;
+    }
+    candidates.sort((a, b) => b.name.length - a.name.length);
+    return candidates[0];
+  }
+
+  return null;
+}
+
 function buildMainMenuMessage(customerName = '') {
   const tpls = getBotTemplates();
   const biz = getBusinessContext();
@@ -845,12 +931,20 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-// Cargar productos de la base de datos local
+// Cargar productos de la base de datos local (priorizando Promos al frente)
 function getStoredProducts() {
   try {
     if (fs.existsSync(PRODUCTS_FILE)) {
       const raw = fs.readFileSync(PRODUCTS_FILE, 'utf-8');
-      return JSON.parse(raw);
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) {
+        return list.slice().sort((a, b) => {
+          const isPromoA = (a.category || '').toLowerCase() === 'promos' ? 0 : 1;
+          const isPromoB = (b.category || '').toLowerCase() === 'promos' ? 0 : 1;
+          if (isPromoA !== isPromoB) return isPromoA - isPromoB;
+          return 0;
+        });
+      }
     }
   } catch (e) {
     console.error('[WHATSAPP BOT] Error al leer products.json:', e);
@@ -1859,13 +1953,13 @@ class WhatsAppBotServer {
               }
             }
 
-            // Intentar sumar otro producto por número o nombre
+            // Intentar sumar otro producto por número o nombre (con detección inteligente de promos)
             const numIdx = parseInt(lower.replace(/\D/g, ''), 10);
             let selectedProd = null;
-            if (!isNaN(numIdx) && numIdx >= 1 && numIdx <= prods.length) {
+            if (!isNaN(numIdx) && numIdx >= 1 && numIdx <= prods.length && !lower.includes('hamburguesa') && !lower.includes('burger')) {
               selectedProd = prods[numIdx - 1];
             } else {
-              selectedProd = prods.find(p => lower.includes(p.name.toLowerCase()));
+              selectedProd = findProductByText(lower, prods);
             }
 
             if (selectedProd) {
@@ -1928,6 +2022,21 @@ class WhatsAppBotServer {
           if (lower === 'ver todo' || lower === 'todo' || lower === 'todas' || lower === 'completa' || lower === 'completo') {
             const reply = buildCatalogMessage(prods, 1, 8, true);
             await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
+            continue;
+          }
+
+          // -------------------------------------------------------------
+          // COMANDO: CONSULTA DIRECTA DE PROMOS ("promos", "ver promos", "ofertas")
+          // -------------------------------------------------------------
+          const isPromoTrigger = [
+            'promo', 'promos', 'ver promo', 'ver promos', 'promocion', 'promociones',
+            'oferta', 'ofertas', 'descuento', 'descuentos', 'combo', 'combos'
+          ].includes(lower) || /^(ver\s+)?(las\s+)?(promos?|promocion(es)?|ofertas?)$/i.test(lower);
+
+          if (isPromoTrigger) {
+            session.step = 'SELECTING';
+            const promoReply = buildPromosMessage(prods);
+            await this.safeSendMessage(remoteJid, { text: promoReply }, msg.key);
             continue;
           }
 
@@ -2053,10 +2162,10 @@ class WhatsAppBotServer {
           // -------------------------------------------------------------
           const initialNum = parseInt(lower.replace(/\D/g, ''), 10);
           let matchedProd = null;
-          if (!isNaN(initialNum) && initialNum >= 1 && initialNum <= prods.length) {
+          if (!isNaN(initialNum) && initialNum >= 1 && initialNum <= prods.length && !lower.includes('hamburguesa') && !lower.includes('burger')) {
             matchedProd = prods[initialNum - 1];
           } else {
-            matchedProd = prods.find(p => lower.includes(p.name.toLowerCase()));
+            matchedProd = findProductByText(lower, prods);
           }
 
           if (matchedProd && (lower.startsWith('comprar') || lower.startsWith('pedir') || lower.startsWith('quiero') || lower.startsWith('dame') || (initialNum >= 6 && initialNum <= prods.length) || session.step === 'SELECTING')) {
