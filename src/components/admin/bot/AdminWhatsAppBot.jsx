@@ -3,7 +3,7 @@ import {
   Bot, Sparkles, Key, Download, Terminal, Settings, ShieldCheck, QrCode, 
   Smartphone, CheckCircle2, Save, RotateCcw, Plus, 
   Trash2, Copy, Check, Info, Zap, AlertCircle, RefreshCw,
-  Power, Wifi, WifiOff, ExternalLink, Clock, UserCheck, MessageSquare
+  Power, Wifi, WifiOff, ExternalLink, Clock, UserCheck, MessageSquare, Store
 } from 'lucide-react';
 import AdminBotFlowsTab from './AdminBotFlowsTab';
 import AdminBotVariablesTab from './AdminBotVariablesTab';
@@ -2380,61 +2380,113 @@ call npm run dev
             </div>
 
             {/* RIGHT: SYSTEM PROMPT / PERSONALITY EDITOR */}
-            <div style={{
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '1.25rem',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.85rem'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Settings size={16} style={{ color: 'var(--accent-amber)' }} />
-                  <span>Personalidad del Asistente & Instrucciones (System Prompt)</span>
+            {(() => {
+              const botVarsMap = chatbotService.getBotVariablesMap();
+              const currentStoreName = botVarsMap.nombre_local || "Burga's Chamical";
+              const currentWelcomeMsg = botVarsMap.mensaje_bienvenida || `¡Hola {cliente}! Bienvenido a ${currentStoreName} 🔥 Las mejores hamburguesas smashadas a la plancha.`;
+              return (
+                <div style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: '1.25rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.85rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Settings size={16} style={{ color: 'var(--accent-amber)' }} />
+                      <span>Personalidad del Asistente & Instrucciones (System Prompt)</span>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      Personalizá el tono y respuestas
+                    </span>
+                  </div>
+
+                  {/* ACTIVE IDENTITY & GREETING INFO BOX */}
+                  <div style={{
+                    background: 'rgba(245, 158, 11, 0.08)',
+                    border: '1px solid rgba(245, 158, 11, 0.25)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '0.75rem 0.9rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                      <span style={{ fontWeight: 800, color: 'var(--accent-amber)', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}>
+                        <Store size={15} /> Identidad en la IA: <u>{currentStoreName}</u>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('variables')}
+                        className="qty-btn"
+                        style={{ height: '24px', padding: '0 8px', fontSize: '0.7rem', gap: '4px', textDecoration: 'none' }}
+                        title="Ir a modificar las variables del negocio"
+                      >
+                        <span>Editar en Variables</span>
+                        <ExternalLink size={11} />
+                      </button>
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      <strong>👋 Saludo / Bienvenida de referencia para la IA:</strong>
+                      <div style={{
+                        marginTop: '3px',
+                        fontStyle: 'italic',
+                        background: 'var(--bg-main)',
+                        padding: '5px 8px',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1px solid var(--border-subtle)',
+                        color: 'var(--text-primary)',
+                        wordBreak: 'break-word'
+                      }}>
+                        "{currentWelcomeMsg}"
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.69rem', color: 'var(--text-muted)' }}>
+                      💡 Cuando un cliente saluda por primera vez (ej: <em>"hola", "buenas noches"</em>), la IA se presenta en nombre de <strong>{currentStoreName}</strong> usando este estilo y calidez.
+                    </div>
+                  </div>
+
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+                    Podés escribir tus propias directivas personalizadas para la IA. Por defecto, el sistema le inyecta automáticamente a <strong>{currentStoreName}</strong> el <strong>catálogo completo en tiempo real</strong>, precios, formas de entrega (Retiro y Delivery) y alias de pago.
+                  </p>
+
+                  <textarea
+                    rows={10}
+                    value={aiConfig.systemPrompt}
+                    onChange={(e) => setAiConfig(prev => ({ ...prev, systemPrompt: e.target.value }))}
+                    placeholder={`Dejá en blanco para usar la personalidad oficial gastronómica de ${currentStoreName}:\n- Se presenta siempre como ${currentStoreName} y utiliza el saludo de bienvenida configurado.\n- Tono canchero y simpático argentino con emojis (🍔, 🔥, 🍟).\n- Respuestas cortas y vendedoras (2-3 párrafos).\n- Recomendación de hamburguesas smash y adicionales.\n- Instrucciones para pedir escribiendo el número o la palabra COMPRAR.`}
+                    className="search-input"
+                    style={{
+                      width: '100%',
+                      fontSize: '0.82rem',
+                      lineHeight: '1.45',
+                      padding: '0.75rem',
+                      borderRadius: 'var(--radius-md)',
+                      resize: 'vertical',
+                      fontFamily: 'inherit'
+                    }}
+                  />
+
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      💡 La IA solo interviene en consultas abiertas. Para armar pedidos, el sistema toma el control garantizando la comanda exacta.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAiConfig(prev => ({ ...prev, systemPrompt: '' }))}
+                      className="qty-btn"
+                      style={{ height: '30px', padding: '0 10px', fontSize: '0.72rem', gap: '4px' }}
+                    >
+                      <RotateCcw size={12} />
+                      <span>Restablecer Prompt por Defecto</span>
+                    </button>
+                  </div>
                 </div>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                  Personalizá el tono y respuestas
-                </span>
-              </div>
-
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
-                Podés escribir tus propias directivas para la IA. Por defecto, ComandaFast le inyecta automáticamente el <strong>catálogo de hamburguesas en tiempo real</strong>, precios, formas de entrega (Retiro y Delivery) y alias de pago.
-              </p>
-
-              <textarea
-                rows={12}
-                value={aiConfig.systemPrompt}
-                onChange={(e) => setAiConfig(prev => ({ ...prev, systemPrompt: e.target.value }))}
-                placeholder={`Dejá en blanco para usar la personalidad oficial gastronómica de ComandaFast Burgers:\n- Tono canchero y simpático argentino con emojis (🍔, 🔥, 🍟).\n- Respuestas cortas y vendedoras (2-3 párrafos).\n- Recomendación de burgers smash y adicionales.\n- Instrucciones para pedir escribiendo el número o la palabra COMPRAR.`}
-                className="search-input"
-                style={{
-                  width: '100%',
-                  fontSize: '0.82rem',
-                  lineHeight: '1.45',
-                  padding: '0.75rem',
-                  borderRadius: 'var(--radius-md)',
-                  resize: 'vertical',
-                  fontFamily: 'inherit'
-                }}
-              />
-
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                  💡 La IA solo interviene en consultas abiertas. Para armar pedidos, el sistema toma el control garantizando la comanda exacta.
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setAiConfig(prev => ({ ...prev, systemPrompt: '' }))}
-                  className="qty-btn"
-                  style={{ height: '30px', padding: '0 10px', fontSize: '0.72rem', gap: '4px' }}
-                >
-                  <RotateCcw size={12} />
-                  <span>Restablecer Prompt por Defecto</span>
-                </button>
-              </div>
-            </div>
+              );
+            })()}
           </div>
         </div>
       )}

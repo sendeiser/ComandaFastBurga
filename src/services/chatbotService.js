@@ -319,7 +319,9 @@ export const chatbotService = {
         return `${numBadge} *${p.name}* — $${Number(p.price).toLocaleString('es-AR')} ${photoBadge}`;
       }).join('\n');
 
-      return `🍔 *CARTA COMPLETA DE COMANDAFAST (${total} opciones)* 🔥\n\n${list}\n\n👉 *Para pedir:* Respondé con el número (ej: *1*, *12*, *18*) o *COMPRAR*.\n👉 *Para ver foto:* Escribí *FOTO [número]* (ej: *FOTO 12*).`;
+      const botVars = this.getBotVariablesMap();
+      const storeName = botVars.nombre_local || "Burga's Chamical";
+      return `🍔 *CARTA COMPLETA DE ${storeName.toUpperCase()} (${total} opciones)* 🔥\n\n${list}\n\n👉 *Para pedir:* Respondé con el número (ej: *1*, *12*, *18*) o *COMPRAR*.\n👉 *Para ver foto:* Escribí *FOTO [número]* (ej: *FOTO 12*).`;
     }
 
     const totalPages = Math.ceil(total / pageSize) || 1;
@@ -345,7 +347,9 @@ export const chatbotService = {
       }
     }
 
-    return `🍔 *MENÚ COMANDAFAST BURGERS* 🔥\n📄 *Página ${currentPage} de ${totalPages}* (Opciones ${startIdx + 1} al ${startIdx + pageProds.length} de ${total})\n\n${list}\n\n───────────────────\n👉 *Para pedir:* Respondé con el NÚMERO (1 al ${total}).\n👉 *Para ver foto:* Escribí *FOTO [número]* (ej: *FOTO ${startIdx + 1}*).\n${navInstructions}👉 Escribí *VER TODO* para ver la lista completa.`;
+    const botVars = this.getBotVariablesMap();
+    const storeName = botVars.nombre_local || "Burga's Chamical";
+    return `🍔 *MENÚ ${storeName.toUpperCase()}* 🔥\n📄 *Página ${currentPage} de ${totalPages}* (Opciones ${startIdx + 1} al ${startIdx + pageProds.length} de ${total})\n\n${list}\n\n───────────────────\n👉 *Para pedir:* Respondé con el NÚMERO (1 al ${total}).\n👉 *Para ver foto:* Escribí *FOTO [número]* (ej: *FOTO ${startIdx + 1}*).\n${navInstructions}👉 Escribí *VER TODO* para ver la lista completa.`;
   },
 
   // 4. Interpolación de variables en plantillas
@@ -360,15 +364,19 @@ export const chatbotService = {
   // 5. Variables resueltas dinámicamente
   getResolvedVariables(persona = {}, settings = null) {
     const s = settings || this.getSettings();
+    const botVars = this.getBotVariablesMap();
+    const storeName = botVars.nombre_local || s.store_name || "Burga's Chamical";
     return {
       cliente: persona.name || 'Cliente',
-      alias_banco: s.bank_alias || 'comandafast.mp',
-      banco: s.bank_name || 'Mercado Pago / Galicia',
-      titular: s.bank_holder || 'ComandaFast Burgers',
-      cbu: s.bank_cbu || '0000003100092138928374',
-      direccion: s.pickup_address || 'Av. Belgrano 1234, Centro',
-      horarios: s.opening_hours || 'Miércoles a Domingos de 19:30 a 00:30 hs',
-      catalogo_url: s.store_website_url || window.location.origin
+      nombre_local: storeName,
+      alias_banco: botVars.alias_banco || s.bank_alias || 'Burgachamical.nx',
+      banco: botVars.banco || s.bank_name || 'Naranja X',
+      titular: botVars.titular || s.bank_holder || 'Braian Carlos Zarate San Felipe',
+      cbu: botVars.cbu || s.bank_cbu || '0000003100092138928374',
+      direccion: botVars.direccion || botVars.direccion_local || s.pickup_address || 'Av. Perón 145 (frente al super x día)',
+      horarios: botVars.horarios || s.opening_hours || 'Martes a Domingos de 19:30 a 00:30 hs',
+      costo_envio: botVars.costo_envio || '$2.000',
+      catalogo_url: botVars.catalogo_url || s.store_website_url || (typeof window !== 'undefined' ? window.location.origin : '')
     };
   },
 

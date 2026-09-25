@@ -46,6 +46,7 @@
     "triple"
   ],
   "template_welcome": "¡Hola! Bienvenido a Burga Chamical. ¿En qué podemos ayudarte hoy? (Test Live 1790139696388)",
+  "anti_loop_enabled": false,
   "store_website_url": "https://burgasystem.netlify.app",
   "anti_loop_farewell": [
     "chau",
@@ -104,11 +105,11 @@
   "auto_notify_new_order": true,
   "template_order_shipped": "🛵💨 *¡Tu pedido #{pedido_id} va en camino {cliente}!*\n\nDestino: *{direccion}*\nEl repartidor ya salió del local. ¡Mantenete atento para recibir tu comida bien caliente! 🍔🔥",
   "template_order_summary": "🍔 *RESUMEN DE TU PEDIDO* 🔥\n\n🛒 *Items:*\n{carrito_items}\n\n💵 *Subtotal:* ${subtotal}\n{linea_descuento}🛵 *Entrega:* {metodo_entrega}\n📍 *Dirección:* {direccion}\n👤 *Cliente:* {cliente}\n💳 *Forma de Pago:* {medio_pago}\n\n💵 *TOTAL A PAGAR:* ${total}\n\n¿Está todo correcto para mandar a la cocina?\n👉 Respondé *SI* para confirmar tu comanda o *CANCELAR*.",
-  "template_payment_proof": "📸 *¡Comprobante de transferencia recibido!* 💳\n\nMuchas gracias por enviarlo. Ya verificamos el ingreso y tu pedido pasa a cocina inmediatamente. 🔥🍔",
+  "template_payment_proof": "📸 *¡Comprobante de transferencia recibido!* 💳\n\nMuchas gracias por enviarlo. Ya verificamos el ingreso y tu pedido pasara a cocina inmediatamente. 🔥🍔",
   "template_product_photo": "🍔 *{producto}* 🔥\n{detalle}\n💵 *Precio:* {precio}\n\n👉 Para pedir este producto escribí *COMPRAR* o su número.\n👉 Podés agregar aclaraciones como *Sin cebolla*, *Extra cheddar*, etc.",
   "template_address_prompt": "📍 *Por favor escribí tu dirección exacta y entrecalles para el repartidor:*",
   "template_payment_prompt": "💳 *¿Cómo preferís abonar tu pedido?*\n\nRespondé con el número:\n1️⃣ *Transferencia Bancaria* (Alias / CBU)\n2️⃣ *Efectivo contra entrega* (Al recibir o retirar)\n3️⃣ *Mercado Pago* (Link directo de pago)",
-  "human_mode_sleep_minutes": 3,
+  "human_mode_sleep_minutes": 2,
   "template_cart_item_added": "✅ *¡Agregaste {producto}!* 🍔 (+{subtotal_item})\n\n🛒 *Tu pedido actual:*\n{carrito_items}\n\n💵 *Subtotal:* ${subtotal}\n\n👉 ¿Querés sumar otra burger, papas o bebida? *(Escribí su número)*\n👉 Podés pedir aclaraciones *(Ej: sin cebolla, extra cheddar)*\n👉 O escribí *LISTO* para avanzar con la entrega y el pago.",
   "template_order_cancelled": "❌ *Comanda cancelada.* ¿En qué más podemos ayudarte?\n\n{menu}",
   "template_order_confirmed": "🎉 *¡PEDIDO #{pedido_id} CONFIRMADO Y ENVIADO A COCINA!* 🔥🍔\n\n¡Muchas gracias *{cliente}*, tu pedido ya ingresó al sistema de la plancha!\n\n📋 *Detalle:*\n{carrito_items}\n💵 *Total:* ${total}\n🛵 *Entrega:* {direccion}\n\n{instrucciones_pago}",

@@ -28,7 +28,7 @@ export const DEFAULT_ANTI_LOOP_ACKNOWLEDGE = [
 
 export const DEFAULT_ANTI_LOOP_RESPONSES = {
   template_anti_loop_gratitude: '¡De nada! 🙌 Que lo disfrutes un montón. Si querés consultar la carta o volver a pedir, escribí *MENU* cuando gustes. ¡Buen provecho! 🍔🔥',
-  template_anti_loop_farewell: '¡Hasta la próxima! 👋 Gracias por contactarte con ComandaFast. ¡Que tengas un excelente descanso! ✨🍔',
+  template_anti_loop_farewell: '¡Hasta la próxima! 👋 Gracias por contactarte con {nombre_local}. ¡Que tengas un excelente descanso! ✨🍔',
   template_anti_loop_acknowledge: '¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido.'
 };
 
@@ -46,7 +46,7 @@ export const DEFAULT_TEMPLATES = {
   template_anti_loop_acknowledge: DEFAULT_ANTI_LOOP_RESPONSES.template_anti_loop_acknowledge,
 
   // 1. Menú Principal y Opciones
-  template_menu: `🍔 *¡Hola {cliente}! Bienvenido a ComandaFast Burgers* 🔥\n\n¿En qué podemos ayudarte hoy? *Respondé con el número de opción:*\n\n1️⃣ 📋 *Consultar estado de mi pedido*\n2️⃣ 💳 *Ver datos de transferencia bancaria / Alias*\n3️⃣ 📍 *Horarios y ubicación de nuestro local*\n4️⃣ 🍔 *Ver menú completo de hamburguesas y combos*\n5️⃣ 👤 *Hablar con un encargado del local*\n\n_O escribí directamente tu pedido (ej: *2 Dobles con queso sin cebolla y unas papas*)._`,
+  template_menu: `🍔 *¡Hola {cliente}! Bienvenido a {nombre_local}* 🔥\n\n¿En qué podemos ayudarte hoy? *Respondé con el número de opción:*\n\n1️⃣ 📋 *Consultar estado de mi pedido*\n2️⃣ 💳 *Ver datos de transferencia bancaria / Alias*\n3️⃣ 📍 *Horarios y ubicación de nuestro local*\n4️⃣ 🍔 *Ver menú completo de hamburguesas y combos*\n5️⃣ 👤 *Hablar con un encargado del local*\n\n_O escribí directamente tu pedido (ej: *2 Dobles con queso sin cebolla y unas papas*)._`,
   
   menu_response_1: `📋 *Estado de tu Pedido:* #{pedido_id}\n\n• *Estado:* {estado}\n• *Total:* \${total}\n• *Destino:* {direccion}\n\n_Para volver al menú, enviá la palabra *MENU*._`,
   
@@ -54,9 +54,9 @@ export const DEFAULT_TEMPLATES = {
   
   menu_response_3: `📍 *Ubicación y Horarios de Atención:* 🕒\n\n🍔 *Dirección:* {direccion}\n⏰ *Horarios de Cocina:* {horarios}\n\n¡Te esperamos con las mejores burgers a la plancha! 🔥\n\n_Enviá *MENU* para volver al menú principal._`,
   
-  menu_response_4: `🍔 *Menú & Precios de ComandaFast Burgers* 🔥\n\n{catalogo_lista}\n\n👉 *Respondé con el NÚMERO (1, 2, 3...) de la burger para pedir o escribí COMPRAR.*\n🌐 *Menú digital:* {catalogo_url}`,
+  menu_response_4: `🍔 *Menú & Precios de {nombre_local}* 🔥\n\n{catalogo_lista}\n\n👉 *Respondé con el NÚMERO (1, 2, 3...) de la burger para pedir o escribí COMPRAR.*\n🌐 *Menú digital:* {catalogo_url}`,
   
-  menu_response_5: `👤 *¡Entendido {cliente}! Un encargado de ComandaFast te responderá a la brevedad.* 🍔\n\nPor favor dejanos tu consulta detallada para que podamos ayudarte lo antes posible. ¡Muchas gracias!`,
+  menu_response_5: `👤 *¡Entendido {cliente}! Un encargado de {nombre_local} te responderá a la brevedad.* 🍔\n\nPor favor dejanos tu consulta detallada para que podamos ayudarte lo antes posible. ¡Muchas gracias!`,
 
   // 2. Flujo de Compra y Comanda
   template_buy_catalog: `🍔 *¡Vamos a armar tu comanda!* 🔥\n\n{catalogo_lista}\n\n👉 *Respondé con el NÚMERO (1, 2, 3...) de la hamburguesa o combo que quieras pedir.*`,
@@ -538,9 +538,9 @@ export const DEFAULT_BOT_VARIABLES = [
     key: 'mensaje_bienvenida',
     label: 'Mensaje de Saludo y Bienvenida',
     category: 'messages',
-    defaultValue: '¡Hola {cliente}! Bienvenido a ComandaFast Burgers 🔥 Las mejores hamburguesas smashadas a la plancha.',
-    value: '¡Hola {cliente}! Bienvenido a ComandaFast Burgers 🔥 Las mejores hamburguesas smashadas a la plancha.',
-    description: 'Saludo inicial automático cuando el cliente contacta por primera vez',
+    defaultValue: '¡Hola {cliente}! Bienvenido a {nombre_local} 🔥 Las mejores hamburguesas smashadas a la plancha.',
+    value: '¡Hola {cliente}! Bienvenido a {nombre_local} 🔥 Las mejores hamburguesas smashadas a la plancha.',
+    description: 'Saludo inicial y bienvenida utilizado tanto por el Bot como por la IA Gemini al iniciar una conversación',
     icon: 'MessageSquare'
   },
   {

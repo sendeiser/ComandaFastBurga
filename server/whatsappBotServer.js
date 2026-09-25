@@ -576,16 +576,17 @@ function getBusinessContext() {
   const vars = getBotVariablesMap();
   const tpls = getBotTemplates();
   return {
-    alias_banco: vars.alias_banco || tpls.bank_alias || 'burga.chamical.nx',
-    banco: vars.banco || tpls.bank_name || 'Mercado Pago / Banco Galicia',
-    titular: vars.titular || tpls.bank_holder || 'Burga Chamical',
+    nombre_local: vars.nombre_local || tpls.store_name || "Burga's Chamical",
+    alias_banco: vars.alias_banco || tpls.bank_alias || 'Burgachamical.nx',
+    banco: vars.banco || tpls.bank_name || 'Naranja X',
+    titular: vars.titular || tpls.bank_holder || 'Braian Carlos Zarate San Felipe',
     cbu: vars.cbu || tpls.bank_cbu || '0000003100092138928374',
-    direccion: vars.direccion_local || tpls.pickup_address || 'Av. Belgrano 1234, Centro',
-    horarios: vars.horarios || tpls.opening_hours || 'Miércoles a Domingos de 19:30 a 00:30 hs',
-    costo_envio: vars.costo_envio || '$1.500',
+    direccion: vars.direccion || vars.direccion_local || tpls.pickup_address || 'Av. Perón 145 (frente al super x día)',
+    horarios: vars.horarios || tpls.opening_hours || 'Martes a Domingos de 19:30 a 00:30 hs',
+    costo_envio: vars.costo_envio || '$2.000',
     envio_gratis_desde: vars.envio_gratis_desde || '$18.000',
     sitio_web: tpls.store_website_url || vars.sitio_web || '',
-    mensaje_bienvenida: vars.mensaje_bienvenida || tpls.template_welcome || ''
+    mensaje_bienvenida: vars.mensaje_bienvenida || tpls.template_menu || tpls.template_welcome || ''
   };
 }
 
@@ -608,6 +609,8 @@ function formatItemNumber(n) {
 
 function buildCatalogMessage(prods, page = 1, pageSize = 8, isAll = false) {
   const total = prods.length;
+  const biz = getBusinessContext();
+  const storeName = biz.nombre_local || "Burga's Chamical";
   if (total === 0) {
     return '🍔 *La carta se encuentra en actualización.* Por favor consultá en unos minutos.';
   }
@@ -619,7 +622,7 @@ function buildCatalogMessage(prods, page = 1, pageSize = 8, isAll = false) {
       return `${numBadge} *${p.name}* — $${Number(p.price).toLocaleString('es-AR')} ${photoBadge}`;
     }).join('\n');
 
-    return `🍔 *CARTA COMPLETA DE COMANDAFAST (${total} opciones)* 🔥\n\n${list}\n\n👉 *Para pedir:* Respondé con el número (ej: *1*, *12*, *18*) o *COMPRAR*.\n👉 *Para ver foto:* Escribí *FOTO [número]* (ej: *FOTO 12*).`;
+    return `🍔 *CARTA COMPLETA DE ${storeName.toUpperCase()} (${total} opciones)* 🔥\n\n${list}\n\n👉 *Para pedir:* Respondé con el número (ej: *1*, *12*, *18*) o *COMPRAR*.\n👉 *Para ver foto:* Escribí *FOTO [número]* (ej: *FOTO 12*).`;
   }
 
   const totalPages = Math.ceil(total / pageSize) || 1;
@@ -645,7 +648,7 @@ function buildCatalogMessage(prods, page = 1, pageSize = 8, isAll = false) {
     }
   }
 
-  return `🍔 *MENÚ COMANDAFAST BURGERS* 🔥\n📄 *Página ${currentPage} de ${totalPages}* (Opciones ${startIdx + 1} al ${startIdx + pageProds.length} de ${total})\n\n${list}\n\n───────────────────\n👉 *Para pedir:* Respondé con el NÚMERO (1 al ${total}).\n👉 *Para ver foto:* Escribí *FOTO [número]* (ej: *FOTO ${startIdx + 1}*).\n${navInstructions}👉 Escribí *VER TODO* para ver la lista completa.`;
+  return `🍔 *MENÚ ${storeName.toUpperCase()}* 🔥\n📄 *Página ${currentPage} de ${totalPages}* (Opciones ${startIdx + 1} al ${startIdx + pageProds.length} de ${total})\n\n${list}\n\n───────────────────\n👉 *Para pedir:* Respondé con el NÚMERO (1 al ${total}).\n👉 *Para ver foto:* Escribí *FOTO [número]* (ej: *FOTO ${startIdx + 1}*).\n${navInstructions}👉 Escribí *VER TODO* para ver la lista completa.`;
 }
 
 if (!fs.existsSync(DATA_DIR)) {
@@ -1694,13 +1697,15 @@ class WhatsAppBotServer {
             }
 
             if (farewell.some(f => cleanText === f || cleanText.startsWith(f + ' ') || cleanText.endsWith(' ' + f))) {
+              const biz = getBusinessContext();
+              const storeName = biz.nombre_local || "Burga's Chamical";
               const customReply = tpls.template_anti_loop_farewell;
               const defaultReplies = [
-                '¡Hasta la próxima! 👋 Gracias por contactarte con ComandaFast. ¡Que tengas un excelente descanso! ✨🍔',
-                '¡Nos vemos! Un saludo enorme de todo el equipo de ComandaFast. Escribí *MENU* cuando gustes volver a pedir. 🙌'
+                `¡Hasta la próxima! 👋 Gracias por contactarte con ${storeName}. ¡Que tengas un excelente descanso! ✨🍔`,
+                `¡Nos vemos! Un saludo enorme de todo el equipo de ${storeName}. Escribí *MENU* cuando gustes volver a pedir. 🙌`
               ];
               const reply = (customReply && customReply.trim())
-                ? customReply
+                ? interpolateTemplate(customReply, { nombre_local: storeName })
                 : defaultReplies[Math.floor(Math.random() * defaultReplies.length)];
               await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
               continue;
@@ -1737,9 +1742,10 @@ class WhatsAppBotServer {
 
           // SALUDO POR DEFECTO
           const biz = getBusinessContext();
+          const storeName = biz.nombre_local || "Burga's Chamical";
           const welcomeHeader = biz.mensaje_bienvenida 
-            ? interpolateTemplate(biz.mensaje_bienvenida, { cliente: msg.pushName || '' })
-            : '🍔 *¡Hola! Bienvenido a ComandaFast Burgers* 🔥';
+            ? interpolateTemplate(biz.mensaje_bienvenida, { cliente: msg.pushName || '', nombre_local: storeName })
+            : `🍔 *¡Hola! Bienvenido a ${storeName}* 🔥`;
           const reply = `${welcomeHeader}\n\n¿En qué podemos ayudarte hoy?\n\n1️⃣ *Consultar estado de pedido*\n2️⃣ *Datos de transferencia / Alias*\n3️⃣ *Horarios y ubicación*\n4️⃣ *Ver carta completa y fotos (${prods.length} burgers)*\n5️⃣ *Hacer un pedido ahora* 🍔\n\n_Respondé con el número de opción o escribí tu pedido directo._`;
           await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
         }
@@ -2262,7 +2268,12 @@ app.post('/api/ai/test', async (req, res) => {
 app.post('/api/ai/chat', async (req, res) => {
   const { message, customerName, availableProducts } = req.body;
   const prods = availableProducts || getStoredProducts();
-  const reply = await geminiBotService.generateReply(message, { customerName, availableProducts: prods });
+  const biz = getBusinessContext();
+  const reply = await geminiBotService.generateReply(message, { 
+    customerName, 
+    availableProducts: prods,
+    businessInfo: biz
+  });
   res.json({ success: true, reply });
 });
 
