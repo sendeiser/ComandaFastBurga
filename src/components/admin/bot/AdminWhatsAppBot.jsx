@@ -1,14 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Bot, Sparkles, Key, Download, Terminal, Settings, ShieldCheck, QrCode, 
   Smartphone, CheckCircle2, Save, RotateCcw, Plus, 
   Trash2, Copy, Check, Info, Zap, AlertCircle, RefreshCw,
   Power, Wifi, WifiOff, ExternalLink, Clock, UserCheck, MessageSquare, Store,
-  Timer, Play, Gauge
+  Timer, Play, Gauge, ChevronLeft, ChevronRight, FileText, GitBranch, Variable
 } from 'lucide-react';
 import AdminBotFlowsTab from './AdminBotFlowsTab';
 import AdminBotVariablesTab from './AdminBotVariablesTab';
-import { GitBranch, Variable } from 'lucide-react';
 import { 
   ALL_TEMPLATE_NODES, 
   DEFAULT_TEMPLATES, 
@@ -853,119 +852,150 @@ call npm run dev
     return matchesCategory && matchesSearch;
   });
 
+  const tabsBarRef = useRef(null);
+
+  const handleScrollTabs = (direction) => {
+    if (tabsBarRef.current) {
+      tabsBarRef.current.scrollBy({
+        left: direction === 'left' ? -200 : 200,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  const handleTabsWheel = (e) => {
+    if (tabsBarRef.current && e.deltaY !== 0) {
+      e.preventDefault();
+      tabsBarRef.current.scrollLeft += e.deltaY;
+    }
+  };
+
+  useEffect(() => {
+    if (tabsBarRef.current) {
+      const activeEl = tabsBarRef.current.querySelector(`.bot-subnav-btn[data-tab="${activeTab}"]`);
+      if (activeEl) {
+        activeEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      }
+    }
+  }, [activeTab]);
+
+  const tabsList = [
+    {
+      id: 'connection',
+      label: 'Conexión QR',
+      icon: QrCode,
+      color: '#10b981',
+      badge: serverOnline ? (
+        <span 
+          style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            background: connectionStatus === 'connected' ? '#10b981' : '#f59e0b',
+            display: 'inline-block'
+          }} 
+          title={connectionStatus === 'connected' ? 'WhatsApp Conectado' : 'Esperando Vinculación'}
+        />
+      ) : null
+    },
+    {
+      id: 'flows',
+      label: 'Flujos & Respuestas',
+      icon: GitBranch,
+      color: '#f59e0b',
+      badge: (
+        <span className="bot-tab-badge amber">
+          {flows.filter(f => f.enabled).length} Activos
+        </span>
+      )
+    },
+    {
+      id: 'variables',
+      label: 'Variables',
+      icon: Variable,
+      color: '#06b6d4',
+      badge: null
+    },
+    {
+      id: 'ai',
+      label: 'IA Gemini',
+      icon: Sparkles,
+      color: '#a855f7',
+      badge: aiConfig.enabled ? (
+        <span className="bot-tab-badge purple">Gemini</span>
+      ) : null
+    },
+    {
+      id: 'templates',
+      label: 'Plantillas Mensajes',
+      icon: FileText,
+      color: '#6366f1',
+      badge: null
+    },
+    {
+      id: 'security',
+      label: 'Seguridad & Spam',
+      icon: ShieldCheck,
+      color: '#ea580c',
+      badge: null
+    }
+  ];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', height: '100%' }}>
       {/* BOT MANAGER SUBHEADER TABS */}
-      <div style={{
-        background: 'var(--bg-card)',
-        border: '1px solid var(--border-subtle)',
-        borderRadius: 'var(--radius-lg)',
-        padding: '0.5rem 0.85rem',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '0.5rem'
-      }}>
-        <div className="scrollable-tabs-bar" style={{ gap: '0.4rem', flex: 1, paddingBottom: '2px' }}>
-          {/* TAB: GESTOR DE FLUJOS Y CONDICIONES (BUILDER) */}
-          <button
-            type="button"
-            className={`cat-pill-btn ${activeTab === 'flows' ? 'active' : ''}`}
-            style={{ height: '34px', padding: '0.4rem 0.85rem', gap: '6px', borderColor: activeTab === 'flows' ? 'var(--accent-amber)' : undefined, flexShrink: 0, whiteSpace: 'nowrap' }}
-            onClick={() => setActiveTab('flows')}
-          >
-            <GitBranch size={15} style={{ color: 'var(--accent-amber)' }} />
-            <span>🔀 Flujos & Condiciones</span>
-            <span style={{
-              fontSize: '0.65rem',
-              background: 'rgba(245, 158, 11, 0.2)',
-              color: 'var(--accent-amber)',
-              padding: '1px 6px',
-              borderRadius: 'var(--radius-full)',
-              fontWeight: 800
-            }}>
-              {flows.filter(f => f.enabled).length} Activos
-            </span>
-          </button>
+      <div className="bot-subnav-container">
+        <button
+          type="button"
+          className="bot-subnav-scroll-btn left"
+          onClick={() => handleScrollTabs('left')}
+          title="Desplazar pestañas a la izquierda"
+          aria-label="Pestañas anteriores"
+        >
+          <ChevronLeft size={16} />
+        </button>
 
-          {/* TAB: GESTOR DE VARIABLES DEL BOT */}
-          <button
-            type="button"
-            className={`cat-pill-btn ${activeTab === 'variables' ? 'active' : ''}`}
-            style={{ height: '34px', padding: '0.4rem 0.85rem', gap: '6px', borderColor: activeTab === 'variables' ? 'var(--accent-amber)' : undefined, flexShrink: 0, whiteSpace: 'nowrap' }}
-            onClick={() => setActiveTab('variables')}
-          >
-            <Variable size={15} style={{ color: 'var(--accent-amber)' }} />
-            <span>🧩 Variables del Bot</span>
-          </button>
-
-                    {/* TAB 2: IA GEMINI */}
-          <button
-            type="button"
-            className={`cat-pill-btn ${activeTab === 'ai' ? 'active' : ''}`}
-            style={{ height: '34px', padding: '0.4rem 0.85rem', gap: '6px', borderColor: activeTab === 'ai' ? 'var(--accent-purple, #a855f7)' : undefined, flexShrink: 0, whiteSpace: 'nowrap' }}
-            onClick={() => setActiveTab('ai')}
-          >
-            <Sparkles size={15} style={{ color: '#a855f7' }} />
-            <span>✨ Inteligencia Artificial</span>
-            {aiConfig.enabled && (
-              <span style={{
-                fontSize: '0.65rem',
-                background: 'rgba(168, 85, 247, 0.2)',
-                color: '#a855f7',
-                padding: '1px 6px',
-                borderRadius: 'var(--radius-full)',
-                fontWeight: 800
-              }}>
-                Gemini
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            className={`cat-pill-btn ${activeTab === 'templates' ? 'active' : ''}`}
-            style={{ height: '34px', padding: '0.4rem 0.85rem', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}
-            onClick={() => setActiveTab('templates')}
-          >
-            <Bot size={15} />
-            <span>📝 Plantillas & Flujos (Bot Studio)</span>
-          </button>
-
-          <button
-            type="button"
-            className={`cat-pill-btn ${activeTab === 'security' ? 'active' : ''}`}
-            style={{ height: '34px', padding: '0.4rem 0.85rem', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}
-            onClick={() => setActiveTab('security')}
-          >
-            <ShieldCheck size={15} />
-            <span>🛡️ Seguridad & Filtro Anti-Spam</span>
-          </button>
-
-          <button
-            type="button"
-            className={`cat-pill-btn ${activeTab === 'connection' ? 'active' : ''}`}
-            style={{ height: '34px', padding: '0.4rem 0.85rem', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}
-            onClick={() => setActiveTab('connection')}
-          >
-            <Smartphone size={15} />
-            <span>📱 Conexión WhatsApp Web</span>
-            {serverOnline && (
-              <span style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: connectionStatus === 'connected' ? 'var(--accent-emerald)' : '#25D366'
-              }} />
-            )}
-          </button>
+        <div 
+          ref={tabsBarRef} 
+          className="bot-subnav-bar"
+          onWheel={handleTabsWheel}
+        >
+          {tabsList.map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                data-tab={tab.id}
+                className={`bot-subnav-btn ${isActive ? 'active' : ''}`}
+                style={{
+                  '--tab-accent': tab.color
+                }}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                <Icon size={15} className="bot-tab-icon" />
+                <span className="bot-tab-label">{tab.label}</span>
+                {tab.badge}
+              </button>
+            );
+          })}
         </div>
+
+        <button
+          type="button"
+          className="bot-subnav-scroll-btn right"
+          onClick={() => handleScrollTabs('right')}
+          title="Desplazar pestañas a la derecha"
+          aria-label="Pestañas siguientes"
+        >
+          <ChevronRight size={16} />
+        </button>
 
         {/* Global Save Indicator */}
         {saveSuccess && (
-          <span style={{ fontSize: '0.78rem', color: 'var(--accent-emerald)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <CheckCircle2 size={16} /> Ajustes guardados
+          <span className="bot-subnav-save-pill">
+            <CheckCircle2 size={14} /> Guardado
           </span>
         )}
       </div>

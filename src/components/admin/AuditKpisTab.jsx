@@ -1,7 +1,7 @@
 import React from 'react';
-import { DollarSign, ShoppingBag, TrendingUp, CreditCard, MessageSquare, Utensils, CheckCircle2, Clock, ArrowUpRight, Smartphone, ShieldCheck, Bot } from 'lucide-react';
+import { DollarSign, ShoppingBag, TrendingUp, CreditCard, MessageSquare, Utensils, CheckCircle2, Clock, ArrowUpRight } from 'lucide-react';
 
-export default function AuditKpisTab({ kpis, onOpenBot }) {
+export default function AuditKpisTab({ kpis }) {
   const formatMoney = (n) => '$' + Number(n || 0).toLocaleString('es-AR');
 
   const gross = kpis.grossRevenue || 0;
@@ -15,91 +15,6 @@ export default function AuditKpisTab({ kpis, onOpenBot }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      {/* QUICK ACCESS: BOT CONNECTION & SECURITY */}
-      <div 
-        className="tactile-card"
-        style={{
-          background: '#ffffff',
-          border: '1px solid #e2e8f0',
-          borderRadius: 'var(--radius-lg)',
-          padding: '1rem 1.25rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-          <div style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '10px',
-            background: 'rgba(37, 211, 102, 0.12)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#16a34a',
-            flexShrink: 0
-          }}>
-            <Bot size={24} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#0f172a' }}>
-              Gestión Rápida de WhatsApp Bot
-            </div>
-            <div style={{ fontSize: '0.78rem', color: '#475569', marginTop: '2px' }}>
-              Acceso directo a la vinculación QR de WhatsApp y a la configuración de protección anti-baneo y spam.
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            className="cat-pill-btn active"
-            onClick={() => onOpenBot && onOpenBot('connection')}
-            style={{
-              height: '38px',
-              padding: '0 1.1rem',
-              fontSize: '0.82rem',
-              fontWeight: 800,
-              gap: '7px',
-              background: '#10b981',
-              borderColor: '#059669',
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-          >
-            <Smartphone size={16} />
-            <span>Conexión de Bot (QR)</span>
-          </button>
-
-          <button
-            type="button"
-            className="cat-pill-btn"
-            onClick={() => onOpenBot && onOpenBot('security')}
-            style={{
-              height: '38px',
-              padding: '0 1.1rem',
-              fontSize: '0.82rem',
-              fontWeight: 800,
-              gap: '7px',
-              background: '#ffffff',
-              border: '1.5px solid #d97706',
-              color: '#b45309',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-          >
-            <ShieldCheck size={16} color="#d97706" />
-            <span>Seguridad & Filtro Anti-Spam</span>
-          </button>
-        </div>
-      </div>
-
       {/* 4 MAIN KPI CARDS */}
       <div className="audit-kpis-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.85rem' }}>
         {/* Card 1: Facturación Bruta */}
