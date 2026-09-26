@@ -22,7 +22,7 @@ function formatPrice(n) {
   return '$ ' + Number(n).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function generateWhatsAppMessage(items, subtotal, serviceType, customerName, customerAddress, customerPhone, deliveryFee, notes) {
+function generateWhatsAppMessage(items, subtotal, serviceType, customerName, customerAddress, customerPhone, deliveryFee, notes, paymentMethod = 'efectivo') {
   const lines = items.map(item => {
     const mods = [...(item.selectedMods || []).map(m => `  + ${m.name}`),
                   ...(item.selectedOptions || []).map(o => `  → ${o.name}`),
@@ -31,12 +31,14 @@ function generateWhatsAppMessage(items, subtotal, serviceType, customerName, cus
   });
 
   const total = subtotal + (deliveryFee || 0);
+  const paymentLabel = paymentMethod === 'transferencia' ? 'Transferencia Bancaria / MP 🏦' : 'Efectivo 💵';
 
   return `🍔 *Mi Pedido — ComandaFast*\n\n${lines.join('\n')}\n\n` +
     `💵 *Subtotal:* ${formatPrice(subtotal)}\n` +
     (deliveryFee ? `🛵 *Delivery:* ${formatPrice(deliveryFee)}\n` : '') +
     `💰 *TOTAL:* ${formatPrice(total)}\n\n` +
     `🚀 *Tipo de entrega:* ${serviceType === 'delivery' ? 'Delivery 🛵' : 'Para llevar 🏃'}\n` +
+    `💳 *Forma de pago:* ${paymentLabel}\n` +
     (customerName ? `👤 *Nombre:* ${customerName}\n` : '') +
     (serviceType === 'delivery' && customerAddress ? `📍 *Dirección:* ${customerAddress}\n` : '') +
     (customerPhone ? `📞 *Teléfono:* ${customerPhone}\n` : '') +
@@ -388,6 +390,7 @@ export default function CatalogPage({ onClose }) {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('efectivo'); // 'efectivo' | 'transferencia'
 
   const cart = useCart();
   const sectionRefs = useRef({});
@@ -591,6 +594,7 @@ export default function CatalogPage({ onClose }) {
       customerPhone,
       deliveryFee,
       orderNotes,
+      paymentMethod
     );
 
     const waUrl = waPhone
@@ -604,6 +608,7 @@ export default function CatalogPage({ onClose }) {
     setCustomerPhone('');
     setCustomerAddress('');
     setOrderNotes('');
+    setPaymentMethod('efectivo');
     setServiceType(null);
     showToast('🎉 Pedido enviado por WhatsApp');
   };
@@ -679,6 +684,43 @@ export default function CatalogPage({ onClose }) {
               <input className="cat-form-input" placeholder="Calle, número, entrecalles o piso" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} />
             </div>
           )}
+          {/* Selector de Forma de Pago */}
+          <div className="cat-form-group">
+            <label className="cat-form-label">Forma de Pago *</label>
+            <div className="cat-payment-options">
+              <button
+                type="button"
+                className={`cat-payment-btn ${paymentMethod === 'efectivo' ? 'active' : ''}`}
+                onClick={() => setPaymentMethod('efectivo')}
+              >
+                <span className="cat-payment-icon">💵</span>
+                <div className="cat-payment-text">
+                  <strong>Efectivo</strong>
+                  <small>{serviceType === 'delivery' ? 'Abonás al recibir' : 'Abonás al retirar'}</small>
+                </div>
+                {paymentMethod === 'efectivo' && <Check size={16} className="cat-payment-check" />}
+              </button>
+
+              <button
+                type="button"
+                className={`cat-payment-btn ${paymentMethod === 'transferencia' ? 'active' : ''}`}
+                onClick={() => setPaymentMethod('transferencia')}
+              >
+                <span className="cat-payment-icon">🏦</span>
+                <div className="cat-payment-text">
+                  <strong>Transferencia</strong>
+                  <small>Alias / CBU</small>
+                </div>
+                {paymentMethod === 'transferencia' && <Check size={16} className="cat-payment-check" />}
+              </button>
+            </div>
+            {paymentMethod === 'transferencia' && (
+              <div className="cat-payment-notice">
+                ℹ️ Al enviar el pedido recibirás el Alias y CBU por WhatsApp para transferir y adjuntar el comprobante.
+              </div>
+            )}
+          </div>
+
           <div className="cat-form-group">
             <label className="cat-form-label">Aclaraciones o notas del pedido</label>
             <textarea className="cat-form-textarea" placeholder="Ej: Timbre blanco, sin cebolla, etc." value={orderNotes} onChange={e => setOrderNotes(e.target.value)} />

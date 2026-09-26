@@ -1457,6 +1457,82 @@
   color: var(--cat-text-muted);
 }
 
+/* ---- PAYMENT METHOD SELECTOR ---- */
+.cat-payment-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.cat-payment-btn {
+  background: var(--cat-surface);
+  border: 1px solid var(--cat-border-strong);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  transition: all 0.15s ease;
+  position: relative;
+  font-family: var(--cat-font);
+}
+
+.cat-payment-btn:hover {
+  border-color: #52525b;
+  background: var(--cat-surface-2);
+}
+
+.cat-payment-btn.active {
+  border-color: var(--cat-red);
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.cat-payment-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.cat-payment-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.cat-payment-text strong {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--cat-text);
+  line-height: 1.2;
+}
+
+.cat-payment-text small {
+  font-size: 0.7rem;
+  color: var(--cat-text-muted);
+  margin-top: 2px;
+  line-height: 1.2;
+}
+
+.cat-payment-check {
+  color: var(--cat-red);
+  flex-shrink: 0;
+}
+
+.cat-payment-notice {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 8px;
+  font-size: 0.76rem;
+  color: #93c5fd;
+  line-height: 1.4;
+}
+
 .cat-send-order-btn {
   width: 100%;
   background: #25d366;

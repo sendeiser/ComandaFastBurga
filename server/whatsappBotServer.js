@@ -874,11 +874,22 @@ function parseCatalogOrder(text) {
   const addrMatch = text.match(/Direcci[oó]n:\*?\s*([^\n]+)/i);
   const phoneMatch = text.match(/Tel[eé]fono:\*?\s*([^\n]+)/i);
   const typeMatch = text.match(/Tipo de entrega:\*?\s*([^\n]+)/i);
+  const payMatch = text.match(/Forma de pago:\*?\s*([^\n]+)/i) || text.match(/Pago:\*?\s*([^\n]+)/i);
   const notesMatch = text.match(/Aclaraciones:\*?\s*([^\n]+)/i);
 
   const serviceType = (typeMatch && (typeMatch[1].toLowerCase().includes("llevar") || typeMatch[1].toLowerCase().includes("retiro") || typeMatch[1].toLowerCase().includes("local"))) 
     ? 'local' 
     : 'delivery';
+
+  let paymentMethod = null;
+  if (payMatch) {
+    const rawPay = payMatch[1].toLowerCase();
+    if (rawPay.includes('transf') || rawPay.includes('alias') || rawPay.includes('banco') || rawPay.includes('mp') || rawPay.includes('mercado')) {
+      paymentMethod = 'transferencia';
+    } else if (rawPay.includes('efectivo')) {
+      paymentMethod = 'efectivo';
+    }
+  }
 
   return {
     items,
@@ -889,6 +900,7 @@ function parseCatalogOrder(text) {
     customerAddress: addrMatch ? addrMatch[1].trim() : '',
     customerPhone: phoneMatch ? phoneMatch[1].trim() : '',
     serviceType,
+    paymentMethod,
     notes: notesMatch ? notesMatch[1].trim() : ''
   };
 }
@@ -1758,10 +1770,15 @@ class WhatsAppBotServer {
           // -------------------------------------------------------------
           const parsedCatalogOrder = parseCatalogOrder(text);
           if (parsedCatalogOrder && parsedCatalogOrder.items && parsedCatalogOrder.items.length > 0) {
-            console.log(`🛒 [WHATSAPP BOT] Pedido recibido desde el Catálogo Online de ${remoteJid}:`, parsedCatalogOrder.customerName);
+            console.log(`🛒 [WHATSAPP BOT] Pedido recibido desde el Catálogo Online de ${remoteJid}:`, parsedCatalogOrder.customerName, `| Pago: ${parsedCatalogOrder.paymentMethod || 'No especificado'}`);
             const cleanDigits = extractCleanDigits(remoteJid);
             const orderId = (await getLatestOrderNumber()) + 1;
             const biz = getBusinessContext();
+
+            const chosenMethod = parsedCatalogOrder.paymentMethod || 'pendiente';
+            const chosenStatus = chosenMethod === 'transferencia' 
+              ? 'pendiente_comprobante' 
+              : (chosenMethod === 'efectivo' ? 'pendiente_efectivo' : 'pendiente_pago');
 
             const newOrder = {
               id: `CMD-${orderId}`,
@@ -1778,8 +1795,8 @@ class WhatsAppBotServer {
               deliveryFee: Number(parsedCatalogOrder.deliveryFee) || 0,
               subtotal: Number(parsedCatalogOrder.subtotal) || Number(parsedCatalogOrder.total) || 0,
               total: Number(parsedCatalogOrder.total) || 0,
-              paymentMethod: 'pendiente',
-              paymentStatus: 'pendiente_pago',
+              paymentMethod: chosenMethod,
+              paymentStatus: chosenStatus,
               paymentConfirmed: false,
               items: parsedCatalogOrder.items.map((it, idx) => ({
                 id: `cat_${Date.now()}_${idx}`,
@@ -1799,9 +1816,53 @@ class WhatsAppBotServer {
             saveStoredOrder(newOrder);
             pushOrderToSupabase(newOrder).catch(() => {});
             pendingOrdersForPos.push(newOrder);
-            console.log(`🛎️ [PEDIDO CATÁLOGO WEB]: Pedido #${orderId} de ${newOrder.customer.name} (${newOrder.total}) inyectado a cocina y POS.`);
+            console.log(`🛎️ [PEDIDO CATÁLOGO WEB]: Pedido #${orderId} de ${newOrder.customer.name} ($${newOrder.total}) inyectado a cocina y POS. Método: ${chosenMethod}`);
 
-            // Actualizar sesión del cliente para el siguiente paso (forma de pago)
+            const itemsSummary = parsedCatalogOrder.items.map(it => `• ${it.qty}x ${it.name} - $${(it.price * it.qty).toLocaleString('es-AR')}`).join('\n');
+            const shippingLabel = newOrder.deliveryType === 'delivery' 
+              ? `🛵 Envío a Domicilio (${newOrder.customer.address})` 
+              : '🛍️ Retiro por el Local (Mostrador)';
+
+            // CASO 1: Ya eligió TRANSFERENCIA en el catálogo web
+            if (chosenMethod === 'transferencia') {
+              resetCustomerSession(remoteJid);
+              const reply = `🎉 *¡RECIBIMOS TU PEDIDO #${orderId} DESDE NUESTRO CATÁLOGO ONLINE!* 🍔🔥\n\n` +
+                `¡Muchas gracias *${newOrder.customer.name}*! Tu comanda ya ingresó al sistema de nuestra cocina.\n\n` +
+                `📋 *Detalle del pedido:*\n${itemsSummary}\n\n` +
+                `💵 *Subtotal:* $${newOrder.subtotal.toLocaleString('es-AR')}\n` +
+                (newOrder.deliveryFee > 0 ? `🛵 *Envío:* $${newOrder.deliveryFee.toLocaleString('es-AR')}\n` : '') +
+                `💰 *TOTAL A TRANSFERIR:* $${newOrder.total.toLocaleString('es-AR')}\n` +
+                `🚀 *Entrega:* ${shippingLabel}` +
+                (newOrder.notes ? `\n📝 *Aclaraciones:* ${newOrder.notes}` : '') +
+                `\n\n💳 *Datos para la Transferencia Bancaria:* 🏦\n` +
+                `• *Alias:* \`${biz.alias_banco}\`\n` +
+                `• *Banco:* ${biz.banco}\n` +
+                `• *Titular:* ${biz.titular}` +
+                (biz.cbu ? `\n• *CBU:* \`${biz.cbu}\`` : '') +
+                `\n\n📸 *Por favor enviá la captura o comprobante por este chat para mandarlo a la plancha.* ¡Muchas gracias! 🔥🍔`;
+
+              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
+              continue;
+            }
+
+            // CASO 2: Ya eligió EFECTIVO en el catálogo web
+            if (chosenMethod === 'efectivo') {
+              resetCustomerSession(remoteJid);
+              const reply = `🎉 *¡PEDIDO #${orderId} CONFIRMADO Y ENVIADO A LA COCINA!* 🔥🍔\n\n` +
+                `¡Muchas gracias *${newOrder.customer.name}*! Tu comanda ya ingresó a la cocina y está confirmada.\n\n` +
+                `📋 *Detalle del pedido:*\n${itemsSummary}\n\n` +
+                `💵 *Subtotal:* $${newOrder.subtotal.toLocaleString('es-AR')}\n` +
+                (newOrder.deliveryFee > 0 ? `🛵 *Envío:* $${newOrder.deliveryFee.toLocaleString('es-AR')}\n` : '') +
+                `💰 *TOTAL EN EFECTIVO:* $${newOrder.total.toLocaleString('es-AR')}\n` +
+                `🚀 *Entrega:* ${shippingLabel}` +
+                (newOrder.notes ? `\n📝 *Aclaraciones:* ${newOrder.notes}` : '') +
+                `\n\n🛵 *Abonás al ${newOrder.deliveryType === 'delivery' ? 'recibir el pedido' : 'retirar por el local'}*. ¡Nuestros cocineros ya están marchando tus burgers! 🍔✨`;
+
+              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
+              continue;
+            }
+
+            // CASO 3: Método no especificado en el catálogo -> preguntar forma de pago (fallback)
             session.step = 'ASK_PAYMENT';
             session.activeOrderId = orderId;
             session.customerName = newOrder.customer.name;
@@ -1812,14 +1873,9 @@ class WhatsAppBotServer {
             session.total = newOrder.total;
             session.items = newOrder.items;
 
-            const itemsSummary = parsedCatalogOrder.items.map(it => `• ${it.qty}x ${it.name} - ${(it.price * it.qty).toLocaleString('es-AR')}`).join('\n');
-            const shippingLabel = newOrder.deliveryType === 'delivery' 
-              ? `🛵 Envío a Domicilio (${newOrder.customer.address})` 
-              : '🛍️ Retiro por el Local (Mostrador)';
-
-            const reply = `🎉 *¡RECIBIMOS TU PEDIDO #${orderId} DESDE NUESTRO CATÁLOGO ONLINE!* 🍔🔥\n\n¡Muchas gracias *${newOrder.customer.name}*! Tu comanda ya ingresó al sistema de nuestra cocina.\n\n📋 *Detalle del pedido:*\n${itemsSummary}\n\n💵 *Subtotal:* ${newOrder.subtotal.toLocaleString('es-AR')}\n` +
-              (newOrder.deliveryFee > 0 ? `🛵 *Envío:* ${newOrder.deliveryFee.toLocaleString('es-AR')}\n` : '') +
-              `💰 *TOTAL:* ${newOrder.total.toLocaleString('es-AR')}\n🚀 *Entrega:* ${shippingLabel}` +
+            const reply = `🎉 *¡RECIBIMOS TU PEDIDO #${orderId} DESDE NUESTRO CATÁLOGO ONLINE!* 🍔🔥\n\n¡Muchas gracias *${newOrder.customer.name}*! Tu comanda ya ingresó al sistema de nuestra cocina.\n\n📋 *Detalle del pedido:*\n${itemsSummary}\n\n💵 *Subtotal:* $${newOrder.subtotal.toLocaleString('es-AR')}\n` +
+              (newOrder.deliveryFee > 0 ? `🛵 *Envío:* $${newOrder.deliveryFee.toLocaleString('es-AR')}\n` : '') +
+              `💰 *TOTAL:* $${newOrder.total.toLocaleString('es-AR')}\n🚀 *Entrega:* ${shippingLabel}` +
               (newOrder.notes ? `\n📝 *Aclaraciones:* ${newOrder.notes}` : '') +
               `\n\n💳 *¿Cómo preferís abonar?*\n\n1️⃣ *Efectivo* (al recibir o retirar)\n2️⃣ *Transferencia Bancaria / Mercado Pago* (Alias: \`${biz.alias_banco}\`)\n\n_Respondé con *1* para Efectivo o *2* para Transferencia._`;
 
