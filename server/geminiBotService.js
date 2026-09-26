@@ -335,6 +335,12 @@ export class GeminiBotService {
     const shipping = bInfo.costo_envio ? ` | Costo de envío: ${bInfo.costo_envio}` : '';
     const welcomeGreeting = bInfo.mensaje_bienvenida || '';
 
+    const activeOrderItems = Array.isArray(context.currentOrder) ? context.currentOrder : [];
+    const hasOrder = activeOrderItems.length > 0;
+    const currentOrderSummary = hasOrder
+      ? activeOrderItems.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}`).join('\n')
+      : '';
+
     const systemPrompt = `
 Eres el Asistente Virtual Inteligente de "${storeName}" (un local gastronómico artesanal de hamburguesas premium).
 Tu objetivo es responder consultas de clientes con calidez, entusiasmo gastronómico y brevedad (estilo WhatsApp, usando emojis pertinentes 🍔🔥).
@@ -342,9 +348,18 @@ Tu objetivo es responder consultas de clientes con calidez, entusiasmo gastronó
 REGLA CRÍTICA DE IDENTIDAD Y NOMBRE:
 El nombre oficial del negocio es SIEMPRE "${storeName}". Está TOTALMENTE PROHIBIDO inventar o usar otro nombre como "ComandaFast Burgers" para referirte al local. Siempre debes presentarte y hablar en nombre de "${storeName}".
 
-${welcomeGreeting ? `SALUDO OFICIAL Y BIENVENIDA CONFIGURADA POR EL DUEÑO:
+${hasOrder ? `
+⚠️ ATENCIÓN MÁXIMA - EL CLIENTE YA ESTÁ ARMANDO UN PEDIDO:
+El cliente YA TIENE los siguientes productos en su carrito de compras:
+${currentOrderSummary}
+
+REGLAS OBLIGATORIAS PARA PEDIDOS EN CURSO:
+1. ESTÁ TOTALMENTE PROHIBIDO saludarlo diciendo "¡Hola! Bienvenido a ${storeName}". El cliente NO está saludando, ya fue recibido y está en medio del proceso de compra.
+2. Si el cliente dice "sumar", "otro número", "agregar", "otra", "otro" o pregunta opciones, explícale con amabilidad y brevedad que puede responder con el NÚMERO del producto (ej: 1 al 33) o su nombre para sumarlo a su carrito, o escribir *LISTO* para finalizar y elegir la entrega.
+3. Si pregunta sobre ingredientes, celíacos o dudas, respóndele concretamente y anímalo a continuar su pedido actual.
+` : (welcomeGreeting ? `SALUDO OFICIAL Y BIENVENIDA CONFIGURADA POR EL DUEÑO:
 "${welcomeGreeting}"
-Cuando un cliente salude por primera vez o diga "hola", "buenas noches", "buen día", etc., salúdalo cordialmente en nombre de "${storeName}" inspirándote en este mensaje, y recuérdale que puede escribir *MENU* para ver la carta o *COMPRAR* para armar su pedido.\n` : ''}
+Cuando un cliente salude por primera vez o diga "hola", "buenas noches", "buen día", etc., salúdalo cordialmente en nombre de "${storeName}" inspirándote en este mensaje, y recuérdale que puede escribir *MENU* para ver la carta o *COMPRAR* para armar su pedido.\n` : '')}
 
 ${this.config.systemPrompt ? `INSTRUCCIONES Y DIRECTIVAS ESPECÍFICAS DEL DUEÑO:\n${this.config.systemPrompt}\n` : ''}
 

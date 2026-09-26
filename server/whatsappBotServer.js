@@ -863,6 +863,14 @@ function normalizeSearchText(str) {
     .trim();
 }
 
+function cleanTokens(txt) {
+  return normalizeSearchText(txt)
+    .replace(/\b(promos?|promocion(es)?|ofertas?|descuentos?|combos?|quiero|dame|pedir|comprar|sumar|suma|agregar|agrega|mas|más|otro|otra|la|el|un|una|de|con|por favor|me das)\b/g, '')
+    .replace(/[^a-z0-9]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function findProductByText(inputText, prodsList) {
   if (!inputText || !Array.isArray(prodsList) || prodsList.length === 0) return null;
   const rawNorm = normalizeSearchText(inputText);
@@ -870,13 +878,7 @@ function findProductByText(inputText, prodsList) {
 
   const isPromoSearch = /\b(promos?|promocion(es)?|ofertas?|descuentos?|combos?)\b/.test(rawNorm);
 
-  // Limpiar palabras accesorias
-  const strippedText = rawNorm
-    .replace(/\b(promos?|promocion(es)?|ofertas?|descuentos?|combos?)\b/g, '')
-    .replace(/\b(quiero|dame|pedir|comprar|la|el|un|una|de|con|por favor|me das)\b/g, '')
-    .replace(/[!¡?¿.,;:\-_]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const strippedText = cleanTokens(rawNorm);
 
   const promoProds = prodsList.filter(p => normalizeSearchText(p.category) === 'promos');
   const regularProds = prodsList.filter(p => normalizeSearchText(p.category) !== 'promos');
@@ -890,28 +892,25 @@ function findProductByText(inputText, prodsList) {
     }
   }
 
-  // 1. Si es búsqueda de promo o incluye strippedText que coincide con alguna promo
+  // 1. Comparación por tokens limpios exactos (ignora conectores como "de", "con", "sumar", etc.)
+  if (strippedText) {
+    const promoTokenMatch = promoProds.find(p => cleanTokens(p.name) === strippedText);
+    if (promoTokenMatch) return promoTokenMatch;
+
+    const regularTokenMatch = regularProds.find(p => cleanTokens(p.name) === strippedText);
+    if (regularTokenMatch) return regularTokenMatch;
+  }
+
+  // 2. Si es búsqueda de promo y coincide con nombre de promo
   if (isPromoSearch && strippedText) {
     const promoMatch = promoProds.find(p => {
-      const pNorm = normalizeSearchText(p.name);
-      return pNorm === strippedText || strippedText.includes(pNorm) || pNorm.includes(strippedText);
+      const pTokens = cleanTokens(p.name);
+      return pTokens === strippedText || strippedText.includes(pTokens) || pTokens.includes(strippedText);
     });
     if (promoMatch) return promoMatch;
   }
 
-  // 2. Si el strippedText coincide exactamente con una promo (priorizar Promos si tienen el mismo nombre!)
-  if (strippedText) {
-    const exactPromo = promoProds.find(p => normalizeSearchText(p.name) === strippedText);
-    if (exactPromo) return exactPromo;
-  }
-
-  // 3. Coincidencia exacta con strippedText en productos regulares
-  if (strippedText) {
-    const exactRegular = regularProds.find(p => normalizeSearchText(p.name) === strippedText);
-    if (exactRegular) return exactRegular;
-  }
-
-  // 4. Coincidencia exacta completa (rawNorm) con nombre de producto (priorizando promo)
+  // 3. Coincidencia exacta completa (rawNorm) con nombre de producto (priorizando promo)
   const exactFullPromo = promoProds.find(p => {
     const pNorm = normalizeSearchText(p.name);
     return rawNorm === pNorm || rawNorm === `promo ${pNorm}` || rawNorm === `la ${pNorm}`;
@@ -924,27 +923,18 @@ function findProductByText(inputText, prodsList) {
   });
   if (exactFullRegular) return exactFullRegular;
 
-  // 5. Coincidencia parcial donde el texto contenga el nombre de algún producto o viceversa
-  if (isPromoSearch) {
-    const promoCand = promoProds.find(p => {
-      const pNorm = normalizeSearchText(p.name);
-      return rawNorm.includes(pNorm) || pNorm.includes(rawNorm) || (pNorm.length >= 4 && rawNorm.includes(pNorm.slice(0, -1)));
-    });
-    if (promoCand) return promoCand;
-  }
-
-  const allCandidates = prodsList.filter(p => {
-    const pNorm = normalizeSearchText(p.name);
-    return rawNorm.includes(pNorm) || (rawNorm.length >= 4 && pNorm.includes(rawNorm)) || (pNorm.length >= 4 && rawNorm.includes(pNorm.slice(0, -1)));
-  });
-
-  if (allCandidates.length > 0) {
+  // 4. Coincidencia parcial con tokens limpios significativos (al menos 3 letras)
+  if (strippedText && strippedText.length >= 3) {
     if (isPromoSearch) {
-      const pPromo = allCandidates.find(p => normalizeSearchText(p.category) === 'promos');
-      if (pPromo) return pPromo;
+      const candPromo = promoProds.find(p => cleanTokens(p.name).includes(strippedText) || strippedText.includes(cleanTokens(p.name)));
+      if (candPromo) return candPromo;
     }
-    allCandidates.sort((a, b) => b.name.length - a.name.length);
-    return allCandidates[0];
+
+    const candRegular = regularProds.find(p => cleanTokens(p.name).includes(strippedText) || strippedText.includes(cleanTokens(p.name)));
+    if (candRegular) return candRegular;
+
+    const candAnyPromo = promoProds.find(p => cleanTokens(p.name).includes(strippedText) || strippedText.includes(cleanTokens(p.name)));
+    if (candAnyPromo) return candAnyPromo;
   }
 
   return null;
@@ -2001,10 +1991,13 @@ class WhatsAppBotServer {
             }
 
             // Intentar sumar otro producto por número o nombre (con detección inteligente de promos)
-            const numIdx = parseInt(lower.replace(/\D/g, ''), 10);
             let selectedProd = null;
-            if (!isNaN(numIdx) && numIdx >= 1 && numIdx <= prods.length && !lower.includes('hamburguesa') && !lower.includes('burger')) {
-              selectedProd = prods[numIdx - 1];
+            const numOnlyMatch = lower.match(/^(?:el\s+|la\s+|n[uú]mero\s+|numero\s+|nro\s+|#|opci[oó]n\s+|opcion\s+|sumar\s+|agregar\s+|otro\s+n[uú]mero\s+|otro\s+numero\s+)?(\d+)$/i);
+            if (numOnlyMatch) {
+              const numIdx = parseInt(numOnlyMatch[1], 10);
+              if (numIdx >= 1 && numIdx <= prods.length) {
+                selectedProd = prods[numIdx - 1];
+              }
             } else {
               selectedProd = findProductByText(lower, prods);
             }
@@ -2038,6 +2031,25 @@ class WhatsAppBotServer {
               await this.safeSendMessage(remoteJid, {
                 text: `✅ *¡Sumaste ${selectedProd.name}!* 🍔 (+$${Number(selectedProd.price).toLocaleString('es-AR')})\n\n🛒 *Tu pedido actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n👉 ¿Querés sumar algo más? *(Escribí otro número)*${modsHint}\n👉 O escribí *LISTO* para continuar.`
               }, msg.key);
+              continue;
+            }
+
+            // Si el cliente pide explícitamente sumar, agregar o ver otro número / opciones
+            const cleanNormSelecting = normalizeSearchText(lower);
+            const isAddMoreTrigger = 
+              /^(sumar|suma|sumo|quiero\s+sumar|agregar|agrega|agrego|quiero\s+agregar|otro|otra|otros|otras|otro\s+n[uú]mero|otro\s+numero|otro\s+producto|otra\s+hamburguesa|otra\s+burger|ver\s+m[aá]s|ver\s+mas|m[aá]s|mas|quiero\s+otra|quiero\s+otro|dame\s+otra|dame\s+otro|como\s+sumo)$/i.test(cleanNormSelecting) ||
+              /\b(opciones|catalogo|cat[aá]logo|carta|menu|men[uú]|que\s+tienen|que\s+hay|que\s+mas\s+hay|que\s+mas\s+tienen)\b/i.test(cleanNormSelecting) ||
+              cleanNormSelecting.startsWith('sumar') ||
+              cleanNormSelecting.startsWith('agregar') ||
+              cleanNormSelecting.startsWith('otro ') ||
+              cleanNormSelecting.startsWith('otra ');
+
+            if (isAddMoreTrigger) {
+              session.catalogPage = session.catalogPage || 1;
+              const catalogText = buildCatalogMessage(prods, session.catalogPage, 8, false);
+              const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}`).join('\n');
+              const reply = `🛒 *Tu pedido actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n🍟 *Elegí qué hamburguesa, promo o agregado querés sumar:*\n\n${catalogText}\n\n───────────────────\n👉 *Para sumar:* Respondé con el NÚMERO (1 al ${prods.length}) o escribí su nombre.\n👉 O respondé *LISTO* para elegir cómo recibirlo.`;
+              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
               continue;
             }
           }
@@ -2366,7 +2378,9 @@ class WhatsAppBotServer {
               customerName: msg.pushName || '',
               customerPhone: remoteJid,
               availableProducts: prods,
-              businessInfo: biz
+              businessInfo: biz,
+              currentOrder: session.items || [],
+              orderStep: session.step
             });
 
             if (aiReply) {
@@ -2378,7 +2392,14 @@ class WhatsAppBotServer {
             console.warn('[WHATSAPP BOT AI ERROR]:', aiErr);
           }
 
-          // SALUDO POR DEFECTO CON EL MENÚ DE LA PLANTILLA SI LA IA NO RESPONDE
+          // SALUDO POR DEFECTO O RECORDATORIO DE PEDIDO EN CURSO
+          if (session.step === 'SELECTING' && session.items && session.items.length > 0) {
+            const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
+            const fallbackReply = `🛒 *Tu pedido actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n👉 Respondé con el *NÚMERO* (1 al ${prods.length}) o escribí su nombre para sumar otro producto.\n👉 ¿Algún cambio? (Ej: Sin cebolla, Extra cheddar)\n👉 O respondé *LISTO* para elegir la forma de entrega.`;
+            await this.safeSendMessage(remoteJid, { text: fallbackReply }, msg.key);
+            continue;
+          }
+
           const fallbackMenu = buildMainMenuMessage(msg.pushName);
           await this.safeSendMessage(remoteJid, { text: fallbackMenu }, msg.key);
         }
