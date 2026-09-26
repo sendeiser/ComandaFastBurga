@@ -7,7 +7,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Search, Menu, Info, X, Clock, MapPin, 
   MessageCircle, ExternalLink, ChevronRight, Check,
-  ShoppingBag, ArrowLeft, Plus, Minus, Trash2, Phone
+  ShoppingBag, ArrowLeft, Plus, Minus, Trash2, Phone,
+  Flame, Sparkles, Tag
 } from 'lucide-react';
 import { supabaseSync, DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_ANON_KEY } from '../services/supabaseClient';
 import { storageService } from '../services/storageService';
@@ -155,6 +156,10 @@ function RetroMascotLogo({ brandName = "BURGA'S" }) {
 // ---- Product Card (Exact Tripp Layout) ----
 function ProductCard({ product, onOpen }) {
   const [imgError, setImgError] = useState(false);
+  const isPromo = Boolean(product.discountBadge) || (product.category || '').toLowerCase().includes('promo');
+  const hasDiscount = Boolean(product.originalPrice && Number(product.originalPrice) > Number(product.price));
+  const discountPercent = hasDiscount ? Math.round(((Number(product.originalPrice) - Number(product.price)) / Number(product.originalPrice)) * 100) : 0;
+
   return (
     <div className="cat-product-card" onClick={() => onOpen(product)}>
       <div className="cat-product-card-info">
@@ -164,11 +169,16 @@ function ProductCard({ product, onOpen }) {
         )}
         <div className="cat-product-card-price-wrap">
           <span className="cat-product-card-price">{formatPrice(product.price)}</span>
-          {product.originalPrice && (
+          {hasDiscount && (
             <span className="cat-product-card-original-price">{formatPrice(product.originalPrice)}</span>
           )}
-          {product.discountBadge && (
-            <span className="cat-product-card-badge">{product.discountBadge}</span>
+          {hasDiscount && discountPercent > 0 && (
+            <span className="cat-product-card-discount-tag">-{discountPercent}%</span>
+          )}
+          {isPromo && (
+            <span className="cat-product-card-badge promo-badge">
+              {product.discountBadge || '🔥 PROMO'}
+            </span>
           )}
           {product.freeShipping && (
             <span className="cat-product-card-badge free-shipping">
@@ -569,15 +579,26 @@ export default function CatalogPage({ initialCashShift }) {
     fetchData();
   }, []);
 
-  // ---- Categories (Sort Combos first if exists, like in the screenshot) ----
+  // ---- Categories (Sort Promos first, then Combos, then Burgers) ----
   const rawCategories = [...new Set(products.map(p => p.category))];
   const categories = rawCategories.sort((a, b) => {
+    const isPromoA = (a || '').toLowerCase().includes('promo') ? 0 : 1;
+    const isPromoB = (b || '').toLowerCase().includes('promo') ? 0 : 1;
+    if (isPromoA !== isPromoB) return isPromoA - isPromoB;
+
     if (a.toLowerCase() === 'combos') return -1;
     if (b.toLowerCase() === 'combos') return 1;
     if (a.toLowerCase().includes('burger') || a.toLowerCase().includes('hamburguesa')) return -1;
     if (b.toLowerCase().includes('burger') || b.toLowerCase().includes('hamburguesa')) return 1;
     return a.localeCompare(b);
   });
+
+  // ---- Promos del Día (Productos en categoría Promos o con descuento activo) ----
+  const promoProducts = products.filter(p => 
+    (p.category || '').toLowerCase().includes('promo') ||
+    Boolean(p.discountBadge) ||
+    Boolean(p.originalPrice && Number(p.originalPrice) > Number(p.price))
+  );
 
   useEffect(() => {
     if (categories.length > 0 && !activeCategory) {
@@ -980,6 +1001,76 @@ export default function CatalogPage({ initialCashShift }) {
         </button>
       </div>
 
+      {/* 3.1 CARTELITO / BANNER DE PROMOS DEL DÍA */}
+      {promoProducts.length > 0 && (
+        <div className="cat-promos-banner-wrap">
+          <div className="cat-promos-banner">
+            <div className="cat-promos-banner-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <div className="cat-promos-badge">
+                  <Flame size={14} className="cat-flame-icon" />
+                  <span>PROMOS DEL DÍA</span>
+                </div>
+                <span className="cat-promos-badge-sub">
+                  ¡Imperdibles de hoy! 🔥
+                </span>
+              </div>
+              <button 
+                type="button" 
+                className="cat-promos-banner-action"
+                onClick={() => {
+                  const promoCat = categories.find(c => c.toLowerCase().includes('promo')) || categories[0];
+                  scrollToCategory(promoCat);
+                }}
+              >
+                Ver todas ➔
+              </button>
+            </div>
+            <div className="cat-promos-items-scroll">
+              {promoProducts.map(p => {
+                const hasDiscount = Boolean(p.originalPrice && Number(p.originalPrice) > Number(p.price));
+                return (
+                  <div 
+                    key={p.id} 
+                    className="cat-promo-chip"
+                    onClick={() => setSelectedProduct(p)}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <div className="cat-promo-chip-media">
+                      {p.image ? (
+                        <img src={p.image} alt={p.name} className="cat-promo-chip-img" loading="lazy" />
+                      ) : (
+                        <span className="cat-promo-chip-emoji">{p.emoji || '🍔'}</span>
+                      )}
+                    </div>
+                    <div className="cat-promo-chip-info">
+                      <span className="cat-promo-chip-name">{p.name}</span>
+                      <div className="cat-promo-chip-prices">
+                        <span className="cat-promo-chip-price">{formatPrice(p.price)}</span>
+                        {hasDiscount && (
+                          <span className="cat-promo-chip-old-price">{formatPrice(p.originalPrice)}</span>
+                        )}
+                      </div>
+                    </div>
+                    <button 
+                      type="button" 
+                      className="cat-promo-chip-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedProduct(p);
+                      }}
+                    >
+                      Pedir
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 4. STICKY CATEGORY NAVIGATION BAR */}
       <div className="cat-sticky-nav-bar">
         <div className="cat-sticky-nav-inner">
@@ -1002,18 +1093,21 @@ export default function CatalogPage({ initialCashShift }) {
             <Menu size={18} />
           </button>
           <div className="cat-nav-tabs-scroll" ref={navRef}>
-            {categories.map(cat => (
-              <button
-                key={cat}
-                data-cat={cat}
-                type="button"
-                className={`cat-nav-tab-item ${activeCategory === cat ? 'active' : ''}`}
-                onClick={() => scrollToCategory(cat)}
-              >
-                {cat.toUpperCase()}
-                {activeCategory === cat && <span className="cat-nav-tab-indicator" />}
-              </button>
-            ))}
+            {categories.map(cat => {
+              const isPromoCat = cat.toLowerCase().includes('promo');
+              return (
+                <button
+                  key={cat}
+                  data-cat={cat}
+                  type="button"
+                  className={`cat-nav-tab-item ${activeCategory === cat ? 'active' : ''} ${isPromoCat ? 'is-promo-tab' : ''}`}
+                  onClick={() => scrollToCategory(cat)}
+                >
+                  {cat.toUpperCase()}
+                  {activeCategory === cat && <span className="cat-nav-tab-indicator" />}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -1058,25 +1152,45 @@ export default function CatalogPage({ initialCashShift }) {
             <div className="cat-empty-text">No encontramos productos para "{searchQuery}"</div>
           </div>
         ) : (
-          Object.entries(grouped).map(([cat, prods]) => (
-            <div
-              key={cat}
-              className="cat-section"
-              ref={el => { sectionRefs.current[cat] = el; }}
-              id={`cat-section-${cat}`}
-            >
-              <h2 className="cat-section-title">{cat.toUpperCase()}</h2>
-              <div className="cat-product-grid">
-                {prods.map(p => (
-                  <ProductCard
-                    key={p.id}
-                    product={p}
-                    onOpen={setSelectedProduct}
-                  />
-                ))}
+          Object.entries(grouped).map(([cat, prods]) => {
+            const isPromoCat = cat.toLowerCase().includes('promo');
+            return (
+              <div
+                key={cat}
+                className="cat-section"
+                ref={el => { sectionRefs.current[cat] = el; }}
+                id={`cat-section-${cat}`}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <h2 className="cat-section-title" style={{ marginBottom: 0 }}>
+                    {isPromoCat ? `🔥 ${cat.toUpperCase()}` : cat.toUpperCase()}
+                  </h2>
+                  {isPromoCat && (
+                    <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#f97316', background: 'rgba(249, 115, 22, 0.12)', padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(249, 115, 22, 0.3)', textTransform: 'uppercase' }}>
+                      ⚡ Especiales de Hoy
+                    </span>
+                  )}
+                </div>
+
+                {isPromoCat && (
+                  <div className="cat-promos-section-callout">
+                    <Flame size={16} style={{ color: '#f97316', flexShrink: 0 }} />
+                    <span>🔥 ¡Promociones especiales del día! Calidad 100% smashada a precio promocional.</span>
+                  </div>
+                )}
+
+                <div className="cat-product-grid">
+                  {prods.map(p => (
+                    <ProductCard
+                      key={p.id}
+                      product={p}
+                      onOpen={setSelectedProduct}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 

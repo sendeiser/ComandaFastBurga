@@ -1790,3 +1790,276 @@
   align-items: center;
   gap: 8px;
 }
+
+/* ============================================================
+   PROMOS DEL DÍA — CARTELITO & CALLOUTS
+   ============================================================ */
+.cat-promos-banner-wrap {
+  max-width: 960px;
+  margin: 0 auto 12px;
+  padding: 0 16px;
+}
+
+.cat-promos-banner {
+  background: linear-gradient(135deg, rgba(28, 19, 15, 0.96) 0%, rgba(20, 13, 9, 0.98) 100%);
+  border: 1px solid rgba(249, 115, 22, 0.4);
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 4px 20px rgba(249, 115, 22, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.cat-promos-banner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #ef4444, #f97316, #fbbf24, #ef4444);
+  background-size: 200% 100%;
+  animation: promoShimmer 3s linear infinite;
+}
+
+@keyframes promoShimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+.cat-promos-banner-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.cat-promos-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(135deg, #ef4444 0%, #ea580c 100%);
+  color: #ffffff;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.35);
+}
+
+.cat-flame-icon {
+  color: #fef08a;
+  animation: flamePulse 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes flamePulse {
+  0% { transform: scale(1); filter: drop-shadow(0 0 2px #ef4444); }
+  100% { transform: scale(1.18); filter: drop-shadow(0 0 6px #f59e0b); }
+}
+
+.cat-promos-badge-sub {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fbbf24;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cat-promos-banner-action {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #f97316;
+  background: rgba(249, 115, 22, 0.12);
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  border-radius: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.cat-promos-banner-action:hover {
+  background: rgba(249, 115, 22, 0.22);
+  color: #ffedd5;
+}
+
+.cat-promos-items-scroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 2px 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.cat-promos-items-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.cat-promo-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 7px 12px;
+  min-width: 210px;
+  flex: 1;
+  transition: all 0.18s ease;
+  cursor: pointer;
+  user-select: none;
+}
+
+.cat-promo-chip:hover {
+  background: rgba(249, 115, 22, 0.1);
+  border-color: rgba(249, 115, 22, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.cat-promo-chip-media {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cat-promo-chip-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cat-promo-chip-emoji {
+  font-size: 1.3rem;
+}
+
+.cat-promo-chip-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.cat-promo-chip-name {
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: #ffffff;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.2px;
+}
+
+.cat-promo-chip-prices {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 1px;
+}
+
+.cat-promo-chip-price {
+  font-size: 0.88rem;
+  font-weight: 900;
+  color: #f97316;
+}
+
+.cat-promo-chip-old-price {
+  font-size: 0.74rem;
+  color: #71717a;
+  text-decoration: line-through;
+  font-weight: 600;
+}
+
+.cat-promo-chip-btn {
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 4px 9px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.cat-promo-chip-btn:hover {
+  background: #dc2626;
+  transform: scale(1.05);
+}
+
+/* Callout en la categoría de Promos */
+.cat-promos-section-callout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(249, 115, 22, 0.08) 100%);
+  border-left: 3px solid #f97316;
+  border-radius: 0 8px 8px 0;
+  padding: 9px 12px;
+  margin-bottom: 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #fed7aa;
+}
+
+/* Tab de Promos en Sticky Nav */
+.cat-nav-tab-item.is-promo-tab {
+  color: #f97316;
+  font-weight: 900;
+  position: relative;
+}
+
+.cat-nav-tab-item.is-promo-tab::after {
+  content: '🔥';
+  font-size: 0.75rem;
+  margin-left: 4px;
+}
+
+/* Badge de Promo en ProductCard */
+.cat-product-card-badge.promo-badge {
+  background: linear-gradient(135deg, #ef4444 0%, #ea580c 100%);
+  color: #ffffff;
+  font-weight: 900;
+  box-shadow: 0 1px 6px rgba(239, 68, 68, 0.4);
+}
+
+.cat-product-card-discount-tag {
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: #4ade80;
+  font-size: 0.7rem;
+  font-weight: 900;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: -0.2px;
+}
+
+.cat-modal-promo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #ef4444 0%, #ea580c 100%);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 900;
+  padding: 3px 8px;
+  border-radius: 6px;
+  margin-left: 8px;
+  vertical-align: middle;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.35);
+}

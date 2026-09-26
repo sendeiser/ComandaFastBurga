@@ -107,9 +107,14 @@ export default function ProductModal({ product, onClose, onAddToCart }) {
             )}
             <div className="cat-modal-product-price">
               {formatPrice(product.price)}
-              {product.originalPrice && (
+              {product.originalPrice && Number(product.originalPrice) > Number(product.price) && (
                 <span className="cat-product-card-original-price">
                   {formatPrice(product.originalPrice)}
+                </span>
+              )}
+              {(product.discountBadge || (product.category || '').toLowerCase().includes('promo')) && (
+                <span className="cat-modal-promo-badge">
+                  🔥 PROMO DEL DÍA
                 </span>
               )}
             </div>
