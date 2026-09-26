@@ -642,6 +642,9 @@ Nuestros cocineros están preparando tus hamburguesas con la carne recién smash
   template_order_ready: `🔔 *¡Tu pedido #{pedido_id} está LISTO {cliente}!* 🍔🍟
 
 Ya podés pasar a retirarlo por nuestro local en {direccion}. ¡Te esperamos con las burgers calentitas!`,
+  template_order_ready_delivery: `🔔 *¡Tu pedido #{pedido_id} ya está listo y empaquetado {cliente}!* 🍔📦
+
+Nuestra cocina terminó de preparar tu pedido. En breve el repartidor lo retira para salir hacia {direccion}. ¡Mantenete atento! 🛵💨`,
   template_order_shipped: `🛵💨 *¡Tu pedido #{pedido_id} va en camino {cliente}!*
 
 Destino: *{direccion}*
@@ -1501,26 +1504,25 @@ class WhatsAppBotServer {
                        order.shippingMethod === 'delivery' ||
                        customerObj.deliveryType === 'delivery' ||
                        customerObj.shippingMethod === 'delivery' ||
-                       Number(order.deliveryFee || 0) > 0 ||
-                       (customerObj.address && !['retiro en local', 'mostrador', 'local', 'en el local'].includes(customerObj.address.toLowerCase().trim()) && customerObj.address.length > 2 && !order.tableNumber);
+                       Number(order.deliveryFee || order.delivery_fee || 0) > 0 ||
+                       (customerObj.address && !['retiro en local', 'mostrador', 'local', 'en el local'].includes(customerObj.address.toLowerCase().trim()) && customerObj.address.length > 2 && !order.tableNumber && !order.table_number);
 
     // Dirección adecuada según contexto:
     // - Para Retiro en Local: siempre es la dirección física de la hamburguesería (vars.direccion)
     // - Para Envíos a Domicilio: es el domicilio del cliente
-    const storeAddress = vars.direccion || 'Nuestro Local (Av. Perón 145)';
+    const storeAddress = vars.direccion || 'Nuestro Local (Av. Belgrano 1234, Centro)';
     const customerDeliveryAddress = customerObj.address || order.address || 'tu domicilio';
-    const addressToUse = (normalizedStatus === 'listo') ? storeAddress : customerDeliveryAddress;
+    const addressToUse = (!isDelivery) ? storeAddress : customerDeliveryAddress;
 
     let templateText = '';
     if (normalizedStatus === 'cocina') {
       templateText = tpls.template_order_preparing || DEFAULT_SERVER_TEMPLATES.template_order_preparing;
     } else if (normalizedStatus === 'listo') {
       if (isDelivery) {
-        // En pedidos para DELIVERY: El cliente NO debe recibir el aviso de retirar por el local.
-        console.log(`ℹ️ [NOTIF WHATSAPP]: Pedido #${orderNum} es para DELIVERY. Se omite notificación de 'Retiro en Local' en estado 'listo'. Se notificará cuando el cadete salga ('despachar'/'entregado').`);
-        return { success: false, reason: 'delivery_order_skip_pickup_notice' };
+        templateText = tpls.template_order_ready_delivery || DEFAULT_SERVER_TEMPLATES.template_order_ready_delivery;
+      } else {
+        templateText = tpls.template_order_ready || DEFAULT_SERVER_TEMPLATES.template_order_ready;
       }
-      templateText = tpls.template_order_ready || DEFAULT_SERVER_TEMPLATES.template_order_ready;
     } else if (normalizedStatus === 'entregado') {
       if (isDelivery) {
         templateText = tpls.template_order_shipped || DEFAULT_SERVER_TEMPLATES.template_order_shipped;
@@ -1541,7 +1543,17 @@ class WhatsAppBotServer {
 
     console.log(`🚀 [NOTIF WHATSAPP]: Enviando aviso de estado '${normalizedStatus}' (${isDelivery ? 'Delivery' : 'Take Away'}) a ${targetJid} (Pedido #${orderNum})...`);
 
-    const sendResult = await this.safeSendMessage(targetJid, { text: finalMessage });
+    let sendResult = await this.safeSendMessage(targetJid, { text: finalMessage });
+
+    const phone = customerObj.phone || order.phone || order.customerPhone || null;
+    const phoneJid = phone ? formatPhoneToRemoteJid(String(phone)) : null;
+    if (!sendResult && phoneJid && targetJid !== phoneJid) {
+      console.log(`🔄 [NOTIF WHATSAPP]: Reintentando envío a número telefónico directo ${phoneJid}...`);
+      sendResult = await this.safeSendMessage(phoneJid, { text: finalMessage });
+      if (sendResult) {
+        targetJid = phoneJid;
+      }
+    }
 
     if (sendResult) {
       if (!order.notifiedStatuses) order.notifiedStatuses = [];
@@ -2828,6 +2840,160 @@ async function checkRemoteCommands() {
   } catch (_) {}
 }
 setInterval(checkRemoteCommands, 15000);
+
+// =========================================================
+// SYNC ORDER STATUSES & REAL-TIME NOTIFICATIONS FROM SUPABASE CLOUD
+// Permite que cuando el personal en Netlify o tablets cambie estados
+// (o pulse el botón de notificar en KDS), el bot envíe los mensajes
+// =========================================================
+let isSyncingCloudOrders = false;
+const cloudNotifiedStatusCache = new Set();
+const cloudLastForceNotifyTime = new Map();
+const SERVER_BOOT_TIME = Date.now();
+let isCloudOrdersInitialSeedDone = false;
+
+async function syncCloudOrderStatuses() {
+  if (isSyncingCloudOrders) return;
+  if (!botServer || botServer.status !== 'connected' || !botServer.sock) return;
+
+  isSyncingCloudOrders = true;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=updated_at.desc&limit=30`, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      }
+    });
+
+    if (!res.ok) return;
+    const cloudOrders = await res.json();
+    if (!Array.isArray(cloudOrders) || cloudOrders.length === 0) return;
+
+    // Si es la primera iteración al bootear el servidor, sembrar caché con órdenes viejas
+    if (!isCloudOrdersInitialSeedDone) {
+      for (const ord of cloudOrders) {
+        if (!ord || !ord.id) continue;
+        const normSt = ord.status === 'preparando' ? 'cocina' : (ord.status || '').toLowerCase();
+        const timestamps = ord.status_timestamps || {};
+        const notified = Array.isArray(timestamps.notifiedStatuses) ? timestamps.notifiedStatuses : [];
+        const updatedTime = new Date(ord.updated_at || ord.created_at || 0).getTime();
+        const isOldOrder = (SERVER_BOOT_TIME - updatedTime) > 10 * 60 * 1000;
+        if (isOldOrder || notified.includes(normSt)) {
+          cloudNotifiedStatusCache.add(`${ord.id}:${normSt}`);
+        }
+      }
+      isCloudOrdersInitialSeedDone = true;
+      console.log(`☁️ [SUPABASE CLOUD ORDERS]: Inicialización completada. ${cloudNotifiedStatusCache.size} estados previos asegurados contra reenvío.`);
+      return;
+    }
+
+    for (const ord of cloudOrders) {
+      if (!ord || !ord.id) continue;
+      const targetStatus = (ord.status || '').toLowerCase();
+      if (!['cocina', 'preparando', 'listo', 'entregado'].includes(targetStatus)) continue;
+
+      const normalizedStatus = (targetStatus === 'preparando') ? 'cocina' : targetStatus;
+      const cacheKey = `${ord.id}:${normalizedStatus}`;
+      const timestamps = ord.status_timestamps || {};
+      const notifiedList = Array.isArray(timestamps.notifiedStatuses) ? timestamps.notifiedStatuses : [];
+
+      // Detección de solicitud de reenvío forzado desde el KDS en Netlify
+      const forceAtStr = timestamps.forceNotifyAt || null;
+      let isForced = false;
+      if (forceAtStr) {
+        const forceTime = new Date(forceAtStr).getTime();
+        const lastForce = cloudLastForceNotifyTime.get(ord.id) || 0;
+        if (forceTime > lastForce && (Date.now() - forceTime) < 5 * 60 * 1000) {
+          isForced = true;
+          cloudLastForceNotifyTime.set(ord.id, forceTime);
+        }
+      }
+
+      // Si no es forzado y ya fue notificado tanto en caché como en la base de datos, omitir
+      if (!isForced && (cloudNotifiedStatusCache.has(cacheKey) || notifiedList.includes(normalizedStatus))) {
+        continue;
+      }
+
+      // Solo notificar si la comanda se actualizó en las últimas 24 horas
+      const orderTime = new Date(ord.updated_at || ord.created_at || Date.now()).getTime();
+      if (Date.now() - orderTime > 24 * 60 * 60 * 1000) {
+        continue;
+      }
+
+      // Normalizar objeto de pedido para sendOrderStatusNotification
+      const normalizedOrder = {
+        id: ord.id,
+        orderNumber: ord.order_number || ord.orderNumber || (ord.id ? String(ord.id).slice(-4) : 'Comanda'),
+        channel: ord.channel || 'catalogo_online',
+        customer: ord.customer || {},
+        remoteJid: ord.customer?.remoteJid || null,
+        phone: ord.customer?.phone || null,
+        address: ord.customer?.address || null,
+        deliveryType: ord.channel === 'delivery' || ord.delivery_fee > 0 ? 'delivery' : (ord.customer?.deliveryType || 'mostrador'),
+        deliveryFee: Number(ord.delivery_fee || 0),
+        subtotal: Number(ord.subtotal || ord.total || 0),
+        total: Number(ord.total || 0),
+        items: Array.isArray(ord.items) ? ord.items : [],
+        paymentMethod: ord.payment_method || 'efectivo',
+        status: ord.status,
+        notifiedStatuses: [...notifiedList],
+        statusTimestamps: timestamps
+      };
+
+      const hasContact = normalizedOrder.remoteJid || normalizedOrder.customer?.phone || normalizedOrder.phone;
+      if (!hasContact) {
+        cloudNotifiedStatusCache.add(cacheKey);
+        continue;
+      }
+
+      console.log(`☁️ [SUPABASE CLOUD]: Cambio de estado detectado en orden #${normalizedOrder.orderNumber} (${ord.id}) -> '${normalizedStatus}'${isForced ? ' (FORZADO MANUAL)' : ''}. Disparando notificación WhatsApp...`);
+
+      const notifyRes = await botServer.sendOrderStatusNotification(normalizedOrder, normalizedStatus, isForced);
+      if (notifyRes && notifyRes.success) {
+        cloudNotifiedStatusCache.add(cacheKey);
+
+        const updatedNotified = Array.from(new Set([...notifiedList, normalizedStatus]));
+        const updatedTimestamps = {
+          ...timestamps,
+          notifiedStatuses: updatedNotified,
+          [`${normalizedStatus}NotifiedAt`]: new Date().toISOString()
+        };
+
+        fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${ord.id}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            status_timestamps: updatedTimestamps,
+            updated_at: new Date().toISOString()
+          })
+        }).catch(() => {});
+
+        try {
+          const stored = getStoredOrders();
+          const sIdx = stored.findIndex(o => o.id === ord.id);
+          if (sIdx !== -1) {
+            stored[sIdx].status = normalizedStatus;
+            stored[sIdx].notifiedStatuses = updatedNotified;
+            stored[sIdx].statusTimestamps = updatedTimestamps;
+            fs.writeFileSync(ORDERS_FILE, JSON.stringify(stored, null, 2), 'utf-8');
+          }
+        } catch (_) {}
+      } else if (notifyRes && notifyRes.reason === 'no_phone') {
+        cloudNotifiedStatusCache.add(cacheKey);
+      }
+    }
+  } catch (err) {
+    // Silently ignore transient network errors
+  } finally {
+    isSyncingCloudOrders = false;
+  }
+}
+
+setInterval(syncCloudOrderStatuses, 3500);
 
 // Señal de apagado limpio
 process.on('SIGINT', async () => {

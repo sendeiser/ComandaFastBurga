@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChefHat, Clock, CheckCircle2, Play, AlertCircle, Printer, MessageSquare, ShoppingBag, Utensils, RefreshCw, XCircle, ArrowLeftRight, ChevronUp, ChevronDown, RotateCcw } from 'lucide-react';
 import ConfirmModal from '../common/ConfirmModal';
+import { supabaseSync } from '../../services/supabaseClient';
 
 export default function KitchenDisplay({ 
   orders, 
@@ -23,24 +24,43 @@ export default function KitchenDisplay({
   const handleNotifyWhatsApp = async (order) => {
     if (notifyingId) return;
     setNotifyingId(order.id);
+    let handled = false;
     try {
       const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
       const res = await fetch(`http://${botHost}:3002/api/orders/${order.id}/notify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: order.status, order, force: true })
+        body: JSON.stringify({ status: order.status, order, force: true }),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
       const data = await res.json();
+      handled = true;
       if (data.success) {
         alert(`✅ Notificación de WhatsApp enviada a ${data.jid}`);
       } else {
-        alert(`ℹ️ Resultado WhatsApp: ${data.reason === 'bot_disconnected' ? 'Bot desconectado (inicie el bot en el panel Admin)' : data.reason || 'Sin número'}`);
+        alert(`ℹ️ Resultado WhatsApp: ${data.reason === 'bot_disconnected' ? 'Bot desconectado (inicie el bot en el servidor de WhatsApp)' : data.reason || 'Sin número'}`);
       }
     } catch (_) {
-      alert('⚠️ No se pudo conectar al servidor local de WhatsApp (puerto 3002).');
-    } finally {
-      setNotifyingId(null);
+      // Direct local fetch failed (e.g. running on Netlify HTTPS or cross-device)
     }
+
+    if (!handled) {
+      try {
+        const forceTime = new Date().toISOString();
+        const currentTimestamps = order.statusTimestamps || {};
+        await supabaseSync.updateOrderStatus(order.id, order.status, {
+          ...currentTimestamps,
+          forceNotifyAt: forceTime
+        });
+        alert('🔔 Solicitud de aviso enviada a WhatsApp vía la nube. El bot lo despachará en segundos.');
+      } catch (err2) {
+        alert('⚠️ No se pudo enviar la solicitud de notificación por WhatsApp.');
+      }
+    }
+    setNotifyingId(null);
   };
 
   const getElapsedMinutes = (dateString) => {

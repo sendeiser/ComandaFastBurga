@@ -122,5 +122,6 @@
   "template_anti_loop_farewell": "¡Hasta la próxima! 👋 Gracias por contactarte con {nombre_local}. ¡Que tengas un excelente descanso! ✨🍔",
   "require_keywords_for_chatbot": false,
   "template_anti_loop_gratitude": "¡De nada! 🙌 Que lo disfrutes un montón. Si querés consultar la carta o volver a pedir, escribí *MENU* cuando gustes. ¡Buen provecho! 🍔🔥",
-  "template_anti_loop_acknowledge": "¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido."
+  "template_anti_loop_acknowledge": "¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido.",
+  "template_order_ready_delivery": "🔔 *¡Tu pedido #{pedido_id} ya está listo y empaquetado {cliente}!* 🍔📦\n\nNuestra cocina terminó de preparar tu pedido. En breve el repartidor lo retira para salir hacia {direccion}. ¡Mantenete atento! 🛵💨"
 }
