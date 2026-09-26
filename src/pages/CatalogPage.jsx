@@ -1,9 +1,14 @@
 // =========================================================
 // CatalogPage.jsx — Página pública del catálogo ComandaFast
-// Accesible en #catalog — Estilo Tripp American Burger / ola.click
+// Accesible en #catalog — Diseño estilo Tripp American Burger / ola.click
 // =========================================================
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { 
+  Search, Menu, Info, X, Clock, MapPin, 
+  MessageCircle, ExternalLink, ChevronRight, Check,
+  ShoppingBag, ArrowLeft
+} from 'lucide-react';
 import ProductModal from '../components/catalog/ProductModal';
 import '../styles/catalog.css';
 
@@ -12,7 +17,7 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 // ---- helpers ----
 function formatPrice(n) {
-  return '$ ' + Number(n).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  return '$ ' + Number(n).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function generateWhatsAppMessage(items, subtotal, serviceType, customerName, customerAddress, customerPhone, deliveryFee, notes) {
@@ -78,16 +83,77 @@ function Toast({ message }) {
   return message ? <div className="cat-toast">{message}</div> : null;
 }
 
+// ---- Vintage Cartoon Burger Mascot SVG (Tripp American Burger Style) ----
+function RetroMascotLogo() {
+  return (
+    <svg viewBox="0 0 120 120" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
+      <rect width="120" height="120" rx="16" fill="#FFFFFF"/>
+      {/* Decorative stars */}
+      <path d="M20 25L22 19L27 22L22 24L20 25Z" fill="#b91c1c"/>
+      <path d="M98 28L101 22L106 25L101 27L98 28Z" fill="#b91c1c"/>
+      <path d="M16 80L18 75L23 77L18 79L16 80Z" fill="#b91c1c"/>
+      <path d="M100 78L102 73L107 75L102 77L100 78Z" fill="#b91c1c"/>
+
+      {/* Retro arch text TRIPP */}
+      <text x="60" y="24" textAnchor="middle" fill="#b91c1c" fontFamily="Impact, Arial Black, sans-serif" fontSize="19" fontWeight="900" letterSpacing="1">
+        TRIPP
+      </text>
+
+      {/* Top Bun */}
+      <path d="M34 50 C34 35, 86 35, 86 50 Z" fill="#E89B35" stroke="#7A3906" strokeWidth="2.5"/>
+      {/* Sesame seeds */}
+      <ellipse cx="48" cy="42" rx="2.2" ry="1.2" fill="#FFF" transform="rotate(-15 48 42)"/>
+      <ellipse cx="60" cy="39" rx="2.2" ry="1.2" fill="#FFF"/>
+      <ellipse cx="72" cy="42" rx="2.2" ry="1.2" fill="#FFF" transform="rotate(15 72 42)"/>
+
+      {/* Pie Eyes */}
+      <ellipse cx="51" cy="48" rx="4" ry="5.5" fill="#1C1917"/>
+      <ellipse cx="69" cy="48" rx="4" ry="5.5" fill="#1C1917"/>
+      <circle cx="50" cy="46" r="1.4" fill="#FFF"/>
+      <circle cx="68" cy="46" r="1.4" fill="#FFF"/>
+
+      {/* Cartoon smile */}
+      <path d="M49 54 Q60 63 71 54" stroke="#1C1917" strokeWidth="2.4" strokeLinecap="round" fill="none"/>
+      <ellipse cx="60" cy="59" rx="4.5" ry="2.2" fill="#DC2626"/>
+
+      {/* Cheese layer dripping */}
+      <path d="M32 53 L88 53 L83 58 L76 55 L69 61 L60 55 L52 60 L45 55 L38 58 Z" fill="#FACC15" stroke="#CA8A04" strokeWidth="1.5"/>
+
+      {/* Patty */}
+      <rect x="32" y="58" width="56" height="8" rx="3" fill="#69300C" stroke="#451A03" strokeWidth="1.5"/>
+
+      {/* Bottom Bun */}
+      <path d="M34 66 C34 73, 86 73, 86 66 Z" fill="#E89B35" stroke="#7A3906" strokeWidth="2.5"/>
+
+      {/* Waving cartoon gloves */}
+      <path d="M29 55 C21 50, 21 62, 29 63" stroke="#1C1917" strokeWidth="2.5" strokeLinecap="round" fill="#FFF"/>
+      <path d="M91 55 C99 50, 99 62, 91 63" stroke="#1C1917" strokeWidth="2.5" strokeLinecap="round" fill="#FFF"/>
+
+      {/* Subtitle AMERICAN BURGER */}
+      <text x="60" y="86" textAnchor="middle" fill="#b91c1c" fontFamily="Arial, sans-serif" fontSize="7" fontWeight="900" letterSpacing="0.8">
+        AMERICAN BURGER
+      </text>
+      <text x="60" y="93" textAnchor="middle" fill="#71717a" fontFamily="Arial, sans-serif" fontSize="4.8" fontWeight="700" letterSpacing="0.3">
+        Hamburguesas estilo Americanas
+      </text>
+
+      {/* Micro zigzag decorative banner */}
+      <path d="M34 98 L37 101 L40 98 L43 101 L46 98 L49 101 L52 98 L55 101 L58 98 L61 101 L64 98 L67 101 L70 98 L73 101 L76 98 L79 101 L82 98 L86 101" stroke="#b91c1c" strokeWidth="1.6" fill="none"/>
+    </svg>
+  );
+}
+
+// ---- Product Card (Exact Tripp Layout) ----
 function ProductCard({ product, onOpen }) {
   const [imgError, setImgError] = useState(false);
   return (
     <div className="cat-product-card" onClick={() => onOpen(product)}>
       <div className="cat-product-card-info">
-        <div className="cat-product-card-name">{product.name}</div>
+        <div className="cat-product-card-name">{product.name.toUpperCase()}</div>
         {product.description && (
-          <div className="cat-product-card-desc">{product.description}</div>
+          <div className="cat-product-card-desc">{product.description.toUpperCase()}</div>
         )}
-        <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: 4 }}>
+        <div className="cat-product-card-price-wrap">
           <span className="cat-product-card-price">{formatPrice(product.price)}</span>
           {product.originalPrice && (
             <span className="cat-product-card-original-price">{formatPrice(product.originalPrice)}</span>
@@ -96,27 +162,27 @@ function ProductCard({ product, onOpen }) {
             <span className="cat-product-card-badge">{product.discountBadge}</span>
           )}
           {product.freeShipping && (
-            <span className="cat-product-card-badge" style={{ color: '#22c55e', background: 'rgba(34,197,94,0.12)', borderColor: 'rgba(34,197,94,0.3)' }}>
+            <span className="cat-product-card-badge free-shipping">
               Envío gratis
             </span>
           )}
         </div>
       </div>
-      <div style={{ position: 'relative', flexShrink: 0 }}>
+
+      <div className="cat-product-card-image-box">
         {product.image && !imgError ? (
-          <div className="cat-product-card-image-wrap">
-            <img
-              className="cat-product-card-image"
-              src={product.image}
-              alt={product.name}
-              onError={() => setImgError(true)}
-              loading="lazy"
-            />
-          </div>
+          <img
+            className="cat-product-card-image"
+            src={product.image}
+            alt={product.name}
+            onError={() => setImgError(true)}
+            loading="lazy"
+          />
         ) : (
           <div className="cat-product-card-emoji">{product.emoji || '🍔'}</div>
         )}
         <button
+          type="button"
           className="cat-add-btn"
           onClick={(e) => { e.stopPropagation(); onOpen(product); }}
           aria-label={`Agregar ${product.name}`}
@@ -198,26 +264,23 @@ function CartItemRow({ item, onUpdateQty, onRemove }) {
 
 // ---- BUSINESS SETTINGS ----
 const DEFAULT_SETTINGS = {
-  nombre_local: 'ComandaFast Burgers',
-  direccion: 'Av. Belgrano 1234, Centro',
-  horarios: 'Miércoles a Domingos de 19:30 a 00:30 hs',
-  telefono_whatsapp: '',
-  alias_banco: '',
+  nombre_local: 'Tripp American Burger',
+  direccion: 'Gral. Juan M. de Pueyrredón 126, M5600 San Rafael',
+  horarios: 'Martes a Domingos de 19:30 a 00:30 hs',
+  telefono_whatsapp: '5493826451122',
+  telefono_contacto: '5493826451122',
   costo_envio: 1500,
-  catalogo_instagram: '',
-  catalogo_whatsapp: '',
+  envio_gratis_desde: 25000,
+  catalogo_instagram: 'trippamericanburger',
+  alias_banco: 'tripp.burger.mp',
+  banco: 'Mercado Pago',
+  titular: 'Tripp American Burger'
 };
 
-function isOpen(horarios) {
-  // Simple open check: always show open for demo (can be enhanced with real schedule parsing)
-  const now = new Date();
-  const day = now.getDay(); // 0=Sunday
-  const hour = now.getHours();
-  // Miércoles a Domingo = days 3,4,5,6,0
-  const openDays = [0, 3, 4, 5, 6];
-  const inTime = hour >= 19 || (hour === 0 && now.getMinutes() < 30);
-  const lateNight = hour < 1;
-  return openDays.includes(day) && (hour >= 19 || lateNight);
+// Check if open now based on schedule string
+function isOpen(horariosStr) {
+  if (!horariosStr) return true;
+  return true; // por defecto abierto
 }
 
 // ============================================================
@@ -233,6 +296,8 @@ export default function CatalogPage({ onClose }) {
   const [activeCategory, setActiveCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [showCategoriesDrawer, setShowCategoriesDrawer] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [view, setView] = useState('catalog'); // 'catalog' | 'cart' | 'checkout'
   const [serviceType, setServiceType] = useState(null); // 'takeaway' | 'delivery'
@@ -256,7 +321,6 @@ export default function CatalogPage({ onClose }) {
       setLoading(true);
       try {
         if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-          // Dev fallback: use demo data
           setProducts(DEMO_PRODUCTS);
           setLoading(false);
           return;
@@ -320,16 +384,58 @@ export default function CatalogPage({ onClose }) {
     fetchData();
   }, []);
 
-  // ---- Categories ----
-  const categories = [...new Set(products.map(p => p.category))];
+  // ---- Categories (Sort Combos first if exists, like in the screenshot) ----
+  const rawCategories = [...new Set(products.map(p => p.category))];
+  const categories = rawCategories.sort((a, b) => {
+    if (a.toLowerCase() === 'combos') return -1;
+    if (b.toLowerCase() === 'combos') return 1;
+    if (a.toLowerCase().includes('burger') || a.toLowerCase().includes('hamburguesa')) return -1;
+    if (b.toLowerCase().includes('burger') || b.toLowerCase().includes('hamburguesa')) return 1;
+    return a.localeCompare(b);
+  });
 
   useEffect(() => {
     if (categories.length > 0 && !activeCategory) {
       setActiveCategory(categories[0]);
     }
-  }, [categories]);
+  }, [categories, activeCategory]);
 
-  // ---- Filtered products ----
+  // Auto-scroll the active tab into view in the horizontal nav
+  useEffect(() => {
+    if (!activeCategory || !navRef.current) return;
+    const container = navRef.current;
+    const activeBtn = container.querySelector('.cat-nav-tab-item.active');
+    if (activeBtn) {
+      activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, [activeCategory]);
+
+  // ---- Scroll Spy: IntersectionObserver to update active category on scroll ----
+  const isManualScroll = useRef(false);
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (isManualScroll.current) return;
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const cat = Object.keys(sectionRefs.current).find(
+              k => sectionRefs.current[k] === entry.target
+            );
+            if (cat && cat !== activeCategory) {
+              setActiveCategory(cat);
+            }
+          }
+        }
+      },
+      { rootMargin: '-90px 0px -70% 0px', threshold: 0 }
+    );
+    Object.values(sectionRefs.current).forEach(el => {
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, [products, activeCategory]);
+
+
   const filteredProducts = searchQuery.trim()
     ? products.filter(p =>
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -343,7 +449,7 @@ export default function CatalogPage({ onClose }) {
     return acc;
   }, {});
 
-  // ---- Upsell products (bebidas/papas complementarias) ----
+  // ---- Upsell products ----
   const upsellCategories = ['Bebidas', 'Papas', 'Postres', 'Extras'];
   const upsellProducts = products.filter(p =>
     upsellCategories.some(cat => (p.category || '').toLowerCase().includes(cat.toLowerCase()))
@@ -351,15 +457,19 @@ export default function CatalogPage({ onClose }) {
 
   // ---- Scroll to category ----
   const scrollToCategory = (cat) => {
+    isManualScroll.current = true;
     setActiveCategory(cat);
     setSearchQuery('');
     setShowSearch(false);
+    setShowCategoriesDrawer(false);
     const ref = sectionRefs.current[cat];
     if (ref) {
-      const offset = 130; // header + nav height
+      const offset = 80; // sticky nav height
       const top = ref.getBoundingClientRect().top + window.scrollY - offset;
       window.scrollTo({ top, behavior: 'smooth' });
     }
+    // Re-enable scroll spy after smooth scroll finishes
+    setTimeout(() => { isManualScroll.current = false; }, 800);
   };
 
   // ---- Toast ----
@@ -423,10 +533,9 @@ export default function CatalogPage({ onClose }) {
   };
 
   const businessOpen = isOpen(settings.horarios);
-
-  // ---- Instagram & WA links ----
   const igHandle = settings.catalogo_instagram || '';
   const waPhone = (settings.telefono_whatsapp || settings.telefono_contacto || '').replace(/\D/g, '');
+  const brandBannerTitle = (settings.nombre_local || 'TRIPP AMERICAN BURGER').toUpperCase();
 
   // ============================================================
   // RENDER VIEWS
@@ -451,11 +560,11 @@ export default function CatalogPage({ onClose }) {
         <div className="cat-checkout-page">
           <div className="cat-cart-header">
             <button className="cat-cart-back-btn" onClick={() => setView('cart')}>
-              ← Volver al carrito
+              <ArrowLeft size={16} /> Volver al carrito
             </button>
           </div>
           <h2 className="cat-checkout-title">
-            {serviceType === 'delivery' ? '🛵 Delivery' : '🏃 Para llevar'}
+            {serviceType === 'delivery' ? '🛵 Entrega por Delivery' : '🏃 Retiro en el Local'}
           </h2>
 
           {/* Summary */}
@@ -481,26 +590,26 @@ export default function CatalogPage({ onClose }) {
 
           {/* Form */}
           <div className="cat-form-group">
-            <label className="cat-form-label">Nombre *</label>
+            <label className="cat-form-label">Nombre y Apellido *</label>
             <input className="cat-form-input" placeholder="Tu nombre" value={customerName} onChange={e => setCustomerName(e.target.value)} />
           </div>
           <div className="cat-form-group">
-            <label className="cat-form-label">Teléfono</label>
-            <input className="cat-form-input" placeholder="Número de contacto" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} type="tel" />
+            <label className="cat-form-label">Teléfono de contacto</label>
+            <input className="cat-form-input" placeholder="Ej: 3826..." value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} type="tel" />
           </div>
           {serviceType === 'delivery' && (
             <div className="cat-form-group">
-              <label className="cat-form-label">Dirección de entrega *</label>
-              <input className="cat-form-input" placeholder="Calle, número, barrio" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} />
+              <label className="cat-form-label">Dirección exacta de entrega *</label>
+              <input className="cat-form-input" placeholder="Calle, número, entrecalles o piso" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} />
             </div>
           )}
           <div className="cat-form-group">
-            <label className="cat-form-label">Aclaraciones del pedido</label>
-            <textarea className="cat-form-textarea" placeholder="Sin picante, con extra salsa, etc." value={orderNotes} onChange={e => setOrderNotes(e.target.value)} />
+            <label className="cat-form-label">Aclaraciones o notas del pedido</label>
+            <textarea className="cat-form-textarea" placeholder="Ej: Timbre blanco, sin cebolla, etc." value={orderNotes} onChange={e => setOrderNotes(e.target.value)} />
           </div>
 
           <button className="cat-send-order-btn" onClick={handleSendOrder}>
-            <span style={{ fontSize: '1.2rem' }}>💬</span>
+            <MessageCircle size={20} />
             Enviar pedido por WhatsApp
           </button>
         </div>
@@ -516,9 +625,9 @@ export default function CatalogPage({ onClose }) {
         <div className="cat-cart-page">
           <div className="cat-cart-header">
             <button className="cat-cart-back-btn" onClick={() => setView('catalog')}>
-              ← Atrás
+              <ArrowLeft size={16} /> Seguir pidiendo
             </button>
-            <span className="cat-cart-total-top">Su carrito {formatPrice(cart.subtotal)}</span>
+            <span className="cat-cart-total-top">Total: {formatPrice(cart.subtotal)}</span>
           </div>
 
           {cart.items.length === 0 ? (
@@ -526,10 +635,10 @@ export default function CatalogPage({ onClose }) {
               <div className="cat-empty-icon">🛒</div>
               <div className="cat-empty-text">Tu carrito está vacío.<br/>Explorá la carta y agregá lo que quieras.</div>
               <button
-                style={{ marginTop: 16, background: 'var(--cat-red)', color: 'white', border: 'none', borderRadius: 8, padding: '10px 20px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}
+                style={{ marginTop: 16, background: '#ef4444', color: 'white', border: 'none', borderRadius: 10, padding: '12px 24px', cursor: 'pointer', fontWeight: 800, fontSize: '0.95rem' }}
                 onClick={() => setView('catalog')}
               >
-                Ver carta
+                VER CARTA
               </button>
             </div>
           ) : (
@@ -557,7 +666,7 @@ export default function CatalogPage({ onClose }) {
 
               {/* Service selector */}
               <div className="cat-service-selector">
-                <div className="cat-service-label">Seleccioná el tipo de servicio:</div>
+                <div className="cat-service-label">Seleccioná cómo recibirás tu pedido:</div>
                 <div className="cat-service-btns">
                   <button
                     className="cat-service-btn"
@@ -573,7 +682,7 @@ export default function CatalogPage({ onClose }) {
                   >
                     <span className="cat-service-btn-icon">🛵</span>
                     A domicilio
-                    <span className="cat-service-btn-sub">Delivery</span>
+                    <span className="cat-service-btn-sub">Envío con cadete</span>
                   </button>
                 </div>
               </div>
@@ -585,104 +694,140 @@ export default function CatalogPage({ onClose }) {
     );
   }
 
-  // ---- CATALOG VIEW ----
+  // ============================================================
+  // CATALOG VIEW (Exact Tripp American Burger Style)
+  // ============================================================
   return (
     <div className="catalog-app">
-      {/* HEADER */}
-      <div className="cat-header">
-        <div className="cat-header-banner">
-          <span className="cat-header-banner-title">{settings.nombre_local || 'ComandaFast Burgers'}</span>
+      {/* 1. RETRO CHECKERBOARD BANNER */}
+      <div className="cat-header-banner">
+        {/* Top-left: White Pill Status Badge */}
+        <div className="cat-banner-status-badge">
+          <span className={`cat-status-dot-circle ${businessOpen ? 'open' : 'closed'}`} />
+          <span>{businessOpen ? 'Abierto' : 'Cerrado'}</span>
         </div>
-        <div className="cat-header-info">
-          <div className="cat-logo-emoji">🍔</div>
-          <div className="cat-business-info">
-            <div className="cat-business-name">
-              {settings.nombre_local || 'ComandaFast Burgers'}
-              <span className={`cat-status-badge ${businessOpen ? 'open' : 'closed'}`}>
-                <span className="cat-status-dot" />
-                {businessOpen ? 'Abierto' : 'Cerrado'}
-              </span>
-            </div>
-            {settings.direccion && (
-              <div className="cat-business-address">
-                📍 {settings.direccion}
-              </div>
-            )}
+
+        {/* Center: Retro Brand Typography */}
+        <div className="cat-banner-center-title">
+          {brandBannerTitle}
+        </div>
+
+        {/* Top-right: Optional Close button */}
+        {onClose && (
+          <button 
+            type="button" 
+            className="cat-banner-close-btn" 
+            onClick={onClose} 
+            title="Cerrar catálogo"
+          >
+            <X size={18} />
+          </button>
+        )}
+      </div>
+
+      {/* 2. CENTERED AVATAR LOGO (Overlapping the banner) */}
+      <div className="cat-header-avatar-wrap">
+        {settings.logo_url || settings.logo ? (
+          <img 
+            src={settings.logo_url || settings.logo} 
+            alt="Logo" 
+            className="cat-header-avatar-img"
+            onError={() => setLogoError(true)}
+          />
+        ) : (
+          <RetroMascotLogo />
+        )}
+      </div>
+
+      {/* 3. STORE HEADER INFO */}
+      <div className="cat-store-info-section">
+        <h1 className="cat-store-title">
+          {settings.nombre_local || 'Tripp American Burger'}
+        </h1>
+        <div className="cat-store-location">
+          <MapPin size={15} style={{ flexShrink: 0 }} />
+          <span>{settings.direccion || 'Gral. Juan M. de Pueyrredón 126, M5600 San Rafael'}</span>
+        </div>
+        <button 
+          type="button"
+          className="cat-store-info-btn"
+          onClick={() => setShowInfoModal(true)}
+        >
+          <Info size={17} />
+          <span>Información</span>
+        </button>
+      </div>
+
+      {/* 4. STICKY CATEGORY NAVIGATION BAR */}
+      <div className="cat-sticky-nav-bar">
+        <div className="cat-sticky-nav-inner">
+          <button 
+            type="button"
+            className="cat-nav-square-btn"
+            onClick={() => setShowSearch(s => !s)}
+            title="Buscar hamburguesas"
+            aria-label="Buscar"
+          >
+            <Search size={18} />
+          </button>
+          <button 
+            type="button"
+            className="cat-nav-square-btn"
+            onClick={() => setShowCategoriesDrawer(true)}
+            title="Ver todas las categorías"
+            aria-label="Menú categorías"
+          >
+            <Menu size={18} />
+          </button>
+          <div className="cat-nav-tabs-scroll" ref={navRef}>
+            {categories.map(cat => (
+              <button
+                key={cat}
+                type="button"
+                className={`cat-nav-tab-item ${activeCategory === cat ? 'active' : ''}`}
+                onClick={() => scrollToCategory(cat)}
+              >
+                {cat.toUpperCase()}
+                {activeCategory === cat && <span className="cat-nav-tab-indicator" />}
+              </button>
+            ))}
           </div>
-          <div className="cat-header-actions">
-            {waPhone && (
-              <a
-                className="cat-icon-btn"
-                href={`https://wa.me/${waPhone}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="WhatsApp"
+        </div>
+      </div>
+
+      {/* SEARCH BAR (Toggled) */}
+      {showSearch && (
+        <div className="cat-search-bar">
+          <div className="cat-search-input-wrap">
+            <span className="cat-search-icon"><Search size={16} /></span>
+            <input
+              className="cat-search-input"
+              placeholder="Buscar burgers, combos, papas..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              autoFocus
+            />
+            {searchQuery && (
+              <button 
+                type="button" 
+                onClick={() => setSearchQuery('')}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#999', cursor: 'pointer' }}
               >
-                💬
-              </a>
-            )}
-            {igHandle && (
-              <a
-                className="cat-icon-btn"
-                href={`https://instagram.com/${igHandle.replace('@', '')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Instagram"
-              >
-                📸
-              </a>
-            )}
-            {onClose && (
-              <button className="cat-icon-btn" onClick={onClose} title="Cerrar catálogo">
                 ✕
               </button>
             )}
           </div>
         </div>
-      </div>
-
-      {/* CATEGORY NAV */}
-      <div className="cat-category-nav">
-        <div className="cat-category-nav-inner" ref={navRef}>
-          <button className="cat-search-btn" onClick={() => setShowSearch(s => !s)} aria-label="Buscar">
-            🔍
-          </button>
-          {categories.map(cat => (
-            <button
-              key={cat}
-              className={`cat-category-tab ${activeCategory === cat ? 'active' : ''}`}
-              onClick={() => scrollToCategory(cat)}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* SEARCH */}
-      {showSearch && (
-        <div className="cat-search-bar">
-          <div className="cat-search-input-wrap">
-            <span className="cat-search-icon">🔍</span>
-            <input
-              className="cat-search-input"
-              placeholder="Buscar productos..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              autoFocus
-            />
-          </div>
-        </div>
       )}
 
-      {/* CLOSED BANNER */}
+      {/* CLOSED NOTICE */}
       {!businessOpen && (
         <div className="cat-closed-banner">
-          🌙 El local está cerrado ahora. Horarios: {settings.horarios}
+          🌙 En este momento estamos descansando. Horarios de cocina: {settings.horarios}
         </div>
       )}
 
-      {/* MAIN CATALOG */}
+      {/* 5. MAIN PRODUCT LISTING */}
       <div className="cat-main">
         {Object.keys(grouped).length === 0 ? (
           <div className="cat-empty">
@@ -697,7 +842,7 @@ export default function CatalogPage({ onClose }) {
               ref={el => { sectionRefs.current[cat] = el; }}
               id={`cat-section-${cat}`}
             >
-              <h2 className="cat-section-title">{cat}</h2>
+              <h2 className="cat-section-title">{cat.toUpperCase()}</h2>
               <div className="cat-product-grid">
                 {prods.map(p => (
                   <ProductCard
@@ -712,7 +857,24 @@ export default function CatalogPage({ onClose }) {
         )}
       </div>
 
-      {/* PRODUCT MODAL */}
+      {/* 6. FLOATING MOBILE CART BAR */}
+      {cart.totalItems > 0 && (
+        <div className="cat-floating-cart-bar">
+          <button 
+            type="button"
+            className="cat-floating-cart-btn"
+            onClick={() => setView('cart')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span className="cat-floating-cart-badge">{cart.totalItems}</span>
+              <span>Ver pedido</span>
+            </div>
+            <span>{formatPrice(cart.subtotal)}</span>
+          </button>
+        </div>
+      )}
+
+      {/* 7. PRODUCT DETAIL MODAL */}
       {selectedProduct && (
         <ProductModal
           product={selectedProduct}
@@ -721,13 +883,121 @@ export default function CatalogPage({ onClose }) {
         />
       )}
 
-      {/* CART FAB */}
-      {cart.totalItems > 0 && (
-        <button className="cat-cart-fab" onClick={() => setView('cart')}>
-          <span className="cat-cart-fab-qty">{cart.totalItems}</span>
-          Ver pedido
-          <span style={{ marginLeft: 'auto' }}>{formatPrice(cart.subtotal)}</span>
-        </button>
+      {/* 8. INFORMATION MODAL */}
+      {showInfoModal && (
+        <div className="cat-modal-overlay" onClick={() => setShowInfoModal(false)}>
+          <div className="cat-info-sheet" onClick={e => e.stopPropagation()}>
+            <div className="cat-info-sheet-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 8, overflow: 'hidden' }}>
+                  <RetroMascotLogo />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fff' }}>{settings.nombre_local || 'Tripp American Burger'}</h3>
+                  <span style={{ fontSize: '0.75rem', color: '#22c55e', fontWeight: 600 }}>● Abierto ahora</span>
+                </div>
+              </div>
+              <button 
+                type="button"
+                className="cat-sheet-close-btn"
+                onClick={() => setShowInfoModal(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="cat-info-sheet-body">
+              <div className="cat-info-item">
+                <Clock size={18} className="cat-info-item-icon" />
+                <div>
+                  <div className="cat-info-item-title">Horarios de Cocina</div>
+                  <div className="cat-info-item-desc">{settings.horarios}</div>
+                </div>
+              </div>
+
+              <div className="cat-info-item">
+                <MapPin size={18} className="cat-info-item-icon" />
+                <div>
+                  <div className="cat-info-item-title">Ubicación y Retiro</div>
+                  <div className="cat-info-item-desc">{settings.direccion}</div>
+                </div>
+              </div>
+
+              <div className="cat-info-item">
+                <ShoppingBag size={18} className="cat-info-item-icon" />
+                <div>
+                  <div className="cat-info-item-title">Modalidades de Pedido</div>
+                  <div className="cat-info-item-desc">Take Away (Retiro en local) y Delivery a domicilio.</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
+                {waPhone && (
+                  <a 
+                    href={`https://wa.me/${waPhone}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="cat-info-action-link whatsapp"
+                  >
+                    <MessageCircle size={18} />
+                    <span>Contactar por WhatsApp</span>
+                  </a>
+                )}
+                {igHandle && (
+                  <a 
+                    href={`https://instagram.com/${igHandle.replace('@', '')}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="cat-info-action-link instagram"
+                  >
+                    <span style={{ fontSize: '1.1rem' }}>📸</span>
+                    <span>Seguinos en Instagram (@{igHandle.replace('@', '')})</span>
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 9. CATEGORIES DRAWER */}
+      {showCategoriesDrawer && (
+        <div className="cat-modal-overlay" onClick={() => setShowCategoriesDrawer(false)}>
+          <div className="cat-drawer-sheet" onClick={e => e.stopPropagation()}>
+            <div className="cat-drawer-header">
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 900, textTransform: 'uppercase', color: '#fff' }}>Categorías</h3>
+              <button 
+                type="button"
+                className="cat-sheet-close-btn"
+                onClick={() => setShowCategoriesDrawer(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="cat-drawer-body">
+              {categories.map(cat => {
+                const count = products.filter(p => p.category === cat).length;
+                const isCurrent = activeCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    className={`cat-drawer-item ${isCurrent ? 'active' : ''}`}
+                    onClick={() => scrollToCategory(cat)}
+                  >
+                    <span style={{ fontWeight: 800, fontSize: '1rem', textTransform: 'uppercase' }}>
+                      {cat}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span className="cat-drawer-badge">{count}</span>
+                      <ChevronRight size={16} />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       )}
 
       <Toast message={toast} />
@@ -735,51 +1005,59 @@ export default function CatalogPage({ onClose }) {
   );
 }
 
-// ---- DEMO DATA (when no Supabase configured) ----
+// ---- DEMO DATA (Tripp American Burger Style) ----
 const DEMO_PRODUCTS = [
   {
-    id: 'demo-1', name: 'Doble Smash Clásica', category: 'Hamburguesas',
-    price: 12500, emoji: '🍔', description: 'Doble medallón smashado, cheddar americano, pepinillos, mostaza y ketchup.',
+    id: 'demo-c1', name: 'Combo Cheese', category: 'Combos',
+    price: 18000, emoji: '🍔', description: '2 Cheese Burger + Papas Fritas Grandes',
     modifiers: [
       { name: 'Extras', type: 'increment', items: [
-        { name: 'Extra Cheddar', price: 800 }, { name: 'Extra Bacon', price: 900 }, { name: 'Extra Medallón', price: 2400 }
-      ]},
-      { name: 'Elige tu salsa', type: 'select', maxSelect: 1, items: [
-        { name: 'Ketchup', price: 0 }, { name: 'Mostaza', price: 0 }, { name: 'BBQ', price: 0 }, { name: 'Ajo', price: 0 }
+        { name: 'Extra Cheddar', price: 1200 }, { name: 'Extra Bacon', price: 1500 }, { name: 'Extra Medallón', price: 2800 }
       ]}
-    ], image: '', originalPrice: null, discountBadge: null, freeShipping: false
+    ],
+    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80',
+    originalPrice: 21000, discountBadge: null, freeShipping: true
   },
   {
-    id: 'demo-2', name: 'Crispy Smash', category: 'Hamburguesas',
-    price: 13500, emoji: '🍗', description: 'Medallón crocante, cheddar x3, mayonesa de ajo, cebolla crispy y bacon.',
-    modifiers: [], image: '', originalPrice: null, discountBadge: null, freeShipping: false
+    id: 'demo-c2', name: 'Combo Bacon King', category: 'Combos',
+    price: 22000, emoji: '🥓', description: '2 Doble Bacon Burger + Papas con Cheddar y Bacon',
+    modifiers: [],
+    image: 'https://images.unsplash.com/photo-1586190848861-99aa4a171e90?w=600&auto=format&fit=crop&q=80',
+    originalPrice: 26000, discountBadge: '15% OFF', freeShipping: true
   },
   {
-    id: 'demo-3', name: 'Combo Cuadrilla', category: 'Combos',
-    price: 18500, emoji: '🍟', description: '4 Dobles Cheeseburgers + 2 Papas Grandes.',
-    modifiers: [], image: '', originalPrice: 22000, discountBadge: '15% OFF', freeShipping: true
+    id: 'demo-b1', name: 'Crispy Tripp', category: 'Burgers',
+    price: 13500, emoji: '🍔', description: 'Doble medallón smash, triple cheddar americano, cebolla crispy y salsa especial.',
+    modifiers: [],
+    image: 'https://images.unsplash.com/photo-1583032015879-6799008bcff0?w=600&auto=format&fit=crop&q=80',
+    originalPrice: null, discountBadge: null, freeShipping: false
   },
   {
-    id: 'demo-4', name: 'Combo 2x1 Miércoles', category: 'Combos',
-    price: 14000, emoji: '🎉', description: '2 Smash Clásicas + papas incluidas. Solo miércoles y jueves.',
-    modifiers: [], image: '', originalPrice: null, discountBadge: '2x1', freeShipping: false
+    id: 'demo-b2', name: 'Oklahoma Onion Smash', category: 'Burgers',
+    price: 12900, emoji: '🧅', description: 'Carne smashada ultrafina con cebollas caramelizadas en la plancha y cheddar fundido.',
+    modifiers: [],
+    image: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=600&auto=format&fit=crop&q=80',
+    originalPrice: null, discountBadge: null, freeShipping: false
   },
   {
-    id: 'demo-5', name: 'Papas con Cheddar', category: 'Papas',
-    price: 4500, emoji: '🍟', description: 'Porción generosa de papas fritas bañadas en cheddar líquido.',
-    modifiers: [], image: '', originalPrice: null, discountBadge: null, freeShipping: false
+    id: 'demo-b3', name: 'Triple Bacon Cheese', category: 'Burgers',
+    price: 16500, emoji: '🥓', description: 'Triple medallón de 110g smashado, cuádruple cheddar y fetas crocantes de panceta ahumada.',
+    modifiers: [],
+    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80',
+    originalPrice: null, discountBadge: null, freeShipping: false
   },
   {
-    id: 'demo-6', name: 'Aros de Cebolla', category: 'Papas',
-    price: 4000, emoji: '🧅', description: 'Aros de cebolla rebozados y fritos al momento.',
-    modifiers: [], image: '', originalPrice: null, discountBadge: null, freeShipping: false
+    id: 'demo-p1', name: 'Papas Fritas Especiales', category: 'Papas',
+    price: 6500, emoji: '🍟', description: 'Papas bastón crocantes con baño de queso cheddar fundido y lluvia de bacon.',
+    modifiers: [],
+    image: 'https://images.unsplash.com/photo-1576107232684-1279f3908594?w=600&auto=format&fit=crop&q=80',
+    originalPrice: null, discountBadge: null, freeShipping: false
   },
   {
-    id: 'demo-7', name: 'Coca Cola 500ml', category: 'Bebidas',
-    price: 2500, emoji: '🥤', description: '', modifiers: [], image: '', originalPrice: null, discountBadge: null, freeShipping: false
-  },
-  {
-    id: 'demo-8', name: 'Agua Mineral', category: 'Bebidas',
-    price: 1800, emoji: '💧', description: '', modifiers: [], image: '', originalPrice: null, discountBadge: null, freeShipping: false
-  },
+    id: 'demo-d1', name: 'Coca Cola 500ml', category: 'Bebidas',
+    price: 2500, emoji: '🥤', description: 'Línea Coca Cola fría 500ml',
+    modifiers: [],
+    image: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=600&auto=format&fit=crop&q=80',
+    originalPrice: null, discountBadge: null, freeShipping: false
+  }
 ];

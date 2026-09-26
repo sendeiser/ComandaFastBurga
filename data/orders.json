@@ -1,169 +1,366 @@
 [
   {
-    "id": "ord-1790304518976",
-    "orderNumber": 4,
-    "channel": "mesa",
-    "tableNumber": "3",
-    "customer": {
-      "name": "",
-      "notes": "",
-      "phone": "",
-      "address": ""
-    },
-    "items": [
-      {
-        "id": "item-1790304431851-0.6748647758363525",
-        "qty": 2,
-        "name": "CRIOLLA",
-        "unitPrice": 10000,
-        "notes": "",
-        "modifiers": []
-      }
-    ],
-    "subtotal": 20000,
-    "deliveryFee": 0,
-    "total": 20000,
-    "paymentMethod": "efectivo",
-    "status": "entregado",
-    "statusTimestamps": {
-      "readyAt": null,
-      "cookingAt": null,
-      "createdAt": "2026-09-25T02:48:38.976Z",
-      "deliveredAt": null
-    },
-    "createdAt": "2026-09-25T02:48:38.976+00:00",
-    "updatedAt": 1790304714927
-  },
-  {
-    "id": "ord-1790303797454",
-    "orderNumber": 3,
+    "id": "ord-1790382986697",
+    "orderNumber": 15,
     "channel": "whatsapp",
     "tableNumber": "",
     "customer": {
-      "name": "",
+      "name": "CANDE ARABEL",
       "notes": "",
       "phone": "",
-      "address": ""
+      "address": "Pje Sta Lucia, B° Municipal "
     },
     "items": [
       {
-        "id": "item-1790303787424-0.5876072198070066",
+        "id": "item-1790382863665-0.7572537122432019",
         "qty": 1,
-        "name": "4x4",
-        "unitPrice": 15000,
-        "notes": "",
-        "modifiers": []
-      }
-    ],
-    "subtotal": 15000,
-    "deliveryFee": 1000,
-    "total": 16000,
-    "paymentMethod": "efectivo",
-    "status": "entregado",
-    "statusTimestamps": {
-      "readyAt": null,
-      "cookingAt": null,
-      "createdAt": "2026-09-25T02:36:37.454Z",
-      "deliveredAt": null
-    },
-    "createdAt": "2026-09-25T02:36:37.454+00:00",
-    "updatedAt": 1790304375516
-  },
-  {
-    "id": "ord-1790303438306",
-    "orderNumber": 2,
-    "channel": "mesa",
-    "tableNumber": "2",
-    "customer": {
-      "name": "",
-      "notes": "",
-      "phone": "",
-      "address": ""
-    },
-    "items": [
-      {
-        "id": "item-1790303400051-0.8578795359434879",
-        "qty": 1,
-        "name": "CLASICA",
-        "unitPrice": 8000,
-        "notes": "",
-        "modifiers": []
-      },
-      {
-        "id": "item-1790303413573-0.4545107245631549",
-        "qty": 1,
-        "name": "Coca Cola 354ml",
-        "unitPrice": 3000,
+        "name": "GUACAMOLE",
+        "unitPrice": 11000,
         "notes": "",
         "modifiers": []
       }
     ],
     "subtotal": 11000,
-    "deliveryFee": 0,
-    "total": 11000,
-    "paymentMethod": "efectivo",
+    "deliveryFee": 2000,
+    "total": 13000,
+    "paymentMethod": "transferencia",
     "status": "entregado",
     "statusTimestamps": {
-      "readyAt": null,
-      "cookingAt": null,
-      "createdAt": "2026-09-25T02:30:38.307Z",
-      "deliveredAt": null
+      "readyAt": "2026-09-26T00:38:35.608Z",
+      "cookingAt": "2026-09-26T00:38:33.217Z",
+      "createdAt": "2026-09-26T00:36:26.699Z",
+      "deliveredAt": "2026-09-26T00:42:42.089Z"
     },
-    "createdAt": "2026-09-25T02:30:38.306+00:00",
-    "updatedAt": 1790304377716
+    "createdAt": "2026-09-26T00:36:26.697+00:00",
+    "updatedAt": 1790392259161
   },
   {
-    "id": "ord-1790302230924",
-    "orderNumber": 1,
+    "id": "ord-1790383093446",
+    "orderNumber": 16,
     "channel": "whatsapp",
     "tableNumber": "",
     "customer": {
-      "name": "",
+      "name": "VALENTINA",
+      "notes": "RETIRA",
+      "phone": "",
+      "address": ""
+    },
+    "items": [
+      {
+        "id": "item-1790383061616-0.25413582030075066",
+        "qty": 1,
+        "name": "CHEESE",
+        "unitPrice": 10000,
+        "notes": "",
+        "modifiers": []
+      }
+    ],
+    "subtotal": 10000,
+    "deliveryFee": 0,
+    "total": 10000,
+    "paymentMethod": "transferencia",
+    "status": "entregado",
+    "statusTimestamps": {
+      "readyAt": "2026-09-26T00:38:30.897Z",
+      "cookingAt": "2026-09-26T00:38:27.217Z",
+      "createdAt": "2026-09-26T00:38:13.447Z",
+      "deliveredAt": "2026-09-26T00:42:43.775Z"
+    },
+    "createdAt": "2026-09-26T00:38:13.446+00:00",
+    "updatedAt": 1790392259158
+  },
+  {
+    "id": "ord-1790383162111",
+    "orderNumber": 17,
+    "channel": "whatsapp",
+    "tableNumber": "",
+    "customer": {
+      "name": "LUCAS MERCADO",
       "notes": "",
       "phone": "",
       "address": ""
     },
     "items": [
       {
-        "id": "item-1790302166437-0.023882067327170353",
-        "qty": 1,
-        "name": "BIG BURGA",
-        "unitPrice": 10000,
-        "notes": "",
-        "modifiers": [
-          "sin lechuga",
-          "con queso tybo."
-        ]
-      },
-      {
-        "id": "item-1790302171923-0.24523551320795978",
-        "qty": 1,
-        "name": "Aros de Cebolla",
+        "id": "item-1790383141358-0.8232992389009927",
+        "qty": 2,
+        "name": "DOÑA BURGA",
         "unitPrice": 9000,
+        "notes": "",
+        "modifiers": []
+      }
+    ],
+    "subtotal": 18000,
+    "deliveryFee": 0,
+    "total": 18000,
+    "paymentMethod": "transferencia",
+    "status": "entregado",
+    "statusTimestamps": {
+      "readyAt": "2026-09-26T00:42:29.381Z",
+      "cookingAt": "2026-09-26T00:42:27.741Z",
+      "createdAt": "2026-09-26T00:39:22.111Z",
+      "deliveredAt": "2026-09-26T00:42:46.702Z"
+    },
+    "createdAt": "2026-09-26T00:39:22.111+00:00",
+    "updatedAt": 1790392259153
+  },
+  {
+    "id": "ord-1790383222726",
+    "orderNumber": 18,
+    "channel": "whatsapp",
+    "tableNumber": "",
+    "customer": {
+      "name": "OVIEDO",
+      "notes": "",
+      "phone": "",
+      "address": "Sta Rita, B° Municipal"
+    },
+    "items": [
+      {
+        "id": "item-1790383178790-0.12079703789958152",
+        "qty": 1,
+        "name": "Papas Cheddar & Bacon",
+        "unitPrice": 12000,
+        "notes": "",
+        "modifiers": []
+      }
+    ],
+    "subtotal": 12000,
+    "deliveryFee": 2000,
+    "total": 14000,
+    "paymentMethod": "efectivo",
+    "status": "entregado",
+    "statusTimestamps": {
+      "readyAt": "2026-09-26T00:42:20.196Z",
+      "cookingAt": "2026-09-26T00:42:18.093Z",
+      "createdAt": "2026-09-26T00:40:22.727Z",
+      "deliveredAt": "2026-09-26T00:42:48.390Z"
+    },
+    "createdAt": "2026-09-26T00:40:22.726+00:00",
+    "updatedAt": 1790392259150
+  },
+  {
+    "id": "ord-1790383316664",
+    "orderNumber": 19,
+    "channel": "whatsapp",
+    "tableNumber": "",
+    "customer": {
+      "name": "BRISA ARROYO ",
+      "notes": "",
+      "phone": "",
+      "address": "Entre Rios 512, B° Virgen del Rosario "
+    },
+    "items": [
+      {
+        "id": "item-1790383240210-0.22809262816854814",
+        "qty": 1,
+        "name": "COMPLETA",
+        "unitPrice": 11000,
         "notes": "",
         "modifiers": []
       },
       {
-        "id": "item-1790302176883-0.4300727486264281",
+        "id": "item-1790383245431-0.013620312752561148",
         "qty": 1,
-        "name": "Coca Cola 354ml",
-        "unitPrice": 3000,
+        "name": "GUACAMOLE",
+        "unitPrice": 11000,
         "notes": "",
         "modifiers": []
       }
     ],
     "subtotal": 22000,
-    "deliveryFee": 1000,
-    "total": 23000,
+    "deliveryFee": 2000,
+    "total": 24000,
+    "paymentMethod": "transferencia",
+    "status": "entregado",
+    "statusTimestamps": {
+      "readyAt": "2026-09-26T00:42:12.895Z",
+      "cookingAt": "2026-09-26T00:42:10.105Z",
+      "createdAt": "2026-09-26T00:41:56.664Z",
+      "deliveredAt": "2026-09-26T00:42:49.725Z"
+    },
+    "createdAt": "2026-09-26T00:41:56.664+00:00",
+    "updatedAt": 1790392259145
+  },
+  {
+    "id": "ord-1790383439060",
+    "orderNumber": 20,
+    "channel": "whatsapp",
+    "tableNumber": "",
+    "customer": {
+      "name": "FERNANDO RUIZ",
+      "notes": "",
+      "phone": "",
+      "address": ""
+    },
+    "items": [
+      {
+        "id": "item-1790383418642-0.32823970069048947",
+        "qty": 1,
+        "name": "DOÑA BURGA",
+        "unitPrice": 9000,
+        "notes": "",
+        "modifiers": []
+      }
+    ],
+    "subtotal": 9000,
+    "deliveryFee": 0,
+    "total": 9000,
     "paymentMethod": "efectivo",
     "status": "entregado",
     "statusTimestamps": {
-      "readyAt": null,
-      "cookingAt": null,
-      "createdAt": "2026-09-25T02:10:30.924Z",
+      "readyAt": "2026-09-26T00:44:30.333Z",
+      "cookingAt": "2026-09-26T00:44:20.156Z",
+      "createdAt": "2026-09-26T00:43:59.061Z",
+      "deliveredAt": "2026-09-26T00:48:00.326Z"
+    },
+    "createdAt": "2026-09-26T00:43:59.06+00:00",
+    "updatedAt": 1790392259142
+  },
+  {
+    "id": "ord-1790383544440",
+    "orderNumber": 21,
+    "channel": "whatsapp",
+    "tableNumber": "",
+    "customer": {
+      "name": "MILAGROS MORALES",
+      "notes": "",
+      "phone": "",
+      "address": ""
+    },
+    "items": [
+      {
+        "id": "item-1790383499692-0.10962202514988695",
+        "qty": 2,
+        "name": "Clasica",
+        "unitPrice": 7000,
+        "notes": "Retira 22 hs",
+        "modifiers": []
+      }
+    ],
+    "subtotal": 14000,
+    "deliveryFee": 0,
+    "total": 14000,
+    "paymentMethod": "transferencia",
+    "status": "listo",
+    "statusTimestamps": {
+      "readyAt": "2026-09-26T00:47:41.780Z",
+      "cookingAt": "2026-09-26T00:47:39.143Z",
+      "createdAt": "2026-09-26T00:45:44.441Z",
       "deliveredAt": null
     },
-    "createdAt": "2026-09-25T02:10:30.924+00:00",
-    "updatedAt": 1790302383584
+    "createdAt": "2026-09-26T00:45:44.44+00:00",
+    "updatedAt": 1790392259139
+  },
+  {
+    "id": "ord-1790383589378",
+    "orderNumber": 22,
+    "channel": "whatsapp",
+    "tableNumber": "",
+    "customer": {
+      "name": "EMILIANO FLORES",
+      "notes": "",
+      "phone": "",
+      "address": ""
+    },
+    "items": [
+      {
+        "id": "item-1790383562774-0.7220464410179182",
+        "qty": 1,
+        "name": "Clasica",
+        "unitPrice": 7000,
+        "notes": "",
+        "modifiers": []
+      }
+    ],
+    "subtotal": 7000,
+    "deliveryFee": 0,
+    "total": 7000,
+    "paymentMethod": "efectivo",
+    "status": "entregado",
+    "statusTimestamps": {
+      "readyAt": "2026-09-26T00:47:37.184Z",
+      "cookingAt": "2026-09-26T00:47:35.841Z",
+      "createdAt": "2026-09-26T00:46:29.379Z",
+      "deliveredAt": "2026-09-26T00:47:57.252Z"
+    },
+    "createdAt": "2026-09-26T00:46:29.378+00:00",
+    "updatedAt": 1790392259137
+  },
+  {
+    "id": "ord-1790383639108",
+    "orderNumber": 23,
+    "channel": "whatsapp",
+    "tableNumber": "",
+    "customer": {
+      "name": "MANOLO BARRERA",
+      "notes": "",
+      "phone": "",
+      "address": "B° AVP"
+    },
+    "items": [
+      {
+        "id": "item-1790383609094-0.7165982476013345",
+        "qty": 1,
+        "name": "GUACAMOLE",
+        "unitPrice": 11000,
+        "notes": "",
+        "modifiers": []
+      },
+      {
+        "id": "item-1790383611753-0.46460222274568164",
+        "qty": 1,
+        "name": "COMPLETA",
+        "unitPrice": 11000,
+        "notes": "",
+        "modifiers": []
+      }
+    ],
+    "subtotal": 22000,
+    "deliveryFee": 2000,
+    "total": 24000,
+    "paymentMethod": "efectivo",
+    "status": "entregado",
+    "statusTimestamps": {
+      "readyAt": "2026-09-26T00:47:33.559Z",
+      "cookingAt": "2026-09-26T00:47:32.258Z",
+      "createdAt": "2026-09-26T00:47:19.109Z",
+      "deliveredAt": "2026-09-26T00:47:56.041Z"
+    },
+    "createdAt": "2026-09-26T00:47:19.108+00:00",
+    "updatedAt": 1790392259133
+  },
+  {
+    "id": "CMD-24",
+    "orderNumber": 24,
+    "channel": "whatsapp",
+    "tableNumber": "",
+    "customer": {
+      "name": "Cande",
+      "phone": "71854920351925",
+      "address": "San Luis 335",
+      "remoteJid": "71854920351925@lid"
+    },
+    "items": [
+      {
+        "id": "prod-1790375950513",
+        "qty": 1,
+        "name": "Clasica",
+        "unitPrice": 7000,
+        "notes": "",
+        "modifiers": []
+      }
+    ],
+    "subtotal": 7000,
+    "deliveryFee": 2000,
+    "total": 9000,
+    "paymentMethod": "efectivo",
+    "status": "listo",
+    "statusTimestamps": {
+      "readyAt": "2026-09-26T00:52:32.390Z",
+      "cookingAt": "2026-09-26T00:52:29.033Z"
+    },
+    "createdAt": "2026-09-26T00:52:11.489+00:00",
+    "updatedAt": 1790392259123
   }
 ]

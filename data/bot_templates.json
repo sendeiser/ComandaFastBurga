@@ -2,11 +2,13 @@
   "enabled": true,
   "bank_cbu": "0000003100092138928374",
   "bank_name": "Mercado Pago / Banco Galicia",
+  "menu_mode": "catalog",
   "bank_alias": "burga.chamical.nx",
   "bank_holder": "ComandaFast Burgers S.R.L.",
   "opening_hours": "Miércoles a Domingos de 19:30 a 00:30 hs",
   "template_menu": "🍔 *¡Hola {cliente}! Bienvenido a {nombre_local}* 🔥\n\n¿En qué podemos ayudarte hoy? *Respondé con el número de opción:*\n\n1️⃣ 📋 *Consultar estado de mi pedido*\n2️⃣ 💳 *Ver datos de transferencia bancaria / Alias*\n3️⃣ 📍 *Horarios y ubicación de nuestro local*\n4️⃣ 🍔 *Ver menú completo de hamburguesas y combos*\n5️⃣ 👤 *Hablar con un encargado del local*\n\n_O escribí directamente *COMPRAR* o el número de la burger que quieras pedir._",
   "pickup_address": "Av. Belgrano 1234, Centro",
+  "bot_typing_mode": "human_dynamic",
   "ignored_numbers": [],
   "menu_response_1": "📋 *Estado de tu Pedido:* #{pedido_id}\n\n• *Estado:* {estado}\n• *Total:* ${total}\n• *Destino:* {direccion}\n\n_Para volver al menú, enviá la palabra *MENU*._",
   "menu_response_2": "💳 *Datos para Transferencia Bancaria:* 🏦\n\n• *Alias:* `{alias_banco}`\n• *Banco:* {banco}\n• *Titular:* {titular}\n• *CBU:* `{cbu}`\n\n📸 *Una vez realizada la transferencia, podés enviar la captura o foto del comprobante por este mismo chat para comenzar a cocinar.*\n\n_Enviá *MENU* para ver más opciones._",
@@ -46,7 +48,7 @@
     "triple"
   ],
   "template_welcome": "¡Hola! Bienvenido a Burga Chamical. ¿En qué podemos ayudarte hoy? (Test Live 1790139696388)",
-  "anti_loop_enabled": true,
+  "anti_loop_enabled": false,
   "store_website_url": "https://burgasystem.netlify.app",
   "anti_loop_farewell": [
     "chau",
@@ -85,6 +87,7 @@
     "tremendo",
     "super test"
   ],
+  "bot_typing_delay_ms": 3500,
   "template_empty_cart": "⚠️ Tu carrito está vacío. Escribí el *NÚMERO* del producto que querés agregar o escribí *MENU*.",
   "template_buy_catalog": "🍔 *¡Vamos a armar tu pedido!* 🔥\n\n{catalogo_lista}\n\n👉 *Respondé con el NÚMERO (1, 2, 3...) de la hamburguesa o combo que quieras pedir.*",
   "template_name_prompt": "👤 *¿A nombre de quién registramos el pedido?* (Escribí tu nombre y apellido):",
@@ -109,7 +112,7 @@
   "template_product_photo": "🍔 *{producto}* 🔥\n{detalle}\n💵 *Precio:* {precio}\n\n👉 Para pedir este producto escribí *COMPRAR* o su número.\n👉 Podés agregar aclaraciones como *Sin cebolla*, *Extra cheddar*, etc.",
   "template_address_prompt": "📍 *Por favor escribí tu dirección exacta y entrecalles para el repartidor:*",
   "template_payment_prompt": "💳 *¿Cómo preferís abonar tu pedido?*\n\nRespondé con el número:\n1️⃣ *Transferencia Bancaria* (Alias / CBU)\n2️⃣ *Efectivo contra entrega* (Al recibir o retirar)\n3️⃣ *Mercado Pago* (Link directo de pago)",
-  "human_mode_sleep_minutes": 25,
+  "human_mode_sleep_minutes": 3,
   "template_cart_item_added": "✅ *¡Agregaste {producto}!* 🍔 (+{subtotal_item})\n\n🛒 *Tu pedido actual:*\n{carrito_items}\n\n💵 *Subtotal:* ${subtotal}\n\n👉 ¿Querés sumar otra burger, papas o bebida? *(Escribí su número)*\n👉 Podés pedir aclaraciones *(Ej: sin cebolla, extra cheddar)*\n👉 O escribí *LISTO* para avanzar con la entrega y el pago.",
   "template_order_cancelled": "❌ *Pedido cancelado.* ¿En qué más podemos ayudarte?\n\n{menu}",
   "template_order_confirmed": "🎉 *¡PEDIDO #{pedido_id} CONFIRMADO Y ENVIADO A COCINA!* 🔥🍔\n\n¡Muchas gracias *{cliente}*, tu pedido ya ingresó al sistema de la plancha!\n\n📋 *Detalle:*\n{carrito_items}\n💵 *Total:* ${total}\n🛵 *Entrega:* {direccion}\n\n{instrucciones_pago}",
@@ -119,8 +122,5 @@
   "template_anti_loop_farewell": "¡Hasta la próxima! 👋 Gracias por contactarte con {nombre_local}. ¡Que tengas un excelente descanso! ✨🍔",
   "require_keywords_for_chatbot": false,
   "template_anti_loop_gratitude": "¡De nada! 🙌 Que lo disfrutes un montón. Si querés consultar la carta o volver a pedir, escribí *MENU* cuando gustes. ¡Buen provecho! 🍔🔥",
-  "template_anti_loop_acknowledge": "¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido.",
-  "bot_typing_delay_ms": 2500,
-  "bot_typing_mode": "human_dynamic",
-  "menu_mode": "catalog"
+  "template_anti_loop_acknowledge": "¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido."
 }
