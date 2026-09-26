@@ -425,8 +425,8 @@ export const DEFAULT_BOT_VARIABLES = [
     key: 'telefono_contacto',
     label: 'Teléfono / WhatsApp de Atención',
     category: 'business',
-    defaultValue: '+54 9 3826 40-1234',
-    value: '+54 9 3826 40-1234',
+    defaultValue: '+54 9 3826 43-0159',
+    value: '+54 9 3826 43-0159',
     description: 'Número de línea directa para consultas o derivación a humano',
     icon: 'Phone'
   },

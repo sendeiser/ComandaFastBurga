@@ -30,10 +30,10 @@
     "key": "telefono_contacto",
     "icon": "Phone",
     "label": "Teléfono / WhatsApp de Atención",
-    "value": "3826 430159",
+    "value": "+54 9 3826 43-0159",
     "category": "business",
     "description": "Número de línea directa para consultas o derivación a humano",
-    "defaultValue": "+54 9 3826 40-1234"
+    "defaultValue": "+54 9 3826 43-0159"
   },
   {
     "key": "catalogo_url",

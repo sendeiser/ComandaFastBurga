@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Search, Menu, Info, X, Clock, MapPin, 
   MessageCircle, ExternalLink, ChevronRight, Check,
-  ShoppingBag, ArrowLeft, Plus, Minus, Trash2
+  ShoppingBag, ArrowLeft, Plus, Minus, Trash2, Phone
 } from 'lucide-react';
 import { DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_ANON_KEY } from '../services/supabaseClient';
 import { storageService } from '../services/storageService';
@@ -284,15 +284,26 @@ const DEFAULT_SETTINGS = {
   nombre_local: "Burga's Chamical",
   direccion: 'Av. Perón 145 (frente al super x día)',
   horarios: 'Miércoles a Domingos de 19:30 a 00:30 hs',
-  telefono_whatsapp: '5493826451122',
-  telefono_contacto: '5493826451122',
+  telefono_whatsapp: '5493826430159',
+  telefono_contacto: '+54 9 3826 43-0159',
   costo_envio: 1500,
   envio_gratis_desde: 25000,
-  catalogo_instagram: 'burgas.chamical',
+  catalogo_instagram: 'burga_chamical',
   alias_banco: 'burga.chamical.nx',
   banco: 'Mercado Pago',
   titular: "Burga's Chamical"
 };
+
+function formatWhatsAppPhone(phone) {
+  if (!phone) return '5493826430159';
+  let clean = String(phone).replace(/\D/g, '');
+  if (!clean) return '5493826430159';
+  if (clean.startsWith('0')) clean = clean.substring(1);
+  if (clean.startsWith('549')) return clean;
+  if (clean.startsWith('54')) return '549' + clean.substring(2);
+  if (clean.startsWith('9')) return '54' + clean;
+  return '549' + clean;
+}
 
 // ---- DEFAULT PRODUCTS (Burga's Chamical) ----
 const DEMO_PRODUCTS = [
@@ -373,7 +384,20 @@ export default function CatalogPage({ onClose }) {
   const [settings, setSettings] = useState(() => {
     try {
       const local = storageService.getSettings();
-      return local && typeof local === 'object' ? { ...DEFAULT_SETTINGS, ...local } : DEFAULT_SETTINGS;
+      if (local && typeof local === 'object') {
+        const merged = { ...DEFAULT_SETTINGS, ...local };
+        if (merged.telefono_whatsapp === '5493826451122' || !merged.telefono_whatsapp) {
+          merged.telefono_whatsapp = DEFAULT_SETTINGS.telefono_whatsapp;
+        }
+        if (merged.telefono_contacto === '5493826451122' || merged.telefono_contacto === '+54 9 3826 40-1234' || !merged.telefono_contacto) {
+          merged.telefono_contacto = DEFAULT_SETTINGS.telefono_contacto;
+        }
+        if (merged.catalogo_instagram === 'burgas.chamical' || !merged.catalogo_instagram) {
+          merged.catalogo_instagram = DEFAULT_SETTINGS.catalogo_instagram;
+        }
+        return merged;
+      }
+      return DEFAULT_SETTINGS;
     } catch (_) {
       return DEFAULT_SETTINGS;
     }
@@ -610,8 +634,7 @@ export default function CatalogPage({ onClose }) {
       return;
     }
 
-    const waPhone = (settings.telefono_whatsapp || settings.telefono_contacto || '')
-      .replace(/\D/g, '');
+    const waPhone = formatWhatsAppPhone(settings.telefono_whatsapp || settings.telefono_contacto);
     const deliveryFee = serviceType === 'delivery' ? (Number(settings.costo_envio) || 1500) : 0;
 
     const message = generateWhatsAppMessage(
@@ -626,9 +649,7 @@ export default function CatalogPage({ onClose }) {
       paymentMethod
     );
 
-    const waUrl = waPhone
-      ? `https://wa.me/${waPhone}?text=${encodeURIComponent(message)}`
-      : `https://wa.me/?text=${encodeURIComponent(message)}`;
+    const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(message)}`;
 
     window.open(waUrl, '_blank');
     cart.clearCart();
@@ -643,8 +664,9 @@ export default function CatalogPage({ onClose }) {
   };
 
   const businessOpen = isOpen(settings.horarios);
-  const igHandle = settings.catalogo_instagram || '';
-  const waPhone = (settings.telefono_whatsapp || settings.telefono_contacto || '').replace(/\D/g, '');
+  const igHandle = settings.catalogo_instagram || 'burga_chamical';
+  const waPhone = formatWhatsAppPhone(settings.telefono_whatsapp || settings.telefono_contacto);
+  const displayPhone = settings.telefono_contacto || '+54 9 3826 43-0159';
   const brandBannerTitle = (settings.nombre_local || "BURGA'S CHAMICAL").toUpperCase();
 
   // ============================================================
@@ -1075,6 +1097,14 @@ export default function CatalogPage({ onClose }) {
               </div>
 
               <div className="cat-info-item">
+                <Phone size={18} className="cat-info-item-icon" />
+                <div>
+                  <div className="cat-info-item-title">WhatsApp de Contacto</div>
+                  <div className="cat-info-item-desc">{displayPhone}</div>
+                </div>
+              </div>
+
+              <div className="cat-info-item">
                 <ShoppingBag size={18} className="cat-info-item-icon" />
                 <div>
                   <div className="cat-info-item-title">Modalidades de Pedido</div>
@@ -1091,7 +1121,7 @@ export default function CatalogPage({ onClose }) {
                     className="cat-info-action-link whatsapp"
                   >
                     <MessageCircle size={18} />
-                    <span>Contactar por WhatsApp</span>
+                    <span>Contactar por WhatsApp ({displayPhone})</span>
                   </a>
                 )}
                 {igHandle && (
