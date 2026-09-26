@@ -17,6 +17,7 @@ import { storageService } from './services/storageService';
 import { audioService } from './services/audioService';
 import { printerService } from './services/printerService';
 import { supabaseSync } from './services/supabaseClient';
+import CatalogPage from './pages/CatalogPage';
 
 const isLocalEnv = () => {
   if (typeof window === 'undefined') return false;
@@ -42,6 +43,13 @@ export default function App() {
     return hash === '#admin' || hash === '#dueno' || hash === '#dueÃ±o' || hash === '#auditoria' || search.includes('portal=admin') || search.includes('portal=dueno');
   });
 
+  // Catalog route: accessible via #catalog or ?catalog=1
+  const [isCatalogRoute, setIsCatalogRoute] = useState(() => {
+    const hash = window.location.hash.toLowerCase();
+    const search = window.location.search.toLowerCase();
+    return hash === '#catalog' || hash === '#carta' || hash === '#menu' || search.includes('catalog=1');
+  });
+
   // Secret URL listener and secret keyboard shortcut (Ctrl + Shift + D)
   useEffect(() => {
     const handleHash = () => {
@@ -49,6 +57,8 @@ export default function App() {
       const search = window.location.search.toLowerCase();
       const isMatch = hash === '#admin' || hash === '#dueno' || hash === '#dueÃ±o' || hash === '#auditoria' || search.includes('portal=admin') || search.includes('portal=dueno');
       setIsOwnerPortalRoute(isMatch);
+      const isCatalog = hash === '#catalog' || hash === '#carta' || hash === '#menu' || search.includes('catalog=1');
+      setIsCatalogRoute(isCatalog);
     };
     handleHash();
     window.addEventListener('hashchange', handleHash);
@@ -853,6 +863,18 @@ export default function App() {
     window.dispatchEvent(new CustomEvent('comandafast:products_updated'));
     window.dispatchEvent(new CustomEvent('comandafast:system_refreshed'));
   };
+
+  // PUBLIC CATALOG PAGE — accessible via #catalog, #carta or #menu
+  if (isCatalogRoute) {
+    return (
+      <CatalogPage
+        onClose={() => {
+          window.location.hash = '';
+          setIsCatalogRoute(false);
+        }}
+      />
+    );
+  }
 
   if (!settings) return null;
 

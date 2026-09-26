@@ -381,6 +381,23 @@ export default function AdminWhatsAppBot({ initialTab }) {
     chatbotService.saveSettings(updated);
   };
 
+  const handleToggleMenuMode = async (mode) => {
+    const updated = { ...settings, menu_mode: mode };
+    setSettings(updated);
+    await chatbotService.saveSettings(updated);
+    if (BOT_SERVER_URL) {
+      try {
+        await fetch(`${BOT_SERVER_URL}/api/bot-templates`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ templates: updated })
+        });
+      } catch (_) {}
+    }
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 2500);
+  };
+
   const handleAddKeyword = () => {
     const kw = newKeyword.trim().toLowerCase();
     if (!kw) return;
@@ -940,10 +957,21 @@ call npm run dev
     },
     {
       id: 'templates',
-      label: 'Plantillas Mensajes',
+      label: 'Plantillas & Menú',
       icon: FileText,
       color: '#6366f1',
-      badge: null
+      badge: (
+        <span 
+          className="bot-tab-badge" 
+          style={{ 
+            background: (settings.menu_mode || 'catalog') === 'catalog' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(99, 102, 241, 0.2)', 
+            color: (settings.menu_mode || 'catalog') === 'catalog' ? '#10b981' : '#818cf8',
+            fontSize: '0.65rem'
+          }}
+        >
+          {(settings.menu_mode || 'catalog') === 'catalog' ? 'Catálogo' : 'Texto'}
+        </span>
+      )
     },
     {
       id: 'security',
@@ -1033,8 +1061,113 @@ call npm run dev
 
       {/* TAB CONTENT: TEMPLATES STUDIO */}
       {activeTab === 'templates' && (
-        <div 
-          className="bot-studio-grid"
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', flex: 1 }}>
+          {/* MODO DE OPERACIÓN: CATÁLOGO WEB ONLINE vs PLANTILLAS CLÁSICAS */}
+          <div style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1rem 1.25rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.75rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span>🍔</span>
+                  <span>Modo de Operación del Menú y Pedidos</span>
+                  <span style={{
+                    fontSize: '0.72rem',
+                    padding: '3px 10px',
+                    borderRadius: '12px',
+                    background: (settings.menu_mode || 'catalog') === 'catalog' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(99, 102, 241, 0.15)',
+                    color: (settings.menu_mode || 'catalog') === 'catalog' ? '#10b981' : '#818cf8',
+                    fontWeight: 700,
+                    border: (settings.menu_mode || 'catalog') === 'catalog' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(99, 102, 241, 0.3)'
+                  }}>
+                    {(settings.menu_mode || 'catalog') === 'catalog' ? '● Activo: Catálogo Web Online' : '● Activo: Menú de Plantillas de Texto'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                  Elegí cómo querés que el bot gestione las consultas de menú, carta y compras de los clientes:
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem' }}>
+              {/* Opción 1: Catálogo Web Online */}
+              <div 
+                onClick={() => handleToggleMenuMode('catalog')}
+                style={{
+                  padding: '0.9rem 1.1rem',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                  border: (settings.menu_mode || 'catalog') === 'catalog' 
+                    ? '2px solid #10b981' 
+                    : '1px solid var(--border-subtle)',
+                  background: (settings.menu_mode || 'catalog') === 'catalog'
+                    ? 'rgba(16, 185, 129, 0.08)'
+                    : 'var(--bg-main)',
+                  transition: 'all 0.2s ease',
+                  position: 'relative',
+                  boxShadow: (settings.menu_mode || 'catalog') === 'catalog' ? '0 0 16px rgba(16, 185, 129, 0.15)' : 'none'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: (settings.menu_mode || 'catalog') === 'catalog' ? '#10b981' : 'inherit', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>🍔</span> Catálogo Online Web
+                  </div>
+                  <span style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b', fontWeight: 700 }}>
+                    Recomendado
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '5px', lineHeight: 1.4 }}>
+                  El bot envía el enlace directo a la carta interactiva con fotos, modificadores y carrito (estilo ola.click / Tripp). Los pedidos enviados se inyectan automáticamente en la cocina y POS.
+                </div>
+                <div style={{ marginTop: '8px', fontSize: '0.74rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                  <ExternalLink size={13} />
+                  <span>Enlace público: /#catalog</span>
+                </div>
+              </div>
+
+              {/* Opción 2: Plantillas de Texto Clásicas */}
+              <div 
+                onClick={() => handleToggleMenuMode('templates')}
+                style={{
+                  padding: '0.9rem 1.1rem',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                  border: (settings.menu_mode || 'catalog') === 'templates' 
+                    ? '2px solid #6366f1' 
+                    : '1px solid var(--border-subtle)',
+                  background: (settings.menu_mode || 'catalog') === 'templates'
+                    ? 'rgba(99, 102, 241, 0.08)'
+                    : 'var(--bg-main)',
+                  transition: 'all 0.2s ease',
+                  boxShadow: (settings.menu_mode || 'catalog') === 'templates' ? '0 0 16px rgba(99, 102, 241, 0.15)' : 'none'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: (settings.menu_mode || 'catalog') === 'templates' ? '#818cf8' : 'inherit', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>📋</span> Menú de Plantillas de Texto
+                  </div>
+                  <span style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(99, 102, 241, 0.2)', color: '#818cf8', fontWeight: 700 }}>
+                    Clásico
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '5px', lineHeight: 1.4 }}>
+                  El bot atiende 100% en el chat de WhatsApp con menús numerados en texto (1, 2, 3...) y preguntas paso a paso para el pedido, dirección y pago.
+                </div>
+                <div style={{ marginTop: '8px', fontSize: '0.74rem', color: '#818cf8', fontWeight: 600 }}>
+                  <span>Flujo conversacional paso a paso por WhatsApp</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div 
+            className="bot-studio-grid"
           style={{
             background: 'var(--bg-card)',
             border: '1px solid var(--border-subtle)',
@@ -1203,6 +1336,7 @@ call npm run dev
               </div>
             </div>
           </div>
+        </div>
         </div>
       )}
 

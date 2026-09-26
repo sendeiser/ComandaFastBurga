@@ -121,5 +121,6 @@
   "template_anti_loop_gratitude": "¡De nada! 🙌 Que lo disfrutes un montón. Si querés consultar la carta o volver a pedir, escribí *MENU* cuando gustes. ¡Buen provecho! 🍔🔥",
   "template_anti_loop_acknowledge": "¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido.",
   "bot_typing_delay_ms": 2500,
-  "bot_typing_mode": "human_dynamic"
+  "bot_typing_mode": "human_dynamic",
+  "menu_mode": "catalog"
 }

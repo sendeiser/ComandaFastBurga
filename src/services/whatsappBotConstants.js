@@ -41,6 +41,7 @@ export const DEFAULT_TEMPLATES = {
   human_mode_sleep_minutes: 25,
   bot_typing_delay_ms: 2500,
   bot_typing_mode: 'human_dynamic', // 'human_dynamic' | 'fixed'
+  menu_mode: 'catalog', // 'catalog' (Catálogo Web Online con fotos y carrito) | 'templates' (Menú numerado de texto clásico)
   anti_loop_gratitude: DEFAULT_ANTI_LOOP_GRATITUDE,
   anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,
   anti_loop_acknowledge: DEFAULT_ANTI_LOOP_ACKNOWLEDGE,

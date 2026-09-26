@@ -222,7 +222,8 @@ export const chatbotService = {
           human_mode_sleep_minutes: Number(parsed.human_mode_sleep_minutes) || 25,
           anti_loop_gratitude: Array.isArray(parsed.anti_loop_gratitude) ? parsed.anti_loop_gratitude : DEFAULT_ANTI_LOOP_GRATITUDE,
           anti_loop_farewell: Array.isArray(parsed.anti_loop_farewell) ? parsed.anti_loop_farewell : DEFAULT_ANTI_LOOP_FAREWELL,
-          anti_loop_acknowledge: Array.isArray(parsed.anti_loop_acknowledge) ? parsed.anti_loop_acknowledge : DEFAULT_ANTI_LOOP_ACKNOWLEDGE
+          anti_loop_acknowledge: Array.isArray(parsed.anti_loop_acknowledge) ? parsed.anti_loop_acknowledge : DEFAULT_ANTI_LOOP_ACKNOWLEDGE,
+          menu_mode: parsed.menu_mode || 'catalog'
         };
       }
     } catch (e) {
@@ -246,6 +247,7 @@ export const chatbotService = {
       human_mode_sleep_minutes: 25,
       bot_typing_delay_ms: 2500,
       bot_typing_mode: 'human_dynamic',
+      menu_mode: 'catalog',
       anti_loop_gratitude: DEFAULT_ANTI_LOOP_GRATITUDE,
       anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,
       anti_loop_acknowledge: DEFAULT_ANTI_LOOP_ACKNOWLEDGE,
