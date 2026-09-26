@@ -63,6 +63,14 @@
   overflow: hidden;
 }
 
+.cat-header-banner-inner {
+  position: relative;
+  width: 100%;
+  max-width: 960px;
+  height: 100%;
+  margin: 0 auto;
+}
+
 /* Center Horizontal White Band with Retro Condensed Red Typography */
 .cat-banner-center-title {
   position: absolute;
@@ -245,10 +253,13 @@
   position: sticky;
   top: 0;
   z-index: 100;
-  background: var(--cat-bg);
-  border-bottom: 1px solid #1a1a1d;
+  background: rgba(10, 10, 12, 0.94);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   padding: 8px 16px;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  transition: all 0.2s ease;
 }
 
 .cat-sticky-nav-inner {

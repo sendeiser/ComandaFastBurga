@@ -9,11 +9,13 @@ import {
   MessageCircle, ExternalLink, ChevronRight, Check,
   ShoppingBag, ArrowLeft
 } from 'lucide-react';
+import { DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_ANON_KEY } from '../services/supabaseClient';
+import { storageService } from '../services/storageService';
 import ProductModal from '../components/catalog/ProductModal';
 import '../styles/catalog.css';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
 
 // ---- helpers ----
 function formatPrice(n) {
@@ -83,8 +85,13 @@ function Toast({ message }) {
   return message ? <div className="cat-toast">{message}</div> : null;
 }
 
-// ---- Vintage Cartoon Burger Mascot SVG (Tripp American Burger Style) ----
-function RetroMascotLogo() {
+// ---- Vintage Cartoon Burger Mascot SVG ----
+function RetroMascotLogo({ brandName = "BURGA'S" }) {
+  const cleanBrand = (brandName || "BURGA'S").trim();
+  const parts = cleanBrand.split(' ');
+  const topText = (parts[0] || "BURGA'S").toUpperCase();
+  const subText = (parts.slice(1).join(' ') || "CHAMICAL").toUpperCase();
+
   return (
     <svg viewBox="0 0 120 120" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
       <rect width="120" height="120" rx="16" fill="#FFFFFF"/>
@@ -94,9 +101,9 @@ function RetroMascotLogo() {
       <path d="M16 80L18 75L23 77L18 79L16 80Z" fill="#b91c1c"/>
       <path d="M100 78L102 73L107 75L102 77L100 78Z" fill="#b91c1c"/>
 
-      {/* Retro arch text TRIPP */}
-      <text x="60" y="24" textAnchor="middle" fill="#b91c1c" fontFamily="Impact, Arial Black, sans-serif" fontSize="19" fontWeight="900" letterSpacing="1">
-        TRIPP
+      {/* Retro arch text */}
+      <text x="60" y="24" textAnchor="middle" fill="#b91c1c" fontFamily="Impact, Arial Black, sans-serif" fontSize="16" fontWeight="900" letterSpacing="0.8">
+        {topText}
       </text>
 
       {/* Top Bun */}
@@ -129,12 +136,12 @@ function RetroMascotLogo() {
       <path d="M29 55 C21 50, 21 62, 29 63" stroke="#1C1917" strokeWidth="2.5" strokeLinecap="round" fill="#FFF"/>
       <path d="M91 55 C99 50, 99 62, 91 63" stroke="#1C1917" strokeWidth="2.5" strokeLinecap="round" fill="#FFF"/>
 
-      {/* Subtitle AMERICAN BURGER */}
-      <text x="60" y="86" textAnchor="middle" fill="#b91c1c" fontFamily="Arial, sans-serif" fontSize="7" fontWeight="900" letterSpacing="0.8">
-        AMERICAN BURGER
+      {/* Subtitle */}
+      <text x="60" y="86" textAnchor="middle" fill="#b91c1c" fontFamily="Arial, sans-serif" fontSize="6.5" fontWeight="900" letterSpacing="0.8">
+        {subText}
       </text>
-      <text x="60" y="93" textAnchor="middle" fill="#71717a" fontFamily="Arial, sans-serif" fontSize="4.8" fontWeight="700" letterSpacing="0.3">
-        Hamburguesas estilo Americanas
+      <text x="60" y="93" textAnchor="middle" fill="#71717a" fontFamily="Arial, sans-serif" fontSize="4.5" fontWeight="700" letterSpacing="0.3">
+        Hamburguesas a la plancha
       </text>
 
       {/* Micro zigzag decorative banner */}
@@ -264,18 +271,72 @@ function CartItemRow({ item, onUpdateQty, onRemove }) {
 
 // ---- BUSINESS SETTINGS ----
 const DEFAULT_SETTINGS = {
-  nombre_local: 'Tripp American Burger',
-  direccion: 'Gral. Juan M. de Pueyrredón 126, M5600 San Rafael',
-  horarios: 'Martes a Domingos de 19:30 a 00:30 hs',
+  nombre_local: "Burga's Chamical",
+  direccion: 'Av. Perón 145 (frente al super x día)',
+  horarios: 'Miércoles a Domingos de 19:30 a 00:30 hs',
   telefono_whatsapp: '5493826451122',
   telefono_contacto: '5493826451122',
   costo_envio: 1500,
   envio_gratis_desde: 25000,
-  catalogo_instagram: 'trippamericanburger',
-  alias_banco: 'tripp.burger.mp',
+  catalogo_instagram: 'burgas.chamical',
+  alias_banco: 'burga.chamical.nx',
   banco: 'Mercado Pago',
-  titular: 'Tripp American Burger'
+  titular: "Burga's Chamical"
 };
+
+// ---- DEFAULT PRODUCTS (Burga's Chamical) ----
+const DEMO_PRODUCTS = [
+  {
+    id: 'prod-1790375950513', name: 'Clasica', category: 'Promos',
+    price: 7000, emoji: '🍔', description: 'Medallón simple, cheddar, lechuga, tomate, cebolla y aderezos',
+    modifiers: [
+      { name: 'Opciones', type: 'select', items: [
+        { name: 'Sin cebolla', price: 0 }, { name: 'Sin tomate', price: 0 }, { name: 'Sin lechuga', price: 0 }
+      ]}
+    ],
+    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80',
+    originalPrice: 8500, discountBadge: null, freeShipping: true
+  },
+  {
+    id: 'prod-1790376094216', name: 'DOÑA BURGA', category: 'Promos',
+    price: 9000, emoji: '🏷️', description: 'Doble medallón, cheddar, cebolla caramelizada, bacon, mayonesa, ketchup y lactonesa.',
+    modifiers: [
+      { name: 'Extras', type: 'increment', items: [
+        { name: 'Medallón extra', price: 4000 }, { name: 'Extra Bacon', price: 1500 }
+      ]}
+    ],
+    image: 'https://images.unsplash.com/photo-1586190848861-99aa4a171e90?w=600&auto=format&fit=crop&q=80',
+    originalPrice: 11000, discountBadge: 'PROMO', freeShipping: true
+  },
+  {
+    id: 'prod-1789951532547', name: '4x4', category: 'Hamburguesas',
+    price: 15000, emoji: '🍔', description: '4 medallones, cheddar, lechuga, tomate y salsa big.',
+    modifiers: [],
+    image: 'https://images.unsplash.com/photo-1583032015879-6799008bcff0?w=600&auto=format&fit=crop&q=80',
+    originalPrice: null, discountBadge: null, freeShipping: false
+  },
+  {
+    id: 'prod-1789951532548', name: 'BAJONERA', category: 'Hamburguesas',
+    price: 11500, emoji: '🍔', description: 'Triple medallón, cuádruple cheddar americano, panceta crocante y barbacoa.',
+    modifiers: [],
+    image: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=600&auto=format&fit=crop&q=80',
+    originalPrice: null, discountBadge: null, freeShipping: false
+  },
+  {
+    id: 'prod-papas-1', name: 'Papas con Cheddar y Bacon', category: 'Agregados',
+    price: 6500, emoji: '🍟', description: 'Papas bastón crocantes con lluvia de panceta y cheddar fundido.',
+    modifiers: [],
+    image: 'https://images.unsplash.com/photo-1576107232684-1279f3908594?w=600&auto=format&fit=crop&q=80',
+    originalPrice: null, discountBadge: null, freeShipping: false
+  },
+  {
+    id: 'prod-beb-1', name: 'Coca Cola 500ml', category: 'Bebidas',
+    price: 2500, emoji: '🥤', description: 'Línea Coca Cola fría 500ml',
+    modifiers: [],
+    image: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=600&auto=format&fit=crop&q=80',
+    originalPrice: null, discountBadge: null, freeShipping: false
+  }
+];
 
 // Check if open now based on schedule string
 function isOpen(horariosStr) {
@@ -287,8 +348,26 @@ function isOpen(horariosStr) {
 // MAIN COMPONENT
 // ============================================================
 export default function CatalogPage({ onClose }) {
-  const [products, setProducts] = useState([]);
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [products, setProducts] = useState(() => {
+    try {
+      const local = storageService.getProducts();
+      if (Array.isArray(local) && local.length > 0) {
+        const active = local.filter(p => p.is_active !== false);
+        if (active.length > 0) return active;
+      }
+      return DEMO_PRODUCTS;
+    } catch (_) {
+      return DEMO_PRODUCTS;
+    }
+  });
+  const [settings, setSettings] = useState(() => {
+    try {
+      const local = storageService.getSettings();
+      return local && typeof local === 'object' ? { ...DEFAULT_SETTINGS, ...local } : DEFAULT_SETTINGS;
+    } catch (_) {
+      return DEFAULT_SETTINGS;
+    }
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -318,10 +397,8 @@ export default function CatalogPage({ onClose }) {
   // ---- Load products and settings from Supabase ----
   useEffect(() => {
     async function fetchData() {
-      setLoading(true);
       try {
         if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-          setProducts(DEMO_PRODUCTS);
           setLoading(false);
           return;
         }
@@ -361,9 +438,9 @@ export default function CatalogPage({ onClose }) {
               modifiers: Array.isArray(p.modifiers) ? p.modifiers : [],
               image: p.image || imagesMap[p.id] || '',
             }));
-          setProducts(prods.length > 0 ? prods : DEMO_PRODUCTS);
-        } else {
-          setProducts(DEMO_PRODUCTS);
+          if (prods.length > 0) {
+            setProducts(prods);
+          }
         }
 
         if (settingsRes.ok) {
@@ -375,8 +452,7 @@ export default function CatalogPage({ onClose }) {
           }
         }
       } catch (err) {
-        console.warn('[CatalogPage] Error cargando datos:', err.message);
-        setProducts(DEMO_PRODUCTS);
+        console.warn('[CatalogPage] Error cargando datos de Supabase:', err.message);
       } finally {
         setLoading(false);
       }
@@ -535,7 +611,7 @@ export default function CatalogPage({ onClose }) {
   const businessOpen = isOpen(settings.horarios);
   const igHandle = settings.catalogo_instagram || '';
   const waPhone = (settings.telefono_whatsapp || settings.telefono_contacto || '').replace(/\D/g, '');
-  const brandBannerTitle = (settings.nombre_local || 'TRIPP AMERICAN BURGER').toUpperCase();
+  const brandBannerTitle = (settings.nombre_local || "BURGA'S CHAMICAL").toUpperCase();
 
   // ============================================================
   // RENDER VIEWS
@@ -701,28 +777,30 @@ export default function CatalogPage({ onClose }) {
     <div className="catalog-app">
       {/* 1. RETRO CHECKERBOARD BANNER */}
       <div className="cat-header-banner">
-        {/* Top-left: White Pill Status Badge */}
-        <div className="cat-banner-status-badge">
-          <span className={`cat-status-dot-circle ${businessOpen ? 'open' : 'closed'}`} />
-          <span>{businessOpen ? 'Abierto' : 'Cerrado'}</span>
-        </div>
+        <div className="cat-header-banner-inner">
+          {/* Top-left: White Pill Status Badge */}
+          <div className="cat-banner-status-badge">
+            <span className={`cat-status-dot-circle ${businessOpen ? 'open' : 'closed'}`} />
+            <span>{businessOpen ? 'Abierto' : 'Cerrado'}</span>
+          </div>
 
-        {/* Center: Retro Brand Typography */}
-        <div className="cat-banner-center-title">
-          {brandBannerTitle}
-        </div>
+          {/* Center: Retro Brand Typography */}
+          <div className="cat-banner-center-title">
+            {brandBannerTitle}
+          </div>
 
-        {/* Top-right: Optional Close button */}
-        {onClose && (
-          <button 
-            type="button" 
-            className="cat-banner-close-btn" 
-            onClick={onClose} 
-            title="Cerrar catálogo"
-          >
-            <X size={18} />
-          </button>
-        )}
+          {/* Top-right: Optional Close button */}
+          {onClose && (
+            <button 
+              type="button" 
+              className="cat-banner-close-btn" 
+              onClick={onClose} 
+              title="Cerrar catálogo"
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 2. CENTERED AVATAR LOGO (Overlapping the banner) */}
@@ -735,18 +813,18 @@ export default function CatalogPage({ onClose }) {
             onError={() => setLogoError(true)}
           />
         ) : (
-          <RetroMascotLogo />
+          <RetroMascotLogo brandName={settings.nombre_local || "BURGA'S CHAMICAL"} />
         )}
       </div>
 
       {/* 3. STORE HEADER INFO */}
       <div className="cat-store-info-section">
         <h1 className="cat-store-title">
-          {settings.nombre_local || 'Tripp American Burger'}
+          {settings.nombre_local || "Burga's Chamical"}
         </h1>
         <div className="cat-store-location">
           <MapPin size={15} style={{ flexShrink: 0 }} />
-          <span>{settings.direccion || 'Gral. Juan M. de Pueyrredón 126, M5600 San Rafael'}</span>
+          <span>{settings.direccion || 'Av. Perón 145 (frente al super x día)'}</span>
         </div>
         <button 
           type="button"
@@ -890,10 +968,10 @@ export default function CatalogPage({ onClose }) {
             <div className="cat-info-sheet-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 36, height: 36, borderRadius: 8, overflow: 'hidden' }}>
-                  <RetroMascotLogo />
+                  <RetroMascotLogo brandName={settings.nombre_local || "BURGA'S CHAMICAL"} />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fff' }}>{settings.nombre_local || 'Tripp American Burger'}</h3>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fff' }}>{settings.nombre_local || "Burga's Chamical"}</h3>
                   <span style={{ fontSize: '0.75rem', color: '#22c55e', fontWeight: 600 }}>● Abierto ahora</span>
                 </div>
               </div>
@@ -1005,59 +1083,4 @@ export default function CatalogPage({ onClose }) {
   );
 }
 
-// ---- DEMO DATA (Tripp American Burger Style) ----
-const DEMO_PRODUCTS = [
-  {
-    id: 'demo-c1', name: 'Combo Cheese', category: 'Combos',
-    price: 18000, emoji: '🍔', description: '2 Cheese Burger + Papas Fritas Grandes',
-    modifiers: [
-      { name: 'Extras', type: 'increment', items: [
-        { name: 'Extra Cheddar', price: 1200 }, { name: 'Extra Bacon', price: 1500 }, { name: 'Extra Medallón', price: 2800 }
-      ]}
-    ],
-    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80',
-    originalPrice: 21000, discountBadge: null, freeShipping: true
-  },
-  {
-    id: 'demo-c2', name: 'Combo Bacon King', category: 'Combos',
-    price: 22000, emoji: '🥓', description: '2 Doble Bacon Burger + Papas con Cheddar y Bacon',
-    modifiers: [],
-    image: 'https://images.unsplash.com/photo-1586190848861-99aa4a171e90?w=600&auto=format&fit=crop&q=80',
-    originalPrice: 26000, discountBadge: '15% OFF', freeShipping: true
-  },
-  {
-    id: 'demo-b1', name: 'Crispy Tripp', category: 'Burgers',
-    price: 13500, emoji: '🍔', description: 'Doble medallón smash, triple cheddar americano, cebolla crispy y salsa especial.',
-    modifiers: [],
-    image: 'https://images.unsplash.com/photo-1583032015879-6799008bcff0?w=600&auto=format&fit=crop&q=80',
-    originalPrice: null, discountBadge: null, freeShipping: false
-  },
-  {
-    id: 'demo-b2', name: 'Oklahoma Onion Smash', category: 'Burgers',
-    price: 12900, emoji: '🧅', description: 'Carne smashada ultrafina con cebollas caramelizadas en la plancha y cheddar fundido.',
-    modifiers: [],
-    image: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=600&auto=format&fit=crop&q=80',
-    originalPrice: null, discountBadge: null, freeShipping: false
-  },
-  {
-    id: 'demo-b3', name: 'Triple Bacon Cheese', category: 'Burgers',
-    price: 16500, emoji: '🥓', description: 'Triple medallón de 110g smashado, cuádruple cheddar y fetas crocantes de panceta ahumada.',
-    modifiers: [],
-    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80',
-    originalPrice: null, discountBadge: null, freeShipping: false
-  },
-  {
-    id: 'demo-p1', name: 'Papas Fritas Especiales', category: 'Papas',
-    price: 6500, emoji: '🍟', description: 'Papas bastón crocantes con baño de queso cheddar fundido y lluvia de bacon.',
-    modifiers: [],
-    image: 'https://images.unsplash.com/photo-1576107232684-1279f3908594?w=600&auto=format&fit=crop&q=80',
-    originalPrice: null, discountBadge: null, freeShipping: false
-  },
-  {
-    id: 'demo-d1', name: 'Coca Cola 500ml', category: 'Bebidas',
-    price: 2500, emoji: '🥤', description: 'Línea Coca Cola fría 500ml',
-    modifiers: [],
-    image: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=600&auto=format&fit=crop&q=80',
-    originalPrice: null, discountBadge: null, freeShipping: false
-  }
-];
+

@@ -768,6 +768,12 @@ export const chatbotService = {
     // 11. INICIAR COMPRA / MENÚ (OPCIÓN 4 O 'COMPRAR')
     // -------------------------------------------------------------
     if (lower === 'comprar' || lower === 'pedir' || lower === 'quiero pedir' || ((lower === '4' || lower.includes('catalogo') || lower.includes('menu')) && newState.step === 'IDLE')) {
+      const mode = settings.menu_mode || 'catalog';
+      if (mode === 'catalog') {
+        const catalogUrl = (settings.store_website_url || window.location.origin).replace(/\/$/, '');
+        reply = `🍔 *¡Mirá nuestra carta completa con fotos reales y precios!* 📸\n\n👉 ${catalogUrl}/#catalog\n\nElegí tus burgers con fotos reales, armá tu carrito y envialo directamente por acá en un click. ¡Te esperamos! 🔥`;
+        return { reply, newState };
+      }
       newState.step = 'SELECTING_PRODUCTS';
       newState.items = [];
       newState.subtotal = 0;

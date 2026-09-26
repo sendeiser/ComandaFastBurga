@@ -832,6 +832,20 @@ function buildCatalogMessage(prods, page = 1, pageSize = 8, isAll = false) {
 /**
  * Parsea pedidos entrantes generados automáticamente desde el Catálogo Online Web (#catalog)
  */
+function parseCatalogCurrency(str) {
+  if (!str) return 0;
+  let clean = str.trim().replace(/[^\d.,]/g, '');
+  if (clean.includes(',')) {
+    // Formato argentino: punto de miles, coma de decimales (ej: 8.500,00)
+    clean = clean.replace(/\./g, '').replace(',', '.');
+    return Math.round(parseFloat(clean)) || 0;
+  }
+  if (/^\d{1,3}(\.\d{3})+$/.test(clean)) {
+    return parseInt(clean.replace(/\./g, ''), 10) || 0;
+  }
+  return Math.round(parseFloat(clean)) || 0;
+}
+
 function parseCatalogOrder(text) {
   if (!text || typeof text !== 'string') return null;
   const isCatalogOrder = (text.includes("Mi Pedido") || text.includes("Mi pedido") || text.includes("MI PEDIDO")) && 
@@ -845,16 +859,16 @@ function parseCatalogOrder(text) {
     items.push({
       qty: parseInt(match[1], 10) || 1,
       name: match[2].trim(),
-      price: parseInt(match[3].replace(/\D/g, ""), 10) || 0
+      price: parseCatalogCurrency(match[3])
     });
   }
 
-  const subMatch = text.match(/Subtotal[^\d\n]*([\d\.,]+)/i);
-  const subtotal = subMatch ? parseInt(subMatch[1].replace(/\D/g, ""), 10) : 0;
-  const delMatch = text.match(/Delivery[^\d\n]*([\d\.,]+)/i);
-  const deliveryFee = delMatch ? parseInt(delMatch[1].replace(/\D/g, ""), 10) : 0;
-  const totMatch = text.match(/\bTOTAL[^\d\n]*([\d\.,]+)/i);
-  const total = totMatch ? parseInt(totMatch[1].replace(/\D/g, ""), 10) : (subtotal + deliveryFee);
+  const subMatch = text.match(/Subtotal[^\d\n]*([$\d\.,]+)/i);
+  const subtotal = subMatch ? parseCatalogCurrency(subMatch[1]) : 0;
+  const delMatch = text.match(/Delivery[^\d\n]*([$\d\.,]+)/i);
+  const deliveryFee = delMatch ? parseCatalogCurrency(delMatch[1]) : 0;
+  const totMatch = text.match(/\bTOTAL[^\d\n]*([$\d\.,]+)/i);
+  const total = totMatch ? parseCatalogCurrency(totMatch[1]) : (subtotal + deliveryFee);
 
   const nameMatch = text.match(/Nombre:\*?\s*([^\n]+)/i);
   const addrMatch = text.match(/Direcci[oó]n:\*?\s*([^\n]+)/i);
@@ -997,29 +1011,33 @@ function buildMainMenuMessage(customerName = '') {
   const biz = getBusinessContext();
   const storeName = biz.nombre_local || "Burga's Chamical";
   const clientName = customerName ? customerName.trim() : 'amigo/a';
+  const menuMode = tpls.menu_mode || 'catalog';
+  const catalogUrl = (biz.catalogo_url || biz.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
 
+  if (menuMode === 'catalog') {
+    return `🍔 *¡Hola ${clientName}! Bienvenido a ${storeName}* 🔥\n\n` +
+      `📱 *Para hacer tu pedido, ingresá a nuestra Carta Digital interactiva con fotos:*\n` +
+      `👉 ${catalogUrl}/#catalog\n\n` +
+      `¿En qué podemos ayudarte hoy? *Respondé con el número de opción:*\n\n` +
+      `1️⃣ 📋 *Consultar estado de mi pedido*\n` +
+      `2️⃣ 💳 *Ver datos de transferencia bancaria / Alias*\n` +
+      `3️⃣ 📍 *Horarios y ubicación de nuestro local*\n` +
+      `4️⃣ 📱 *Ver Carta Digital con Fotos y Precios*\n` +
+      `5️⃣ 👤 *Hablar con un encargado del local*\n\n` +
+      `_Para pedir ingresá al link de arriba o escribí *4*._`;
+  }
+
+  // MODO PLANTILLAS CLÁSICO
   let rawMenu = tpls.template_menu || DEFAULT_SERVER_TEMPLATES.template_menu;
-
-  // Si la plantilla guardada está vacía, recortada o no contiene opciones numéricas básicas, asegurar la estructura completa con opción 0 y 5
-  if (!rawMenu || !rawMenu.includes('1️⃣') || !rawMenu.includes('5️⃣') || !rawMenu.includes('0️⃣')) {
+  if (!rawMenu || !rawMenu.includes('1️⃣') || !rawMenu.includes('5️⃣')) {
     rawMenu = DEFAULT_SERVER_TEMPLATES.template_menu;
   }
 
-  let formatted = interpolateTemplate(rawMenu, {
+  return interpolateTemplate(rawMenu, {
     cliente: clientName,
     nombre_local: storeName,
     ...biz
   });
-
-  const menuMode = tpls.menu_mode || 'catalog';
-  if (menuMode === 'catalog') {
-    const catalogUrl = (biz.catalogo_url || biz.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
-    if (!formatted.includes('/#catalog')) {
-      formatted += `\n\n📱 *Carta digital con fotos:* ${catalogUrl}/#catalog`;
-    }
-  }
-
-  return formatted;
 }
 
 if (!fs.existsSync(DATA_DIR)) {
@@ -2015,6 +2033,40 @@ class WhatsAppBotServer {
               continue;
             }
 
+            // Si proviene de un pedido del catálogo online ya creado (session.activeOrderId):
+            if (session.activeOrderId) {
+              const orderId = session.activeOrderId;
+              const allOrders = getStoredOrders();
+              const existingIdx = allOrders.findIndex(o => o.orderNumber === orderId || o.id === `CMD-${orderId}`);
+              const biz = getBusinessContext();
+              if (existingIdx !== -1) {
+                allOrders[existingIdx].paymentMethod = session.paymentMethod;
+                allOrders[existingIdx].paymentStatus = session.paymentMethod === 'transferencia' ? 'pendiente_comprobante' : 'pendiente_efectivo';
+                saveStoredOrder(allOrders[existingIdx]);
+                pushOrderToSupabase(allOrders[existingIdx]).catch(() => {});
+              }
+
+              let confirmMsg = '';
+              if (session.paymentMethod === 'transferencia') {
+                confirmMsg = `🎉 *¡FORMA DE PAGO REGISTRADA PARA PEDIDO #${orderId}!* 🏦\n\n` +
+                  `💵 *Total a transferir:* ${Number(session.total).toLocaleString('es-AR')}\n\n` +
+                  `💳 *Datos para la Transferencia:*\n` +
+                  `• *Alias:* \`${biz.alias_banco}\`\n` +
+                  `• *Banco:* ${biz.banco}\n` +
+                  `• *Titular:* ${biz.titular}${biz.cbu ? `\n• *CBU:* \`${biz.cbu}\`` : ''}\n\n` +
+                  `📸 *Por favor enviá la captura o comprobante por este chat para mandarlo a la plancha.* ¡Muchas gracias! 🔥🍔`;
+              } else {
+                confirmMsg = `🎉 *¡PEDIDO #${orderId} CONFIRMADO Y ENVIADO A LA COCINA!* 🔥🍔\n\n` +
+                  `¡Muchas gracias *${session.customerName || 'amigo/a'}*!\n` +
+                  `💵 *Total en Efectivo:* ${Number(session.total).toLocaleString('es-AR')}\n` +
+                  `🛵 Abonás al recibir o retirar tu comida. ¡Nuestros cocineros ya están marchando tus burgers! 🍔✨`;
+              }
+
+              resetCustomerSession(remoteJid);
+              await this.safeSendMessage(remoteJid, { text: confirmMsg }, msg.key);
+              continue;
+            }
+
             session.step = 'CONFIRMING';
             const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
             const hasFreeShippingItem = (session.items || []).some(it => it.freeShipping);
@@ -2099,6 +2151,17 @@ class WhatsAppBotServer {
 
           // ESTADO: SELECTING (Seleccionando productos o modificadores)
           if (session.step === 'SELECTING') {
+            const tplsSel = getBotTemplates();
+            const menuModeSel = tplsSel.menu_mode || 'catalog';
+            if (menuModeSel === 'catalog') {
+              // En modo catálogo online, se desactiva el armado de pedido por plantillas de texto
+              resetCustomerSession(remoteJid);
+              const biz = getBusinessContext();
+              const catalogUrl = (biz.catalogo_url || biz.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
+              const reply = `🍔 *¡Para realizar tu pedido usá obligatoriamente nuestra Carta Digital con fotos!* 📸\n\n👉 ${catalogUrl}/#catalog\n\nAllí podés ver fotos reales de cada producto, elegir tus adicionales favoritos y enviar tu pedido directo por acá en un click.`;
+              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
+              continue;
+            }
             if (lower === 'listo' || lower === 'pedir' || lower === 'comprar' || lower === 'terminar' || lower === 'seguir' || lower === 'avanzar' || lower === 'pagar') {
               if (session.items.length === 0) {
                 await this.safeSendMessage(remoteJid, {
@@ -2272,9 +2335,18 @@ class WhatsAppBotServer {
           if (session.step === 'IDLE') {
             // OPCIÓN 0: VER PROMOCIONES DEL DÍA
             if (lower === '0' || lower === 'promo' || lower === 'promos' || lower === 'ofertas' || lower === 'combos') {
-              session.step = 'SELECTING';
-              const promoReply = buildPromosMessage(prods);
-              await this.safeSendMessage(remoteJid, { text: promoReply }, msg.key);
+              const tpls0 = getBotTemplates();
+              const menuMode0 = tpls0.menu_mode || 'catalog';
+              if (menuMode0 === 'catalog') {
+                const biz0 = getBusinessContext();
+                const catalogUrl0 = (biz0.catalogo_url || biz0.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
+                const promoReply = `🏷️ *¡Mirá todas las promociones y combos del día con fotos y precios especiales!* 🍔🔥\n\n📱 Entrá a nuestra carta digital:\n👉 ${catalogUrl0}/#catalog\n\nElegí tu promo favorita con fotos reales y enviala en un toque. ¡Te esperamos! ✨`;
+                await this.safeSendMessage(remoteJid, { text: promoReply }, msg.key);
+              } else {
+                session.step = 'SELECTING';
+                const promoReply = buildPromosMessage(prods);
+                await this.safeSendMessage(remoteJid, { text: promoReply }, msg.key);
+              }
               continue;
             }
 
@@ -2348,9 +2420,9 @@ class WhatsAppBotServer {
               const biz4 = getBusinessContext();
               const menuMode = tpls4.menu_mode || 'catalog';
               if (menuMode === 'catalog') {
-                // MODO CATÁLOGO ONLINE: envía link al catálogo web con fotos
+                // MODO CATÁLOGO ONLINE: envía link al catálogo web con fotos obligatoriamente
                 const catalogUrl = (biz4.catalogo_url || biz4.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
-                const catalogLink = `🍔 *¡Mirá nuestra carta completa con fotos y precios!* 📸\n\n👉 ${catalogUrl}/#catalog\n\nDesde ahí podés armar tu pedido y enviarlo directamente por este mismo WhatsApp. ¡Todo en segundos! 🔥\n\n_También podés escribir el nombre de lo que querés y te ayudo._`;
+                const catalogLink = `🍔 *¡Mirá nuestra carta completa con fotos reales y precios!* 📸\n\n👉 ${catalogUrl}/#catalog\n\nElegí tus burgers, combos y adicionales con fotos, armá tu carrito y envialo directamente por acá en segundos. ¡Te esperamos! 🔥`;
                 await this.safeSendMessage(remoteJid, { text: catalogLink }, msg.key);
               } else {
                 // MODO PLANTILLAS CLÁSICO: menú numerado de texto
@@ -2374,13 +2446,13 @@ class WhatsAppBotServer {
             }
 
             // INICIAR PEDIDO DIRECTO ('comprar', 'pedir', 'hacer pedido')
-            if (lower === 'comprar' || lower === 'pedir' || lower === 'hacer pedido' || lower === 'quiero pedir') {
+            if (lower === 'comprar' || lower === 'pedir' || lower === 'hacer pedido' || lower === 'quiero pedir' || lower === 'hacer una orden' || lower === 'quiero una hamburguesa') {
               const tplsCmp = getBotTemplates();
               const bizCmp = getBusinessContext();
               const menuModeCmp = tplsCmp.menu_mode || 'catalog';
               if (menuModeCmp === 'catalog') {
                 const catalogUrl = (bizCmp.catalogo_url || bizCmp.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
-                const catalogLink = `🛒 *¡Vamos a armar tu pedido!* 🔥\n\n📱 Entrá a nuestra carta interactiva con fotos:\n👉 ${catalogUrl}/#catalog\n\nElegí lo que más te guste, armá tu carrito y envialo por acá mismo. ¡En segundos ingresa directo a la cocina! 🍔✨\n\n_También podés escribir directamente lo que querés (ej: Promo Doble Cheddar) y te ayudo._`;
+                const catalogLink = `🛒 *¡Para realizar tu pedido usá obligatoriamente nuestra Carta Digital con fotos!* 🍔📸\n\n👉 ${catalogUrl}/#catalog\n\nAllí podés ver fotos reales de cada producto, elegir tus adicionales favoritos y enviar tu pedido directo a la cocina con un click. ¡Te esperamos! 🔥`;
                 await this.safeSendMessage(remoteJid, { text: catalogLink }, msg.key);
               } else {
                 session.step = 'SELECTING';
@@ -2406,6 +2478,17 @@ class WhatsAppBotServer {
           const isPureMenuDigitInIdle = session.step === 'IDLE' && /^[0-5]$/.test(cleanNormText);
 
           if (matchedProd && !isPureMenuDigitInIdle) {
+            const tplsDirect = getBotTemplates();
+            const menuModeDirect = tplsDirect.menu_mode || 'catalog';
+            if (menuModeDirect === 'catalog') {
+              // MODO CATÁLOGO ONLINE: no se permite pedir por texto ni plantillas
+              const biz = getBusinessContext();
+              const catalogUrl = (biz.catalogo_url || biz.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
+              const reply = `🍔 *¡Para pedir ${matchedProd.name}, ingresá a nuestra Carta Digital con fotos!* 📸\n\n👉 ${catalogUrl}/#catalog\n\nDesde allí podés ver fotos reales, elegir los ingredientes o combos y enviar tu pedido directo a la cocina con un click.`;
+              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
+              continue;
+            }
+
             session.step = 'SELECTING';
             if (!session.items) session.items = [];
             
