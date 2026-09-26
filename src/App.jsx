@@ -868,10 +868,7 @@ export default function App() {
   if (isCatalogRoute) {
     return (
       <CatalogPage
-        onClose={() => {
-          window.location.hash = '';
-          setIsCatalogRoute(false);
-        }}
+        initialCashShift={cashShift}
       />
     );
   }

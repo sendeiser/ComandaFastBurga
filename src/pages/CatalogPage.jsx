@@ -9,7 +9,7 @@ import {
   MessageCircle, ExternalLink, ChevronRight, Check,
   ShoppingBag, ArrowLeft, Plus, Minus, Trash2, Phone
 } from 'lucide-react';
-import { DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_ANON_KEY } from '../services/supabaseClient';
+import { supabaseSync, DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_ANON_KEY } from '../services/supabaseClient';
 import { storageService } from '../services/storageService';
 import ProductModal from '../components/catalog/ProductModal';
 import '../styles/catalog.css';
@@ -368,7 +368,16 @@ function isOpen(horariosStr) {
 // ============================================================
 // MAIN COMPONENT
 // ============================================================
-export default function CatalogPage({ onClose }) {
+export default function CatalogPage({ initialCashShift }) {
+  const [isCashOpen, setIsCashOpen] = useState(() => {
+    if (initialCashShift) return !initialCashShift.isClosed;
+    try {
+      const local = storageService.getCashShift();
+      if (local) return !local.isClosed;
+    } catch (_) {}
+    return false;
+  });
+
   const [products, setProducts] = useState(() => {
     try {
       const local = storageService.getProducts();
@@ -435,6 +444,59 @@ export default function CatalogPage({ onClose }) {
   const sectionRefs = useRef({});
   const navRef = useRef(null);
   const toastTimer = useRef(null);
+
+  // ---- Sincronización en tiempo real del estado de Caja (Abierto / Cerrado) ----
+  useEffect(() => {
+    let isMounted = true;
+
+    async function checkCashStatus() {
+      try {
+        const active = await supabaseSync.fetchActiveCashShift();
+        if (!isMounted) return;
+
+        if (active && !active.isClosed) {
+          setIsCashOpen(true);
+          return;
+        }
+
+        const latest = await supabaseSync.fetchLatestCashShift();
+        if (!isMounted) return;
+
+        if (latest) {
+          setIsCashOpen(!latest.isClosed);
+        } else {
+          const local = storageService.getCashShift();
+          setIsCashOpen(Boolean(local && !local.isClosed));
+        }
+      } catch (_) {
+        try {
+          const local = storageService.getCashShift();
+          if (isMounted) setIsCashOpen(Boolean(local && !local.isClosed));
+        } catch (_) {}
+      }
+    }
+
+    checkCashStatus();
+
+    const interval = setInterval(checkCashStatus, 15000);
+
+    const handleShiftEvent = () => checkCashStatus();
+    window.addEventListener('comandafast:cash-shift-change', handleShiftEvent);
+    window.addEventListener('comandafast:shifts_updated', handleShiftEvent);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      window.removeEventListener('comandafast:cash-shift-change', handleShiftEvent);
+      window.removeEventListener('comandafast:shifts_updated', handleShiftEvent);
+    };
+  }, [initialCashShift]);
+
+  useEffect(() => {
+    if (initialCashShift) {
+      setIsCashOpen(!initialCashShift.isClosed);
+    }
+  }, [initialCashShift]);
 
   // ---- Load products and settings from Supabase ----
   useEffect(() => {
@@ -663,7 +725,7 @@ export default function CatalogPage({ onClose }) {
     showToast('🎉 Pedido enviado por WhatsApp');
   };
 
-  const businessOpen = isOpen(settings.horarios);
+  const businessOpen = isCashOpen;
   const igHandle = settings.catalogo_instagram || 'burga_chamical';
   const waPhone = formatWhatsAppPhone(settings.telefono_whatsapp || settings.telefono_contacto);
   const displayPhone = settings.telefono_contacto || '+54 9 3826 43-0159';
@@ -873,27 +935,15 @@ export default function CatalogPage({ onClose }) {
       <div className="cat-header-banner">
         <div className="cat-header-banner-inner">
           {/* Top-left: White Pill Status Badge */}
-          <div className="cat-banner-status-badge">
-            <span className={`cat-status-dot-circle ${businessOpen ? 'open' : 'closed'}`} />
-            <span>{businessOpen ? 'Abierto' : 'Cerrado'}</span>
+          <div className={`cat-banner-status-badge ${isCashOpen ? 'open' : 'closed'}`}>
+            <span className={`cat-status-dot-circle ${isCashOpen ? 'open' : 'closed'}`} />
+            <span>{isCashOpen ? 'Abierto' : 'Cerrado'}</span>
           </div>
 
           {/* Center: Retro Brand Typography */}
           <div className="cat-banner-center-title">
             {brandBannerTitle}
           </div>
-
-          {/* Top-right: Optional Close button */}
-          {onClose && (
-            <button 
-              type="button" 
-              className="cat-banner-close-btn" 
-              onClick={onClose} 
-              title="Cerrar catálogo"
-            >
-              <X size={18} />
-            </button>
-          )}
         </div>
       </div>
 
@@ -994,9 +1044,9 @@ export default function CatalogPage({ onClose }) {
       )}
 
       {/* CLOSED NOTICE */}
-      {!businessOpen && (
+      {!isCashOpen && (
         <div className="cat-closed-banner">
-          🌙 En este momento estamos descansando. Horarios de cocina: {settings.horarios}
+          🌙 En este momento la caja del local está cerrada. Horarios de cocina: {settings.horarios}
         </div>
       )}
 
@@ -1067,7 +1117,9 @@ export default function CatalogPage({ onClose }) {
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fff' }}>{settings.nombre_local || "Burga's Chamical"}</h3>
-                  <span style={{ fontSize: '0.75rem', color: '#22c55e', fontWeight: 600 }}>● Abierto ahora</span>
+                  <span style={{ fontSize: '0.75rem', color: isCashOpen ? '#22c55e' : '#ef4444', fontWeight: 700 }}>
+                    ● {isCashOpen ? 'Abierto ahora' : 'Cerrado ahora'}
+                  </span>
                 </div>
               </div>
               <button 
@@ -1083,8 +1135,16 @@ export default function CatalogPage({ onClose }) {
               <div className="cat-info-item">
                 <Clock size={18} className="cat-info-item-icon" />
                 <div>
-                  <div className="cat-info-item-title">Horarios de Cocina</div>
-                  <div className="cat-info-item-desc">{settings.horarios}</div>
+                  <div className="cat-info-item-title">Estado y Horarios</div>
+                  <div className="cat-info-item-desc" style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                    <span className={`cat-status-dot-circle ${isCashOpen ? 'open' : 'closed'}`} />
+                    <span style={{ color: isCashOpen ? '#22c55e' : '#ef4444' }}>
+                      {isCashOpen ? 'Caja abierta (Tomando pedidos)' : 'Caja cerrada (Fuera de turno)'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--cat-text-muted)', marginTop: 3 }}>
+                    Horarios de atención: {settings.horarios}
+                  </div>
                 </div>
               </div>
 
