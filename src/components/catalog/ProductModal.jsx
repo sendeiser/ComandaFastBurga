@@ -4,6 +4,7 @@
 // =========================================================
 
 import React, { useState, useEffect } from 'react';
+import { Plus, Minus, ArrowLeft, Check } from 'lucide-react';
 
 function formatPrice(n) {
   return '$ ' + Number(n).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -72,11 +73,11 @@ export default function ProductModal({ product, onClose, onAddToCart }) {
       <div className="cat-modal">
         {/* Header */}
         <div className="cat-modal-header">
-          <button className="cat-modal-back-btn" onClick={onClose} aria-label="Cerrar">
-            ‹
+          <button type="button" className="cat-modal-back-btn" onClick={onClose} aria-label="Cerrar">
+            <ArrowLeft size={18} />
           </button>
           <h2 className="cat-modal-title">{product.name}</h2>
-          <div style={{ width: 28 }} />
+          <div style={{ width: 36 }} />
         </div>
 
         {/* Body */}
@@ -89,6 +90,8 @@ export default function ProductModal({ product, onClose, onAddToCart }) {
                 src={product.image}
                 alt={product.name}
                 onError={() => setImageError(true)}
+                loading="lazy"
+                decoding="async"
               />
             ) : (
               <div className="cat-modal-product-emoji">
@@ -141,11 +144,12 @@ export default function ProductModal({ product, onClose, onAddToCart }) {
                         )}
                       </div>
                       <button
+                        type="button"
                         className={`cat-mod-increment-btn ${isSelected ? 'active' : ''}`}
                         onClick={() => handleToggleMod(group.name, item)}
                         aria-label={isSelected ? 'Quitar' : 'Agregar'}
                       >
-                        {isSelected ? '✓' : '+'}
+                        {isSelected ? <Check size={14} /> : <Plus size={14} />}
                       </button>
                     </div>
                   );
@@ -174,12 +178,13 @@ export default function ProductModal({ product, onClose, onAddToCart }) {
                     );
                     return (
                       <button
+                        type="button"
                         key={ii}
                         className={`cat-mod-checkbox ${isSelected ? 'selected' : ''}`}
                         onClick={() => handleToggleOption(group.name, item)}
                       >
                         <span className="cat-mod-checkbox-icon">
-                          {isSelected ? '✓' : ''}
+                          {isSelected ? <Check size={12} /> : null}
                         </span>
                         {item.name}
                         {item.price > 0 && ` (+${formatPrice(item.price)})`}
@@ -206,25 +211,28 @@ export default function ProductModal({ product, onClose, onAddToCart }) {
 
         {/* Footer: cantidad + agregar */}
         <div className="cat-modal-footer">
-          <div className="cat-qty-control">
+          <div className="cat-modal-qty-selector cat-qty-control">
             <button
-              className="cat-qty-btn"
+              type="button"
+              className="cat-modal-qty-btn cat-qty-btn"
               onClick={() => setQty(q => Math.max(1, q - 1))}
-              aria-label="Menos"
+              aria-label="Disminuir cantidad"
             >
-              −
+              <Minus size={18} />
             </button>
-            <span className="cat-qty-value">{qty}</span>
+            <span className="cat-modal-qty-val cat-qty-value">{qty}</span>
             <button
-              className="cat-qty-btn"
+              type="button"
+              className="cat-modal-qty-btn cat-qty-btn"
               onClick={() => setQty(q => q + 1)}
-              aria-label="Más"
+              aria-label="Aumentar cantidad"
             >
-              +
+              <Plus size={18} />
             </button>
           </div>
-          <button className="cat-add-to-cart-btn" onClick={handleAdd}>
-            Agregar {formatPrice(totalPrice)}
+          <button type="button" className="cat-modal-add-btn cat-add-to-cart-btn" onClick={handleAdd}>
+            <span>Agregar</span>
+            <span className="cat-modal-add-price">{formatPrice(totalPrice)}</span>
           </button>
         </div>
       </div>

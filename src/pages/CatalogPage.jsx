@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Search, Menu, Info, X, Clock, MapPin, 
   MessageCircle, ExternalLink, ChevronRight, Check,
-  ShoppingBag, ArrowLeft
+  ShoppingBag, ArrowLeft, Plus, Minus, Trash2
 } from 'lucide-react';
 import { DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_ANON_KEY } from '../services/supabaseClient';
 import { storageService } from '../services/storageService';
@@ -196,7 +196,7 @@ function ProductCard({ product, onOpen }) {
           onClick={(e) => { e.stopPropagation(); onOpen(product); }}
           aria-label={`Agregar ${product.name}`}
         >
-          +
+          <Plus size={16} />
         </button>
       </div>
     </div>
@@ -215,17 +215,19 @@ function UpsellCard({ product, onAdd }) {
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
             onError={() => setImgError(true)}
             loading="lazy"
+            decoding="async"
           />
         ) : (
           <span style={{ fontSize: '2rem' }}>{product.emoji || '🥤'}</span>
         )}
       </div>
       <button
+        type="button"
         className="cat-upsell-add-btn"
         onClick={(e) => { e.stopPropagation(); onAdd(product); }}
         aria-label={`Agregar ${product.name}`}
       >
-        +
+        <Plus size={14} />
       </button>
       <div className="cat-upsell-card-info">
         <div className="cat-upsell-card-name">{product.name}</div>
@@ -246,23 +248,29 @@ function CartItemRow({ item, onUpdateQty, onRemove }) {
     <div className="cat-cart-item">
       <div className="cat-cart-item-image">
         {item.image && !imgError ? (
-          <img src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} onError={() => setImgError(true)} />
+          <img src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} onError={() => setImgError(true)} loading="lazy" decoding="async" />
         ) : (
           <span>{item.emoji}</span>
         )}
       </div>
       <div className="cat-cart-item-info">
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
           <span className="cat-cart-item-name" style={{ flex: 1 }}>{item.name}</span>
-          <button className="cat-cart-delete-btn" onClick={() => onRemove(item.cartId)} aria-label="Eliminar">🗑</button>
+          <button type="button" className="cat-cart-delete-btn" onClick={() => onRemove(item.cartId)} aria-label="Eliminar del carrito" title="Eliminar">
+            <Trash2 size={15} />
+          </button>
         </div>
         {modLabels && <div className="cat-cart-item-mods">↓ {modLabels}</div>}
         {item.notes && <div className="cat-cart-item-mods">📝 {item.notes}</div>}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
           <div className="cat-cart-item-qty-controls">
-            <button className="cat-cart-qty-btn" onClick={() => onUpdateQty(item.cartId, item.qty - 1)}>−</button>
+            <button type="button" className="cat-cart-qty-btn" onClick={() => onUpdateQty(item.cartId, item.qty - 1)} aria-label="Disminuir cantidad">
+              <Minus size={13} />
+            </button>
             <span className="cat-cart-qty-value">{item.qty}</span>
-            <button className="cat-cart-qty-btn" onClick={() => onUpdateQty(item.cartId, item.qty + 1)}>+</button>
+            <button type="button" className="cat-cart-qty-btn" onClick={() => onUpdateQty(item.cartId, item.qty + 1)} aria-label="Aumentar cantidad">
+              <Plus size={13} />
+            </button>
           </div>
           <span className="cat-cart-item-price">{formatPrice(item.unitPrice * item.qty)}</span>
         </div>
@@ -370,7 +378,14 @@ export default function CatalogPage({ onClose }) {
       return DEFAULT_SETTINGS;
     }
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    try {
+      const local = storageService.getProducts();
+      return !(Array.isArray(local) && local.length > 0);
+    } catch (_) {
+      return true;
+    }
+  });
   const [error, setError] = useState(null);
 
   // UI State
@@ -443,6 +458,7 @@ export default function CatalogPage({ onClose }) {
             }));
           if (prods.length > 0) {
             setProducts(prods);
+            try { storageService.saveProducts(prods); } catch (_) {}
           }
         }
 
@@ -451,7 +467,11 @@ export default function CatalogPage({ onClose }) {
           if (Array.isArray(sRows) && sRows.length > 0 && Array.isArray(sRows[0].data)) {
             const varMap = {};
             sRows[0].data.forEach(v => { if (v.key) varMap[v.key] = v.value ?? v.defaultValue; });
-            setSettings(prev => ({ ...prev, ...varMap }));
+            setSettings(prev => {
+              const updated = { ...prev, ...varMap };
+              try { storageService.saveSettings(updated); } catch (_) {}
+              return updated;
+            });
           }
         }
       } catch (err) {
@@ -541,6 +561,15 @@ export default function CatalogPage({ onClose }) {
     setSearchQuery('');
     setShowSearch(false);
     setShowCategoriesDrawer(false);
+
+    // Auto-scroll the nav button horizontally into view
+    if (navRef.current) {
+      const activeBtn = navRef.current.querySelector(`[data-cat="${cat}"]`);
+      if (activeBtn) {
+        activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      }
+    }
+
     const ref = sectionRefs.current[cat];
     if (ref) {
       const offset = 80; // sticky nav height
@@ -640,9 +669,10 @@ export default function CatalogPage({ onClose }) {
       <div className="catalog-app">
         <div className="cat-checkout-page">
           <div className="cat-cart-header">
-            <button className="cat-cart-back-btn" onClick={() => setView('cart')}>
+            <button type="button" className="cat-cart-back-btn" onClick={() => setView('cart')}>
               <ArrowLeft size={16} /> Volver al carrito
             </button>
+            <span className="cat-cart-total-top">{formatPrice(cart.subtotal + deliveryFee)}</span>
           </div>
           <h2 className="cat-checkout-title">
             {serviceType === 'delivery' ? '🛵 Entrega por Delivery' : '🏃 Retiro en el Local'}
@@ -742,7 +772,7 @@ export default function CatalogPage({ onClose }) {
       <div className="catalog-app">
         <div className="cat-cart-page">
           <div className="cat-cart-header">
-            <button className="cat-cart-back-btn" onClick={() => setView('catalog')}>
+            <button type="button" className="cat-cart-back-btn" onClick={() => setView('catalog')}>
               <ArrowLeft size={16} /> Seguir pidiendo
             </button>
             <span className="cat-cart-total-top">Total: {formatPrice(cart.subtotal)}</span>
@@ -903,6 +933,7 @@ export default function CatalogPage({ onClose }) {
             {categories.map(cat => (
               <button
                 key={cat}
+                data-cat={cat}
                 type="button"
                 className={`cat-nav-tab-item ${activeCategory === cat ? 'active' : ''}`}
                 onClick={() => scrollToCategory(cat)}
