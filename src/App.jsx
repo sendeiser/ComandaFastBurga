@@ -18,6 +18,9 @@ import { audioService } from './services/audioService';
 import { printerService } from './services/printerService';
 import { supabaseSync } from './services/supabaseClient';
 import CatalogPage from './pages/CatalogPage';
+import WhatsAppLiveMonitor from './components/pos/WhatsAppLiveMonitor';
+import WhatsAppToastAlert from './components/pos/WhatsAppToastAlert';
+import { liveChatService } from './services/liveChatService';
 
 const isLocalEnv = () => {
   if (typeof window === 'undefined') return false;
@@ -34,6 +37,8 @@ export default function App() {
   const [cashShift, setCashShift] = useState(null);
   const [settings, setSettings] = useState(null);
   const [currentCashier, setCurrentCashier] = useState(() => authService.getCurrentCashier());
+  const [activeWhatsAppCount, setActiveWhatsAppCount] = useState(0);
+  const [orderToLoadInPOS, setOrderToLoadInPOS] = useState(null);
 
   // Owner authentication & secret portal state
   const [isOwnerAuthenticated, setIsOwnerAuthenticated] = useState(() => authService.isAuthenticated());
@@ -64,8 +69,13 @@ export default function App() {
     window.addEventListener('hashchange', handleHash);
     window.addEventListener('popstate', handleHash);
 
-    // Secret shortcut: Ctrl + Shift + D (DueÃ±o)
+    // Secret shortcut: Ctrl + Shift + D (Dueño) & F6 (WhatsApp Live)
     const handleKeyDown = (e) => {
+      if (e.key === 'F6') {
+        e.preventDefault();
+        setCurrentTab(prev => (prev === 'whatsapp' ? 'pos' : 'whatsapp'));
+        return;
+      }
       if (e.ctrlKey && e.shiftKey && (e.key === 'D' || e.key === 'd' || e.key === 'A' || e.key === 'a')) {
         e.preventDefault();
         setIsOwnerPortalRoute(prev => {
@@ -85,6 +95,27 @@ export default function App() {
       window.removeEventListener('hashchange', handleHash);
       window.removeEventListener('popstate', handleHash);
       window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  // Polling para badges de WhatsApp Live en el Header
+  useEffect(() => {
+    let isMounted = true;
+    const fetchActiveCount = async () => {
+      try {
+        const chats = await liveChatService.getActiveChats();
+        if (isMounted && Array.isArray(chats)) {
+          const urgentOrUnread = chats.filter(c => c.requiresHuman || c.unreadCount > 0 || (c.cartItems && c.cartItems.length > 0)).length;
+          setActiveWhatsAppCount(urgentOrUnread);
+        }
+      } catch (_) {}
+    };
+
+    fetchActiveCount();
+    const interval = setInterval(fetchActiveCount, 4000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
     };
   }, []);
 
@@ -416,7 +447,9 @@ export default function App() {
               if (cloudIds.has(o.id)) return true;
               const age = now - (o.createdAt ? new Date(o.createdAt).getTime() : now);
               if (age < 40000) return true;
-              storageService.markOrderDeleted(o.id);
+              if (!/^CMD-\d+$/i.test(String(o.id))) {
+                storageService.markOrderDeleted(o.id);
+              }
               localPruned = true;
               return false;
             });
@@ -919,6 +952,7 @@ export default function App() {
         currentTab={currentTab}
         setCurrentTab={setCurrentTab}
         pendingKitchenCount={pendingKitchenCount}
+        activeWhatsAppCount={activeWhatsAppCount}
         cashShift={cashShift}
         settings={settings}
         theme={theme}
@@ -935,6 +969,8 @@ export default function App() {
             onSaveOrder={handleSaveOrder}
             cashShift={cashShift}
             onOpenCashModal={() => setIsCashModalOpen(true)}
+            initialOrderToLoad={orderToLoadInPOS}
+            onClearInitialOrder={() => setOrderToLoadInPOS(null)}
           />
         )}
 
@@ -960,6 +996,20 @@ export default function App() {
           <MenuManagement 
             products={products}
             onSaveProducts={handleSaveProducts}
+          />
+        )}
+
+        {currentTab === 'whatsapp' && (
+          <WhatsAppLiveMonitor 
+            products={products}
+            settings={settings}
+            onLoadOrderToPOS={(parsedOrder) => {
+              setOrderToLoadInPOS(parsedOrder);
+              setCurrentTab('pos');
+            }}
+            onInjectToKitchen={(orderPayload) => {
+              handleSaveOrder(orderPayload);
+            }}
           />
         )}
       </main>
@@ -993,6 +1043,14 @@ export default function App() {
           onClose={() => setPreviewOrder(null)}
         />
       )}
+
+      {/* FLOATING WHATSAPP BOT TOAST ALERT */}
+      <WhatsAppToastAlert 
+        currentTab={currentTab}
+        onOpenChat={(jid) => {
+          setCurrentTab('whatsapp');
+        }}
+      />
     </div>
   );
 }

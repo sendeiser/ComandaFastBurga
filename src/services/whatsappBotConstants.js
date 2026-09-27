@@ -69,7 +69,7 @@ export const DEFAULT_TEMPLATES = {
   
   template_product_photo: `🍔 *{producto}* 🔥\n{detalle}\n💵 *Precio:* {precio}\n\n👉 Para pedir este producto escribí *COMPRAR* o su número.\n👉 Podés agregar aclaraciones como *Sin cebolla*, *Extra cheddar*, etc.`,
   
-  template_cart_item_added: `✅ *¡Agregaste {producto}!* 🍔 (+{subtotal_item})\n\n🛒 *Tu pedido actual:*\n{carrito_items}\n\n💵 *Subtotal:* \${subtotal}\n\n👉 ¿Querés sumar otra burger, papas o bebida? *(Escribí su número)*\n👉 Podés pedir aclaraciones *(Ej: sin cebolla, extra cheddar)*\n👉 O escribí *LISTO* para avanzar con la entrega y el pago.`,
+  template_cart_item_added: `✅ *¡Agregaste {producto}!* 🍔 (+{subtotal_item})\n\n🛒 *Tu pedido actual:*\n{carrito_items}\n\n💵 *Subtotal:* \${subtotal}\n\n👉 *¿Querés sumar algo más?*\n• Podés pedir directamente por *nombre* (ej: *"1 Coca"*, *"papas"*) o por *número*.\n• Escribí *CARTA* (o *HAMBURGUESAS*, *BEBIDAS*, etc.) para ver la lista sin perder tu carrito.\n• Podés pedir aclaraciones *(Ej: sin cebolla, extra cheddar)*\n👉 O escribí *LISTO* para avanzar con la entrega y el pago.`,
   
   template_cart_view: `🛒 *TU PEDIDO ACTUAL:* 🍔\n\n{carrito_items}\n\n💵 *Subtotal:* \${subtotal}\n\n👉 Para sumar más productos, escribí su *NÚMERO*.\n👉 Para quitar un producto, escribí *QUITAR [número]* (ej: QUITAR 1).\n👉 O escribí *LISTO* para avanzar con la entrega y el pago.`,
   

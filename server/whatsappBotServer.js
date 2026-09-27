@@ -19,7 +19,8 @@ import makeWASocket, {
   fetchLatestBaileysVersion, 
   makeCacheableSignalKeyStore,
   DisconnectReason, 
-  Browsers 
+  Browsers,
+  downloadMediaMessage 
 } from '@whiskeysockets/baileys';
 
 const app = express();
@@ -621,7 +622,7 @@ const DEFAULT_SERVER_TEMPLATES = {
   human_mode_sleep_minutes: 25,
   bot_typing_delay_ms: 2500,
   bot_typing_mode: 'human_dynamic',
-  menu_mode: 'catalog', // 'catalog' = link al catálogo web | 'templates' = menú clásico de plantillas
+  menu_mode: 'templates', // 'templates' = menú clásico de plantillas | 'catalog' = link al catálogo web
   anti_loop_gratitude: DEFAULT_ANTI_LOOP_GRATITUDE,
   anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,
   anti_loop_acknowledge: DEFAULT_ANTI_LOOP_ACKNOWLEDGE,
@@ -640,7 +641,7 @@ const DEFAULT_SERVER_TEMPLATES = {
   template_order_preparing: `👨‍🍳🔥 *¡Buenas noticias {cliente}! Tu pedido #{pedido_id} ya está en la plancha.*
 
 Nuestros cocineros están preparando tus hamburguesas con la carne recién smashada y el cheddar fundido. ¡Te avisamos apenas esté listo! 🍔✨`,
-  template_order_ready: `🔔 *¡Tu pedido #{pedido_id} está LISTO {cliente}!* 🍔🍟
+  template_order_ready: `🔔 *¡Tu pedido #{pedido_id} está LISTO para retirar, {cliente}!* 🍔🍟
 
 Ya podés pasar a retirarlo por nuestro local en {direccion}. ¡Te esperamos con las burgers calentitas!`,
   template_order_ready_delivery: `🔔 *¡Tu pedido #{pedido_id} ya está listo y empaquetado {cliente}!* 🍔📦
@@ -832,6 +833,165 @@ function buildCatalogMessage(prods, page = 1, pageSize = 8, isAll = false) {
   return `🍔 *MENÚ ${storeName.toUpperCase()}* 🔥\n📄 *Página ${currentPage} de ${totalPages}* (Opciones ${startIdx + 1} al ${startIdx + pageProds.length} de ${total})\n\n${list}\n\n───────────────────\n👉 *Para pedir:* Respondé con el NÚMERO (1 al ${total}).\n👉 *Para ver foto:* Escribí *FOTO [número]* (ej: *FOTO ${startIdx + 1}*).\n${navInstructions}👉 Escribí *VER TODO* para ver la lista completa.`;
 }
 
+// -------------------------------------------------------------
+// MAPEADOR Y FORMATEADOR DE CATEGORÍAS (MODO PLANTILLAS)
+// -------------------------------------------------------------
+const CATEGORY_MAP = {
+  hamburguesas: {
+    name: 'Hamburguesas',
+    keywords: ['hamburguesa', 'hamburguesas', 'burger', 'burgers', 'burgas', 'burga']
+  },
+  bebidas: {
+    name: 'Bebidas',
+    keywords: ['bebida', 'bebidas', 'gaseosa', 'gaseosas', 'gaseosita', 'trago', 'tragos', 'refresco', 'refrescos', 'tomar', 'para tomar', 'de tomar']
+  },
+  agregados: {
+    name: 'Agregados',
+    keywords: ['agregado', 'agregados', 'papa', 'papas', 'fritas', 'guarnicion', 'guarniciones', 'acompanamiento', 'acompanamientos', 'entrada', 'entradas']
+  },
+  lomitos: {
+    name: 'Lomitos',
+    keywords: ['lomito', 'lomitos', 'lomo', 'lomos']
+  },
+  panchos: {
+    name: 'Panchos',
+    keywords: ['pancho', 'panchos', 'hot dog', 'hot dogs', 'panchito', 'panchitos']
+  },
+  promos: {
+    name: 'Promos',
+    keywords: ['promo', 'promos', 'promocion', 'promociones', 'combo', 'combos', 'oferta', 'ofertas']
+  }
+};
+
+function detectCategoryQuery(text, prodsList) {
+  if (!text || !Array.isArray(prodsList) || prodsList.length === 0) return null;
+  const clean = normalizeSearchText(text);
+  if (!clean) return null;
+
+  // 1. Si pregunta por ingredientes específicos o alergias, derivar a IA
+  if (/\b(ingredientes?|que\s+trae|que\s+lleva|de\s+que\s+es|como\s+es|celiac[oa]s?|vegan[oa]s?|sin\s+tacc|gluten)\b/i.test(clean)) {
+    return null;
+  }
+
+  // 2. Si empieza con número o cantidad explícita (ej: '1 burger', '2 bajoneras', '3 papas cheddar')
+  if (/^\d+\b/.test(clean)) return null;
+  if (/^(quiero|dame|anotame|traeme|sumar|agregar|pedir)\s+(\d+|un|una|dos|tres|cuatro|cinco)\b/i.test(clean)) {
+    if (!/^(quiero|deseo)\s+ver\b/i.test(clean)) return null;
+  }
+
+  // 3. Patrones de intención de visualización / consulta
+  const isViewIntent = /^(muestrame|mostrame|ver|mostrar|cuales|que|hay|tienen|tenes|lista|opciones|carta|menu|disponible|disponibles|variedad|variedades)\b/i.test(clean);
+
+  // 4. Chequear cada categoría configurada
+  for (const [key, catInfo] of Object.entries(CATEGORY_MAP)) {
+    const catProds = prodsList.filter(p => normalizeSearchText(p.category) === normalizeSearchText(catInfo.name));
+    if (catProds.length === 0) continue;
+
+    for (const kw of catInfo.keywords) {
+      const kwNorm = normalizeSearchText(kw);
+      const isExactCategory = clean === kwNorm || 
+        clean === 'las ' + kwNorm || 
+        clean === 'los ' + kwNorm || 
+        clean === 'la ' + kwNorm || 
+        clean === 'el ' + kwNorm ||
+        clean === 'de ' + kwNorm;
+
+      const isQuestionCategory = (
+        clean.includes(kwNorm) && (
+          isViewIntent ||
+          /\b(tienen|tenes|hay|muestrame|mostrame|ver|cuales|que|carta|menu|lista|opciones|catalogo|cat[aá]logo|variedades|rubro|seccion)\b/i.test(clean)
+        )
+      );
+
+      if (isExactCategory || isQuestionCategory) {
+        return catInfo.name;
+      }
+    }
+  }
+
+  // 5. Categorías dinámicas presentes en la lista de productos
+  const uniqueCats = Array.from(new Set(prodsList.map(p => p.category).filter(Boolean)));
+  for (const cat of uniqueCats) {
+    const catNorm = normalizeSearchText(cat);
+    if (clean === catNorm || clean === 'las ' + catNorm || clean === 'los ' + catNorm || (clean.includes(catNorm) && isViewIntent)) {
+      return cat;
+    }
+  }
+
+  return null;
+}
+
+function buildCategoryCatalogMessage(categoryName, prodsList, currentItems = [], currentTotal = 0) {
+  const categoryProds = prodsList.filter(p => (p.category || '').toLowerCase() === categoryName.toLowerCase());
+  if (categoryProds.length === 0) return null;
+
+  const emojiMap = {
+    hamburguesas: '🍔',
+    bebidas: '🥤',
+    agregados: '🍟',
+    lomitos: '🥩',
+    panchos: '🌭',
+    promos: '🏷️'
+  };
+  const catEmoji = emojiMap[categoryName.toLowerCase()] || '🍔';
+
+  let cartHeader = '';
+  if (Array.isArray(currentItems) && currentItems.length > 0) {
+    const briefList = currentItems.map(it => `• ${it.name} (x${it.qty || 1})`).join(', ');
+    cartHeader = `🛒 *Tu pedido actual sigue guardado:* ${briefList} *(Subtotal: $${(Number(currentTotal) || 0).toLocaleString('es-AR')})*\n\n`;
+  }
+
+  const list = categoryProds.map(p => {
+    const globalIdx = prodsList.indexOf(p) + 1;
+    const numBadge = formatItemNumber(globalIdx);
+    const photoBadge = p.image ? '📸' : '';
+    let priceStr = `$${Number(p.price).toLocaleString('es-AR')}`;
+    if (p.originalPrice && Number(p.originalPrice) > Number(p.price)) {
+      priceStr = `~${Number(p.originalPrice).toLocaleString('es-AR')}~ $${Number(p.price).toLocaleString('es-AR')}`;
+    }
+    const promoBadge = p.discountBadge ? ` [🏷️ ${p.discountBadge}]` : '';
+    const freeShippingBadge = p.freeShipping ? ' [🛵 Envío Gratis]' : '';
+    return `${numBadge} *${p.name}* — ${priceStr}${promoBadge}${freeShippingBadge} ${photoBadge}`;
+  }).join('\n');
+
+  const firstIdx = prodsList.indexOf(categoryProds[0]) + 1;
+  const firstName = categoryProds[0].name;
+
+  return `${cartHeader}${catEmoji} *${categoryName.toUpperCase()} DISPONIBLES* 🔥 (${categoryProds.length} opciones)\n\n${list}\n\n───────────────────\n👉 *Para pedir:* Respondé con el NÚMERO (ej: *${firstIdx}*) o su NOMBRE (ej: *1 ${firstName}*).\n👉 *Para ver foto:* Escribí *FOTO [número]* (ej: *FOTO ${firstIdx}*).\n👉 Escribí *CARTA* para ver todas las opciones o *LISTO* para avanzar con la entrega.`;
+}
+
+function isCategoriesListQuery(text) {
+  if (!text) return false;
+  const clean = normalizeSearchText(text);
+  return /^(categorias|rubros|secciones|ver\s+categorias|ver\s+rubros|que\s+categorias\s+tienen|cuales\s+son\s+las\s+categorias|cuales\s+categorias\s+hay)$/i.test(clean);
+}
+
+function buildCategoriesSummaryMessage(prodsList) {
+  const catCounts = {};
+  prodsList.forEach(p => {
+    if (p.category) {
+      catCounts[p.category] = (catCounts[p.category] || 0) + 1;
+    }
+  });
+
+  const emojiMap = {
+    hamburguesas: '🍔',
+    bebidas: '🥤',
+    agregados: '🍟',
+    lomitos: '🥩',
+    panchos: '🌭',
+    promos: '🏷️'
+  };
+
+  const lines = Object.entries(catCounts).map(([cat, count]) => {
+    const emoji = emojiMap[cat.toLowerCase()] || '🍔';
+    return `${emoji} *${cat}* (${count} opciones)`;
+  }).join('\n');
+
+  return `📋 *CATEGORÍAS DE NUESTRA CARTA:* 🔥\n\n${lines}\n\n───────────────────\n👉 Escribí el nombre de la categoría que querés ver (ej: *HAMBURGUESAS* o *BEBIDAS*).\n👉 O escribí *CARTA* para ver todas las opciones disponibles.`;
+}
+
+
 
 /**
  * Parsea pedidos entrantes generados automáticamente desde el Catálogo Online Web (#catalog)
@@ -1020,6 +1180,51 @@ function findProductByText(inputText, prodsList) {
   }
 
   return null;
+}
+
+function parseCustomerQuantity(text, matchedProdName = '') {
+  if (!text) return 1;
+  const norm = normalizeSearchText(text);
+  const prodNorm = normalizeSearchText(matchedProdName);
+
+  // Si el nombre del producto empieza con un número (ej: "2 Cheese"), no interpretarlo como cantidad repetida
+  const leadingNumMatch = norm.match(/^(\d+)\b/);
+  if (leadingNumMatch && prodNorm.startsWith(leadingNumMatch[1])) {
+    const doubleNumMatch = norm.match(/^(\d+|dos|tres|cuatro|cinco)\s+(?:de\s+)?(?:la\s+)?2\s*cheese/i);
+    if (doubleNumMatch) {
+      const wMap = { 'dos': 2, 'tres': 3, 'cuatro': 4, 'cinco': 5 };
+      const q = parseInt(doubleNumMatch[1], 10) || wMap[doubleNumMatch[1].toLowerCase()] || 1;
+      return Math.min(20, Math.max(1, q));
+    }
+    return 1;
+  }
+
+  const wordQtyMap = {
+    'un': 1, 'una': 1, 'uno': 1,
+    'dos': 2, 'tres': 3, 'cuatro': 4, 'cinco': 5,
+    'seis': 6, 'siete': 7, 'ocho': 8, 'nueve': 9, 'diez': 10
+  };
+
+  const qtyMatch = norm.match(/\b(\d+)\s*(?:de\s+|del\s+|x\s*)?(?:hamburguesas?|burgers?|promos?|clasicas?|cheddar|bajonera|oklahoma|papas)?/i);
+  if (qtyMatch) {
+    const n = parseInt(qtyMatch[1], 10);
+    if (n > 0 && n <= 50) return n;
+  }
+
+  for (const [w, q] of Object.entries(wordQtyMap)) {
+    if (new RegExp(`\\b${w}\\b`).test(norm)) return q;
+  }
+
+  return 1;
+}
+
+function isCustomerInquiry(text) {
+  if (!text) return false;
+  const cleanNorm = normalizeSearchText(text);
+  const hasQuestionMarks = text.includes('?') || text.includes('¿');
+  const hasInquiryKeywords = /\b(que\s+trae|que\s+tiene|como\s+es|cual\s+es|cuales\s+son|que\s+lleva|de\s+que\s+es|ingredientes|sin\s+tacc|celiaco|celíaco|celiacos|celíacos|vegano|vegana|veganos|vegetariano|vegetariana|gluten|recomendas|recomendás|recomiendas|recomiendan|recomendacion|recomendación|sugeris|sugerís|sugieres|sugerencia|cual\s+me\s+recomendas|que\s+me\s+recomendas|que\s+esta\s+bueno|a\s+que\s+hora|hasta\s+que\s+hora|abren|abierto|demora|cuanto\s+demora|cuanto\s+tardan|delivery|envio|envío|envios|envíos|llegan|cuanto\s+sale|precio|precios|cuanto\s+cuesta)\b/i.test(cleanNorm);
+  const hasBuyVerb = /^(quiero|dame|anotame|sumar|agregar|pedir|comprar|llevar|trae|traeme)\b/i.test(cleanNorm);
+  return (hasQuestionMarks || hasInquiryKeywords) && !hasBuyVerb;
 }
 
 function buildMainMenuMessage(customerName = '') {
@@ -1218,6 +1423,98 @@ function resetCustomerSession(jid) {
 }
 
 // =========================================================
+// MONITOREO DE CHATS EN VIVO (PANEL DEL CAJERO & CONTROL REMOTO)
+// =========================================================
+const LIVE_CHATS_FILE = path.join(DATA_DIR, 'live_chats.json');
+
+function loadStoredLiveChats() {
+  try {
+    if (fs.existsSync(LIVE_CHATS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(LIVE_CHATS_FILE, 'utf-8'));
+      if (Array.isArray(data)) {
+        const map = new Map();
+        for (const c of data) {
+          if (c && c.jid) map.set(c.jid, c);
+        }
+        return map;
+      }
+    }
+  } catch (err) {
+    console.warn('⚠️ Error al cargar live_chats.json:', err.message);
+  }
+  return new Map();
+}
+
+const liveChatsMap = loadStoredLiveChats();
+let saveLiveChatsTimer = null;
+
+function scheduleSaveLiveChats() {
+  if (saveLiveChatsTimer) clearTimeout(saveLiveChatsTimer);
+  saveLiveChatsTimer = setTimeout(() => {
+    try {
+      const list = Array.from(liveChatsMap.values()).map(c => ({
+        ...c,
+        messages: (c.messages || []).slice(-60)
+      }));
+      fs.writeFileSync(LIVE_CHATS_FILE, JSON.stringify(list, null, 2), 'utf-8');
+    } catch (err) {
+      console.warn('⚠️ Error guardando live_chats.json:', err.message);
+    }
+  }, 1200);
+}
+
+function recordLiveChatMessage({ jid, name, from, text, isImage, imageUrl, originalMsgKey }) {
+  if (!jid || jid.endsWith('@broadcast') || jid.endsWith('@g.us') || jid.includes('@newsletter')) return;
+  const cleanPhone = jid.replace('@s.whatsapp.net', '').replace('@lid', '');
+
+  if (!liveChatsMap.has(jid)) {
+    liveChatsMap.set(jid, {
+      jid,
+      phone: cleanPhone,
+      name: name || `+${cleanPhone}`,
+      unreadCount: 0,
+      createdAt: Date.now(),
+      lastMessageAt: Date.now(),
+      lastMessageText: text || (isImage ? '📸 Imagen recibida' : ''),
+      lastSender: from,
+      messages: []
+    });
+  }
+
+  const chat = liveChatsMap.get(jid);
+  if (name && (!chat.name || chat.name.startsWith('+'))) {
+    chat.name = name;
+  }
+
+  chat.lastMessageAt = Date.now();
+  chat.lastMessageText = text || (isImage ? '📸 Imagen recibida' : '');
+  chat.lastSender = from;
+
+  if (from === 'customer') {
+    chat.unreadCount = (chat.unreadCount || 0) + 1;
+  }
+
+  const msgId = originalMsgKey?.id || `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  if (!chat.messages) chat.messages = [];
+  if (!chat.messages.some(m => m.id === msgId)) {
+    chat.messages.push({
+      id: msgId,
+      from, // 'customer' | 'bot' | 'cashier'
+      text: text || '',
+      isImage: Boolean(isImage),
+      imageUrl: imageUrl || null,
+      timestamp: Date.now()
+    });
+  }
+
+  if (chat.messages.length > 60) {
+    chat.messages = chat.messages.slice(-60);
+  }
+
+  scheduleSaveLiveChats();
+}
+
+// =========================================================
 // SISTEMA DE PROTECCIÓN ANTIDETECCIÓN & ANTI-BANEO (WhatsApp Business)
 // =========================================================
 
@@ -1226,6 +1523,53 @@ function resetCustomerSession(jid) {
 const HUMAN_PAUSE_DURATION_MS = 25 * 60 * 1000; // 25 minutos
 const HUMAN_PAUSE_FILE = path.join(DATA_DIR, 'human_paused_chats.json');
 const botSentMessageIds = new Set(); // IDs de mensajes despachados por el propio bot (para no auto-pausarse)
+
+// Caché global de estados notificados a WhatsApp (Anti-duplicación estricta entre bot local y Supabase cloud)
+const cloudNotifiedStatusCache = new Set();
+const cloudLastForceNotifyTime = new Map();
+
+function markStatusNotified(orderOrId, status, extraNum = null) {
+  if (!status) return;
+  const normSt = status === 'preparando' ? 'cocina' : String(status).toLowerCase();
+  if (typeof orderOrId === 'object' && orderOrId !== null) {
+    const o = orderOrId;
+    if (o.id) cloudNotifiedStatusCache.add(`${o.id}:${normSt}`);
+    if (o.orderNumber) cloudNotifiedStatusCache.add(`${o.orderNumber}:${normSt}`);
+    if (o.code) cloudNotifiedStatusCache.add(`${o.code}:${normSt}`);
+    if (Array.isArray(o.notifiedStatuses) && !o.notifiedStatuses.includes(normSt)) {
+      o.notifiedStatuses.push(normSt);
+    }
+    if (o.statusTimestamps) {
+      if (!Array.isArray(o.statusTimestamps.notifiedStatuses)) {
+        o.statusTimestamps.notifiedStatuses = [];
+      }
+      if (!o.statusTimestamps.notifiedStatuses.includes(normSt)) {
+        o.statusTimestamps.notifiedStatuses.push(normSt);
+      }
+      o.statusTimestamps[`${normSt}NotifiedAt`] = new Date().toISOString();
+    }
+  } else if (orderOrId) {
+    cloudNotifiedStatusCache.add(`${orderOrId}:${normSt}`);
+    if (extraNum) cloudNotifiedStatusCache.add(`${extraNum}:${normSt}`);
+  }
+}
+
+function isStatusAlreadyNotified(orderOrId, status, extraNum = null) {
+  if (!status) return false;
+  const normSt = status === 'preparando' ? 'cocina' : String(status).toLowerCase();
+  if (typeof orderOrId === 'object' && orderOrId !== null) {
+    const o = orderOrId;
+    if (o.id && cloudNotifiedStatusCache.has(`${o.id}:${normSt}`)) return true;
+    if (o.orderNumber && cloudNotifiedStatusCache.has(`${o.orderNumber}:${normSt}`)) return true;
+    if (o.code && cloudNotifiedStatusCache.has(`${o.code}:${normSt}`)) return true;
+    const notified = Array.isArray(o.notifiedStatuses) ? o.notifiedStatuses : (o.statusTimestamps?.notifiedStatuses || []);
+    if (notified.includes(normSt)) return true;
+  } else if (orderOrId) {
+    if (cloudNotifiedStatusCache.has(`${orderOrId}:${normSt}`)) return true;
+    if (extraNum && cloudNotifiedStatusCache.has(`${extraNum}:${normSt}`)) return true;
+  }
+  return false;
+}
 
 function extractCleanDigits(jid) {
   if (!jid || typeof jid !== 'string') return '';
@@ -1432,6 +1776,13 @@ class WhatsAppBotServer {
         botSentMessageIds.add(sentMsg.key.id);
         setTimeout(() => botSentMessageIds.delete(sentMsg.key.id), 120000);
       }
+      recordLiveChatMessage({
+        jid: remoteJid,
+        from: 'bot',
+        text: typeof content === 'string' ? content : (content?.text || (content?.image ? '📸 Foto enviada' : '')),
+        isImage: Boolean(content?.image),
+        originalMsgKey: sentMsg?.key
+      });
       return sentMsg;
     } catch (err) {
       console.error(`[WHATSAPP BOT] safeSendMessage error enviando a ${remoteJid}:`, err?.message || err);
@@ -1441,6 +1792,13 @@ class WhatsAppBotServer {
           botSentMessageIds.add(fallbackSent.key.id);
           setTimeout(() => botSentMessageIds.delete(fallbackSent.key.id), 120000);
         }
+        recordLiveChatMessage({
+          jid: remoteJid,
+          from: 'bot',
+          text: typeof content === 'string' ? content : (content?.text || (content?.image ? '📸 Foto enviada' : '')),
+          isImage: Boolean(content?.image),
+          originalMsgKey: fallbackSent?.key
+        });
         return fallbackSent;
       } catch (fallbackErr) {
         console.error(`[WHATSAPP BOT] Fallback sendMessage falló:`, fallbackErr?.message || fallbackErr);
@@ -1470,9 +1828,8 @@ class WhatsAppBotServer {
 
     const normalizedStatus = (targetStatus === 'preparando') ? 'cocina' : targetStatus;
 
-    // Control anti-duplicados: evitar reenvíos accidentales por doble click
-    const notified = Array.isArray(order.notifiedStatuses) ? order.notifiedStatuses : [];
-    if (!force && notified.includes(normalizedStatus)) {
+    // Control anti-duplicados estricto: memoria local + caché de nube
+    if (!force && isStatusAlreadyNotified(order, normalizedStatus)) {
       console.log(`ℹ️ [NOTIF WHATSAPP]: Estado '${normalizedStatus}' ya fue notificado previamente al cliente del pedido #${order.orderNumber || order.id}.`);
       return { success: false, reason: 'already_notified' };
     }
@@ -1499,14 +1856,38 @@ class WhatsAppBotServer {
     const customerName = customerObj.name || (typeof order.customer === 'string' ? order.customer : 'Cliente') || 'Cliente';
     const orderNum = order.orderNumber || order.code || (order.id ? String(order.id).slice(-4) : 'Comanda');
 
-    // Detección precisa de modo Delivery
-    const isDelivery = order.deliveryType === 'delivery' || 
-                       order.channel === 'delivery' || 
-                       order.shippingMethod === 'delivery' ||
-                       customerObj.deliveryType === 'delivery' ||
-                       customerObj.shippingMethod === 'delivery' ||
-                       Number(order.deliveryFee || order.delivery_fee || 0) > 0 ||
-                       (customerObj.address && !['retiro en local', 'mostrador', 'local', 'en el local'].includes(customerObj.address.toLowerCase().trim()) && customerObj.address.length > 2 && !order.tableNumber && !order.table_number);
+    // Detección precisa de modo Take Away (Retiro en Local) vs Delivery
+    const rawAddr = (customerObj.address || order.address || '').toString().toLowerCase().trim();
+    const isTakeAwayAddr = /\b(retiro|mostrador|local|take\s*away|takeaway|salon|salón|sucursal|en el local)\b/i.test(rawAddr);
+
+    const isExplicitTakeAway = (
+      order.deliveryType === 'local' ||
+      order.deliveryType === 'takeaway' ||
+      order.deliveryType === 'mostrador' ||
+      order.deliveryType === 'salon' ||
+      order.deliveryType === 'pickup' ||
+      order.shippingMethod === 'local' ||
+      order.shippingMethod === 'takeaway' ||
+      order.shippingMethod === 'mostrador' ||
+      customerObj.deliveryType === 'local' ||
+      customerObj.deliveryType === 'takeaway' ||
+      customerObj.deliveryType === 'mostrador' ||
+      customerObj.shippingMethod === 'local' ||
+      customerObj.shippingMethod === 'takeaway' ||
+      customerObj.shippingMethod === 'mostrador' ||
+      Boolean(order.tableNumber || order.table_number) ||
+      isTakeAwayAddr
+    );
+
+    const isDelivery = !isExplicitTakeAway && (
+      order.deliveryType === 'delivery' || 
+      order.channel === 'delivery' || 
+      order.shippingMethod === 'delivery' ||
+      customerObj.deliveryType === 'delivery' ||
+      customerObj.shippingMethod === 'delivery' ||
+      Number(order.deliveryFee || order.delivery_fee || 0) > 0 ||
+      (rawAddr.length > 3 && !isTakeAwayAddr)
+    );
 
     // Dirección adecuada según contexto:
     // - Para Retiro en Local: siempre es la dirección física de la hamburguesería (vars.direccion)
@@ -1528,11 +1909,17 @@ class WhatsAppBotServer {
       if (isDelivery) {
         templateText = tpls.template_order_shipped || DEFAULT_SERVER_TEMPLATES.template_order_shipped;
       } else {
+        // Para Retiro en Local: NO se envía ningún mensaje al despachar (solo para delivery)
+        console.log(`ℹ️ [NOTIF WHATSAPP]: Pedido #${orderNum} es Retiro en Local. No se envía mensaje en 'entregado'/'despachar' (solo para delivery).`);
+        markStatusNotified(order, 'entregado');
         return { success: false, reason: 'takeaway_delivered_no_notify' };
       }
     }
 
     if (!templateText) return { success: false, reason: 'template_empty' };
+
+    // Registrar de inmediato en la caché para evitar que un tick concurrente de Supabase dispare en paralelo
+    markStatusNotified(order, normalizedStatus);
 
     const finalMessage = templateText
       .replace(/{cliente}/gi, customerName)
@@ -1557,6 +1944,7 @@ class WhatsAppBotServer {
     }
 
     if (sendResult) {
+      markStatusNotified(order, normalizedStatus);
       if (!order.notifiedStatuses) order.notifiedStatuses = [];
       if (!order.notifiedStatuses.includes(normalizedStatus)) {
         order.notifiedStatuses.push(normalizedStatus);
@@ -1569,9 +1957,32 @@ class WhatsAppBotServer {
         if (sIdx !== -1) {
           stored[sIdx].notifiedStatuses = order.notifiedStatuses;
           stored[sIdx].lastNotifiedAt = order.lastNotifiedAt;
+          if (!stored[sIdx].statusTimestamps) stored[sIdx].statusTimestamps = {};
+          stored[sIdx].statusTimestamps.notifiedStatuses = order.notifiedStatuses;
+          stored[sIdx].statusTimestamps[`${normalizedStatus}NotifiedAt`] = new Date().toISOString();
           fs.writeFileSync(ORDERS_FILE, JSON.stringify(stored, null, 2), 'utf-8');
         }
       } catch (_) {}
+
+      // Sincronizar hacia Supabase Cloud status_timestamps con notifiedStatuses para blindar a cualquier tablet
+      if (order.id) {
+        fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${order.id}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            status_timestamps: {
+              ...(order.statusTimestamps || {}),
+              notifiedStatuses: order.notifiedStatuses,
+              [`${normalizedStatus}NotifiedAt`]: new Date().toISOString()
+            },
+            updated_at: new Date().toISOString()
+          })
+        }).catch(() => {});
+      }
 
       console.log(`✅ [NOTIF WHATSAPP]: Notificación de estado '${normalizedStatus}' entregada con éxito a ${targetJid}.`);
       return { success: true, jid: targetJid, status: normalizedStatus };
@@ -1770,6 +2181,13 @@ class WhatsAppBotServer {
             continue;
           }
 
+          // Ignorar mensajes con más de 90 segundos de antigüedad (historial masivo al conectar)
+          const msgTimestamp = Number(msg.messageTimestamp || 0);
+          const nowSec = Math.floor(Date.now() / 1000);
+          if (msgTimestamp > 0 && (nowSec - msgTimestamp) > 90) {
+            continue;
+          }
+
           // Si el mensaje fue enviado por el operador/dueño desde el propio teléfono físico
           if (msg.key?.fromMe) {
             const isSelfChat = (this.connectedUser?.id && remoteJid.includes(this.connectedUser.id.split(':')[0])) ||
@@ -1781,15 +2199,36 @@ class WhatsAppBotServer {
               continue;
             }
             pauseBotForCustomer(remoteJid, null, 'operador_celular');
+            recordLiveChatMessage({
+              jid: remoteJid,
+              from: 'cashier',
+              text: text || (isImageMsg ? '📸 Imagen enviada desde el celular' : ''),
+              isImage: isImageMsg,
+              originalMsgKey: msg.key
+            });
             continue;
           }
 
-          // Ignorar mensajes con más de 90 segundos de antigüedad (historial masivo al conectar)
-          const msgTimestamp = Number(msg.messageTimestamp || 0);
-          const nowSec = Math.floor(Date.now() / 1000);
-          if (msgTimestamp > 0 && (nowSec - msgTimestamp) > 90) {
-            continue;
+          // Registrar mensaje del cliente en el centro de monitoreo en vivo (visible para el cajero)
+          let customerImageBase64 = null;
+          if (isImageMsg && this.sock) {
+            try {
+              const buffer = await downloadMediaMessage(msg, 'buffer', {});
+              if (buffer && buffer.length > 0 && buffer.length < 5 * 1024 * 1024) {
+                customerImageBase64 = `data:image/jpeg;base64,${buffer.toString('base64')}`;
+              }
+            } catch (_) {}
           }
+
+          recordLiveChatMessage({
+            jid: remoteJid,
+            name: msg.pushName || null,
+            from: 'customer',
+            text: text || (isImageMsg ? '📸 Comprobante / Imagen recibida' : ''),
+            isImage: isImageMsg,
+            imageUrl: customerImageBase64,
+            originalMsgKey: msg.key
+          });
 
           // -------------------------------------------------------------
           // CONTROL DE ATENCIÓN HUMANA (MODO HUMANO / HAND-OVER)
@@ -1857,7 +2296,9 @@ class WhatsAppBotServer {
           if (parsedCatalogOrder && parsedCatalogOrder.items && parsedCatalogOrder.items.length > 0) {
             console.log(`🛒 [WHATSAPP BOT] Pedido recibido desde el Catálogo Online de ${remoteJid}:`, parsedCatalogOrder.customerName, `| Pago: ${parsedCatalogOrder.paymentMethod || 'No especificado'}`);
             const cleanDigits = extractCleanDigits(remoteJid);
-            const orderId = (await getLatestOrderNumber()) + 1;
+            const orderNum = (await getLatestOrderNumber()) + 1;
+            const uniqueOrderId = parsedCatalogOrder.id || ('ord-' + Date.now());
+            const displayCode = `CMD-${orderNum}`;
             const biz = getBusinessContext();
 
             const chosenMethod = parsedCatalogOrder.paymentMethod || 'pendiente';
@@ -1865,9 +2306,11 @@ class WhatsAppBotServer {
               ? 'pendiente_comprobante' 
               : (chosenMethod === 'efectivo' ? 'pendiente_efectivo' : 'pendiente_pago');
 
+            const isCash = chosenMethod === 'efectivo';
             const newOrder = {
-              id: `CMD-${orderId}`,
-              orderNumber: orderId,
+              id: uniqueOrderId,
+              code: displayCode,
+              orderNumber: orderNum,
               customer: {
                 name: parsedCatalogOrder.customerName || msg.pushName || 'Cliente Catálogo Web',
                 phone: parsedCatalogOrder.customerPhone || cleanDigits,
@@ -1882,26 +2325,44 @@ class WhatsAppBotServer {
               total: Number(parsedCatalogOrder.total) || 0,
               paymentMethod: chosenMethod,
               paymentStatus: chosenStatus,
-              paymentConfirmed: false,
+              paymentConfirmed: isCash,
               items: parsedCatalogOrder.items.map((it, idx) => ({
                 id: `cat_${Date.now()}_${idx}`,
                 name: it.name,
-                price: Number(it.price),
+                price: Number(it.price) || 0,
+                unitPrice: Number(it.price) || 0,
                 qty: Number(it.qty || 1),
                 quantity: Number(it.qty || 1),
                 modifiers: []
               })),
               notes: parsedCatalogOrder.notes || '',
-              status: 'pendiente',
+              status: isCash ? 'cocina' : 'pendiente',
+              notifiedStatuses: isCash ? ['cocina'] : [],
+              statusTimestamps: {
+                createdAt: new Date().toISOString(),
+                cookingAt: isCash ? new Date().toISOString() : null,
+                readyAt: null,
+                deliveredAt: null,
+                notifiedStatuses: isCash ? ['cocina'] : [],
+                cocinaNotifiedAt: isCash ? new Date().toISOString() : null
+              },
               createdAt: new Date().toISOString(),
+              updatedAt: Date.now(),
               source: 'catalogo_online'
             };
 
+            if (isCash) {
+              markStatusNotified(newOrder, 'cocina');
+              markStatusNotified(displayCode, 'cocina');
+              markStatusNotified(orderNum, 'cocina');
+              markStatusNotified(uniqueOrderId, 'cocina');
+            }
+
             // Inyectar en almacenamiento y cola para el POS / KDS / Cocina
             saveStoredOrder(newOrder);
-            pushOrderToSupabase(newOrder).catch(() => {});
+            await pushOrderToSupabase(newOrder);
             pendingOrdersForPos.push(newOrder);
-            console.log(`🛎️ [PEDIDO CATÁLOGO WEB]: Pedido #${orderId} de ${newOrder.customer.name} ($${newOrder.total}) inyectado a cocina y POS. Método: ${chosenMethod}`);
+            console.log(`🛎️ [PEDIDO CATÁLOGO WEB]: Pedido #${displayCode} de ${newOrder.customer.name} ($${newOrder.total}) inyectado a cocina y POS. Método: ${chosenMethod}`);
 
             const itemsSummary = parsedCatalogOrder.items.map(it => `• ${it.qty}x ${it.name} - $${(it.price * it.qty).toLocaleString('es-AR')}`).join('\n');
             const shippingLabel = newOrder.deliveryType === 'delivery' 
@@ -2093,12 +2554,14 @@ class WhatsAppBotServer {
               // Generar número de comanda correlativo sincronizado
               const latestOrderNum = await getLatestOrderNumber();
               const nextOrderNum = latestOrderNum + 1;
-              const orderId = 'CMD-' + nextOrderNum;
+              const uniqueOrderId = 'ord-' + Date.now();
+              const displayCode = 'CMD-' + nextOrderNum;
               const cleanPhone = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '');
               
+              const isCash = session.paymentMethod === 'efectivo';
               const newOrder = {
-                id: orderId,
-                code: orderId,
+                id: uniqueOrderId,
+                code: displayCode,
                 orderNumber: nextOrderNum,
                 customer: {
                   name: session.customerName || 'Cliente WhatsApp',
@@ -2114,36 +2577,54 @@ class WhatsAppBotServer {
                 total: Number(session.total) || 0,
                 paymentMethod: session.paymentMethod, // 'efectivo' o 'transferencia'
                 paymentStatus: session.paymentMethod === 'transferencia' ? 'pendiente_comprobante' : 'pendiente_efectivo',
-                paymentConfirmed: false,
-                items: session.items.map(it => ({
-                  id: it.id,
+                paymentConfirmed: isCash,
+                items: (session.items || []).map((it, idx) => ({
+                  id: it.id || `item-${Date.now()}-${idx}`,
                   name: it.name,
-                  price: Number(it.price),
+                  price: Number(it.price) || 0,
+                  unitPrice: Number(it.price) || 0,
                   qty: Number(it.qty || it.quantity || 1),
                   quantity: Number(it.qty || it.quantity || 1),
                   freeShipping: Boolean(it.freeShipping),
                   modifiers: it.modifiers || [],
                   notes: it.notes || ''
                 })),
-                status: 'pendiente',
+                status: isCash ? 'cocina' : 'pendiente',
+                notifiedStatuses: isCash ? ['cocina'] : [],
+                statusTimestamps: {
+                  createdAt: new Date().toISOString(),
+                  cookingAt: isCash ? new Date().toISOString() : null,
+                  readyAt: null,
+                  deliveredAt: null,
+                  notifiedStatuses: isCash ? ['cocina'] : [],
+                  cocinaNotifiedAt: isCash ? new Date().toISOString() : null
+                },
                 createdAt: new Date().toISOString(),
+                updatedAt: Date.now(),
                 source: 'whatsapp_bot'
               };
 
-              // Guardar pedido localmente y en cola para el POS
+              if (isCash) {
+                markStatusNotified(newOrder, 'cocina');
+                markStatusNotified(displayCode, 'cocina');
+                markStatusNotified(nextOrderNum, 'cocina');
+                markStatusNotified(uniqueOrderId, 'cocina');
+              }
+
+              // Guardar pedido localmente y en cola para el POS / Cocina
               saveStoredOrder(newOrder);
-              pushOrderToSupabase(newOrder).catch(() => {});
+              await pushOrderToSupabase(newOrder);
               pendingOrdersForPos.push(newOrder);
-              console.log(`🔔 [NUEVO PEDIDO WHATSAPP]: Pedido #${orderId} de ${newOrder.customer.name} ($${newOrder.total}) inyectado.`);
+              console.log(`🔔 [NUEVO PEDIDO WHATSAPP]: Pedido #${displayCode} (${uniqueOrderId}) de ${newOrder.customer.name} ($${newOrder.total}) inyectado.`);
 
               const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
               
               let confirmMsg = '';
               if (session.paymentMethod === 'transferencia') {
                 const biz = getBusinessContext();
-                confirmMsg = `🎉 *¡PEDIDO #${orderId} REGISTRADO!* 🍔🔥\n\n¡Muchas gracias *${newOrder.customer.name}*!\n\n📋 *Detalle de tu pedido:*\n${itemsList}\n\n💵 *Total a transferir:* $${newOrder.total.toLocaleString('es-AR')}\n🛵 *Modo:* ${session.shippingMethod === 'delivery' ? '🛵 Envío a Domicilio' : '🛍️ Retiro por el Local'}\n📍 *Dirección:* ${newOrder.customer.address}\n\n💳 *Datos para Transferencia:*\n• *Alias:* \`${biz.alias_banco}\`\n• *Banco:* ${biz.banco}\n• *Titular:* ${biz.titular}${biz.cbu ? `\n• *CBU:* \`${biz.cbu}\`` : ''}\n\n📸 *IMPORTANTE:* Por favor enviá la foto o captura del comprobante por aquí.\n⏳ *Tu pedido quedará pendiente hasta que una persona de nuestro equipo confirme el comprobante y lo mande a cocina.* 🔥`;
+                confirmMsg = `🎉 *¡PEDIDO #${nextOrderNum} REGISTRADO!* 🍔🔥\n\n¡Muchas gracias *${newOrder.customer.name}*!\n\n📋 *Detalle de tu pedido:*\n${itemsList}\n\n💵 *Total a transferir:* $${newOrder.total.toLocaleString('es-AR')}\n🛵 *Modo:* ${session.shippingMethod === 'delivery' ? '🛵 Envío a Domicilio' : '🛍️ Retiro por el Local'}\n📍 *Dirección:* ${newOrder.customer.address}\n\n💳 *Datos para Transferencia:*\n• *Alias:* \`${biz.alias_banco}\`\n• *Banco:* ${biz.banco}\n• *Titular:* ${biz.titular}${biz.cbu ? `\n• *CBU:* \`${biz.cbu}\`` : ''}\n\n📸 *IMPORTANTE:* Por favor enviá la foto o captura del comprobante por aquí.\n⏳ *Tu pedido quedará pendiente hasta que una persona de nuestro equipo confirme el comprobante y lo mande a cocina.* 🔥`;
               } else {
-                confirmMsg = `🎉 *¡PEDIDO #${orderId} CONFIRMADO Y ENVIADO A LA COCINA!* 🔥🍔\n\n¡Muchas gracias *${newOrder.customer.name}*, tu pedido ya ingresó al sistema de la plancha!\n\n📋 *Detalle:*\n${itemsList}\n\n💵 *Total:* $${newOrder.total.toLocaleString('es-AR')}\n🛵 *Modo:* ${session.shippingMethod === 'delivery' ? '🛵 Envío a Domicilio' : '🛍️ Retiro por el Local'}\n📍 *Dirección:* ${newOrder.customer.address}\n\n💵 *Pago en Efectivo:* Abonás al recibir tu comida. ¡La cocina ya está marchando tus burgers! 🔥`;
+                confirmMsg = `🎉 *¡PEDIDO #${nextOrderNum} CONFIRMADO Y ENVIADO A LA COCINA!* 🔥🍔\n\n¡Muchas gracias *${newOrder.customer.name}*, tu pedido ya ingresó al sistema de la plancha!\n\n📋 *Detalle:*\n${itemsList}\n\n💵 *Total:* $${newOrder.total.toLocaleString('es-AR')}\n🛵 *Modo:* ${session.shippingMethod === 'delivery' ? '🛵 Envío a Domicilio' : '🛍️ Retiro por el Local'}\n📍 *Dirección:* ${newOrder.customer.address}\n\n💵 *Pago en Efectivo:* Abonás al recibir tu comida. ¡La cocina ya está marchando tus burgers! 🔥`;
               }
 
               resetCustomerSession(remoteJid);
@@ -2178,13 +2659,22 @@ class WhatsAppBotServer {
             if (session.activeOrderId) {
               const orderId = session.activeOrderId;
               const allOrders = getStoredOrders();
-              const existingIdx = allOrders.findIndex(o => o.orderNumber === orderId || o.id === `CMD-${orderId}`);
+              const existingIdx = allOrders.findIndex(o => o.orderNumber === orderId || o.id === `CMD-${orderId}` || o.code === `CMD-${orderId}`);
               const biz = getBusinessContext();
               if (existingIdx !== -1) {
                 allOrders[existingIdx].paymentMethod = session.paymentMethod;
                 allOrders[existingIdx].paymentStatus = session.paymentMethod === 'transferencia' ? 'pendiente_comprobante' : 'pendiente_efectivo';
+                if (session.paymentMethod === 'efectivo') {
+                  allOrders[existingIdx].status = 'cocina';
+                  allOrders[existingIdx].paymentConfirmed = true;
+                  allOrders[existingIdx].statusTimestamps = {
+                    ...(allOrders[existingIdx].statusTimestamps || {}),
+                    cookingAt: new Date().toISOString()
+                  };
+                }
+                allOrders[existingIdx].updatedAt = Date.now();
                 saveStoredOrder(allOrders[existingIdx]);
-                pushOrderToSupabase(allOrders[existingIdx]).catch(() => {});
+                await pushOrderToSupabase(allOrders[existingIdx]);
               }
 
               let confirmMsg = '';
@@ -2292,21 +2782,67 @@ class WhatsAppBotServer {
 
           // ESTADO: SELECTING (Seleccionando productos o modificadores)
           if (session.step === 'SELECTING') {
+            if (!Array.isArray(session.items)) session.items = [];
             const tplsSel = getBotTemplates();
-            const menuModeSel = tplsSel.menu_mode || 'catalog';
-            if (menuModeSel === 'catalog') {
-              // En modo catálogo online, se desactiva el armado de pedido por plantillas de texto
-              resetCustomerSession(remoteJid);
-              const biz = getBusinessContext();
-              const catalogUrl = (biz.catalogo_url || biz.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
-              const reply = `🍔 *¡Para realizar tu pedido usá obligatoriamente nuestra Carta Digital con fotos!* 📸\n\n👉 ${catalogUrl}/#catalog\n\nAllí podés ver fotos reales de cada producto, elegir tus adicionales favoritos y enviar tu pedido directo por acá en un click.`;
-              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
-              continue;
-            }
-            if (lower === 'listo' || lower === 'pedir' || lower === 'comprar' || lower === 'terminar' || lower === 'seguir' || lower === 'avanzar' || lower === 'pagar') {
+            const menuModeSel = tplsSel.menu_mode || 'templates';
+
+            // 1. Ver carrito actual
+            const cleanNormSelecting = normalizeSearchText(lower);
+            if (/^(carrito|ver\s+carrito|mi\s+carrito|ver\s+pedido|mi\s+pedido|pedido\s+actual)$/i.test(cleanNormSelecting)) {
               if (session.items.length === 0) {
                 await this.safeSendMessage(remoteJid, {
-                  text: '⚠️ Tu pedido está vacío. Escribí el *NÚMERO* de la burger que querés o escribí *MENU*.'
+                  text: `🛒 *Tu carrito está vacío.*\n\n👉 Respondé con el *NÚMERO* (1 al ${prods.length}) o el nombre de la burger que quieras sumar.\n👉 Escribí *MENU* para ver todas las opciones.`
+                }, msg.key);
+              } else {
+                const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${((Number(it.price) || 0) * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
+                await this.safeSendMessage(remoteJid, {
+                  text: `🛒 *TU CARRITO ACTUAL:* 🍔\n\n${itemsList}\n\n💵 *Subtotal:* $${(session.total || session.subtotal || 0).toLocaleString('es-AR')}\n\n👉 Para sumar más: Respondé con el *NÚMERO* o nombre.\n👉 Para quitar: Escribí *QUITAR [número]*.\n👉 O respondé *LISTO* para elegir cómo recibirlo.`
+                }, msg.key);
+              }
+              continue;
+            }
+
+            // 2. Quitar / Eliminar producto del carrito (ej: "quitar 1", "sacar clásica")
+            const removeMatch = lower.match(/^(?:quitar|sacar|eliminar|borrar)\s+(.+)$/i);
+            if (removeMatch) {
+              const targetStr = removeMatch[1].trim();
+              const targetIdx = parseInt(targetStr, 10);
+              let removedItem = null;
+
+              if (!isNaN(targetIdx) && targetIdx >= 1 && targetIdx <= session.items.length) {
+                removedItem = session.items.splice(targetIdx - 1, 1)[0];
+              } else {
+                const foundCartIdx = session.items.findIndex(it => cleanTokens(it.name).includes(cleanTokens(targetStr)) || cleanTokens(targetStr).includes(cleanTokens(it.name)));
+                if (foundCartIdx !== -1) {
+                  removedItem = session.items.splice(foundCartIdx, 1)[0];
+                }
+              }
+
+              if (removedItem) {
+                session.subtotal = session.items.reduce((acc, it) => acc + ((Number(it.price) || 0) * (it.qty || 1)), 0);
+                session.total = session.subtotal;
+                const itemsList = session.items.length > 0
+                  ? session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${((Number(it.price) || 0) * (it.qty || 1)).toLocaleString('es-AR')}`).join('\n')
+                  : '_Tu carrito ahora está vacío._';
+
+                await this.safeSendMessage(remoteJid, {
+                  text: `🗑️ *Quitaste ${removedItem.name} de tu pedido.*\n\n🛒 *Carrito actual:*\n${itemsList}\n\n💵 *Nuevo Total:* $${session.total.toLocaleString('es-AR')}\n\n👉 Podés sumar otro producto escribiendo su número o escribir *LISTO* para avanzar.`
+                }, msg.key);
+                continue;
+              } else {
+                await this.safeSendMessage(remoteJid, {
+                  text: `⚠️ No encontramos ese producto en tu carrito actual. Para quitarlo escribí *QUITAR [número de item]* (ej: *QUITAR 1*).`
+                }, msg.key);
+                continue;
+              }
+            }
+
+            // 3. Finalizar armado de carrito y avanzar al checkout (entrega y pago)
+            const isCheckoutTrigger = /^(listo|pedir|comprar|terminar|seguir|avanzar|pagar|ya\s+esta|ya\s+está|nada\s+mas|nada\s+más|eso\s+es\s+todo|eso\s+solo|fin)$/i.test(cleanNormSelecting);
+            if (isCheckoutTrigger) {
+              if (session.items.length === 0) {
+                await this.safeSendMessage(remoteJid, {
+                  text: `⚠️ Tu pedido está vacío. Escribí el *NÚMERO* (1 al ${prods.length}) de la burger que querés o escribí *MENU*.`
                 }, msg.key);
                 continue;
               }
@@ -2317,68 +2853,116 @@ class WhatsAppBotServer {
               continue;
             }
 
-            // Detección de modificadores (ej: sin cebolla, extra cheddar)
-            if (lower.startsWith('sin ') || lower.startsWith('con ') || lower.startsWith('extra ') || lower.includes('cebolla') || lower.includes('cheddar') || lower.includes('panceta') || lower.includes('bacon')) {
-              if (session.items.length > 0) {
-                const lastItem = session.items[session.items.length - 1];
-                if (!lastItem.modifiers) lastItem.modifiers = [];
-                lastItem.modifiers.push(text);
-                await this.safeSendMessage(remoteJid, {
-                  text: `📝 *Modificador agregado a ${lastItem.name}:* "${text}".\n\n👉 ¿Querés sumar algo más? *(Escribí el número)*\n👉 O escribí *LISTO* para avanzar con la entrega.`
-                }, msg.key);
+            // 3.5. Detección de consultas por categoría o lista de categorías en modo plantillas
+            if (menuModeSel === 'templates') {
+              if (isCategoriesListQuery(text)) {
+                const catSummaryMsg = buildCategoriesSummaryMessage(prods);
+                await this.safeSendMessage(remoteJid, { text: catSummaryMsg }, msg.key);
+                continue;
+              }
+
+              const matchedCategory = detectCategoryQuery(text, prods);
+              if (matchedCategory) {
+                const catMsg = buildCategoryCatalogMessage(matchedCategory, prods, session.items, session.total);
+                await this.safeSendMessage(remoteJid, { text: catMsg }, msg.key);
                 continue;
               }
             }
 
-            // Intentar sumar otro producto por número o nombre (con detección inteligente de promos)
+            // 4. Consulta a la IA mientras está en SELECTING (dudas de ingredientes, celíacos, recomendaciones)
+            if (isCustomerInquiry(text)) {
+              try {
+                const biz = getBusinessContext();
+                const aiReply = await geminiBotService.generateReply(text, {
+                  customerName: msg.pushName || '',
+                  customerPhone: remoteJid,
+                  availableProducts: prods,
+                  businessInfo: biz,
+                  currentOrder: session.items || [],
+                  orderStep: session.step
+                });
+
+                if (aiReply) {
+                  console.log(`✨ [WHATSAPP IA en SELECTING]: Respondiendo consulta a ${remoteJid}`);
+                  await this.safeSendMessage(remoteJid, { text: aiReply }, msg.key);
+                  continue;
+                }
+              } catch (aiErr) {
+                console.warn('[WHATSAPP BOT AI SELECTING ERROR]:', aiErr);
+              }
+            }
+
+            // 5. Detección de modificadores explícitos (ej: "sin cebolla", "extra cheddar", "con panceta")
+            const isExplicitModifier = /^(sin|con|extra|sacar|agregar|doble)\s+(cebolla|cheddar|panceta|bacon|queso|salsa|tomate|lechuga|huevo|pepino|mayonesa|mostaza|ketchup|papas)/i.test(lower);
+            if (isExplicitModifier && session.items.length > 0) {
+              const lastItem = session.items[session.items.length - 1];
+              if (!lastItem.modifiers) lastItem.modifiers = [];
+              lastItem.modifiers.push(text);
+              await this.safeSendMessage(remoteJid, {
+                text: `📝 *Modificador agregado a ${lastItem.name}:* "${text}".\n\n👉 ¿Querés sumar algo más? *(Escribí el nombre o número)*\n👉 O escribí *LISTO* para avanzar con la entrega.`
+              }, msg.key);
+              continue;
+            }
+
+            // 6. Selección y adición de productos por número o nombre (con soporte inteligente de cantidades)
             let selectedProd = null;
-            const numOnlyMatch = lower.match(/^(?:el\s+|la\s+|n[uú]mero\s+|numero\s+|nro\s+|#|opci[oó]n\s+|opcion\s+|sumar\s+|agregar\s+|otro\s+n[uú]mero\s+|otro\s+numero\s+)?(\d+)$/i);
+            let parsedQty = 1;
+
+            // Detección por número: ej "1", "la 1", "sumar 1", "quiero el 2", "dame 1"
+            const numOnlyMatch = cleanNormSelecting.match(/^(?:quiero\s+|dame\s+|anotame\s+|sumar\s+|agregar\s+|pedir\s+|llevar\s+|trae\s+|traeme\s+)?(?:el\s+|la\s+|n[uú]mero\s+|numero\s+|nro\s+|#|opci[oó]n\s+|opcion\s+|otro\s+n[uú]mero\s+|otro\s+numero\s+)?(\d+)(?:\s+por\s+favor)?$/i);
             if (numOnlyMatch) {
               const numIdx = parseInt(numOnlyMatch[1], 10);
               if (numIdx >= 1 && numIdx <= prods.length) {
                 selectedProd = prods[numIdx - 1];
+                parsedQty = 1;
               }
             } else {
+              // Búsqueda por texto / nombre (ej: "2 clasicas", "quiero doña burga", "bajonera")
               selectedProd = findProductByText(lower, prods);
+              if (selectedProd) {
+                parsedQty = parseCustomerQuantity(lower, selectedProd.name);
+              }
             }
 
             if (selectedProd) {
               const existingIdx = session.items.findIndex(it => it.id === selectedProd.id);
               if (existingIdx !== -1) {
-                session.items[existingIdx].qty = (session.items[existingIdx].qty || 1) + 1;
+                session.items[existingIdx].qty = (session.items[existingIdx].qty || 1) + parsedQty;
                 session.items[existingIdx].quantity = session.items[existingIdx].qty;
               } else {
                 session.items.push({
                   id: selectedProd.id,
                   name: selectedProd.name,
-                  price: Number(selectedProd.price),
+                  price: Number(selectedProd.price) || 0,
                   freeShipping: Boolean(selectedProd.freeShipping),
-                  qty: 1,
-                  quantity: 1,
+                  qty: parsedQty,
+                  quantity: parsedQty,
                   modifiers: []
                 });
               }
 
-              session.subtotal = session.items.reduce((acc, it) => acc + (it.price * (it.qty || 1)), 0);
+              session.subtotal = session.items.reduce((acc, it) => acc + ((Number(it.price) || 0) * (it.qty || 1)), 0);
               session.total = session.subtotal;
 
-              const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
+              const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${((Number(it.price) || 0) * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
 
               const modsHint = selectedProd.modifiers && selectedProd.modifiers.length > 0 
                 ? `\n👉 *Modificadores disponibles:* ${selectedProd.modifiers.join(', ')}`
                 : `\n👉 *¿Modificaciones?* (Ej: Sin cebolla, Extra cheddar)`;
 
+              const qtyStr = parsedQty > 1 ? ` (x${parsedQty})` : '';
               await this.safeSendMessage(remoteJid, {
-                text: `✅ *¡Sumaste ${selectedProd.name}!* 🍔 (+$${Number(selectedProd.price).toLocaleString('es-AR')})\n\n🛒 *Tu pedido actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n👉 ¿Querés sumar algo más? *(Escribí otro número)*${modsHint}\n👉 O escribí *LISTO* para continuar.`
+                text: `✅ *¡Sumaste ${selectedProd.name}${qtyStr}!* 🍔 (+$${((Number(selectedProd.price) || 0) * parsedQty).toLocaleString('es-AR')})\n\n🛒 *Tu pedido actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n👉 *¿Querés sumar algo más?*\n• Podés pedir directamente por *nombre* (ej: *"1 Coca"*, *"papas"*) o por *número*.\n• Escribí *CARTA* (o *HAMBURGUESAS*, *BEBIDAS*, etc.) para ver la lista sin perder tu carrito.${modsHint}\n👉 O escribí *LISTO* para avanzar con la entrega y el pago.`
               }, msg.key);
               continue;
             }
 
-            // Si el cliente pide explícitamente sumar, agregar o ver otro número / opciones
-            const cleanNormSelecting = normalizeSearchText(lower);
+            // 7. Si el cliente pide explícitamente sumar, agregar o ver otro número / opciones / categorías
             const isAddMoreTrigger = 
-              /^(sumar|suma|sumo|quiero\s+sumar|agregar|agrega|agrego|quiero\s+agregar|otro|otra|otros|otras|otro\s+n[uú]mero|otro\s+numero|otro\s+producto|otra\s+hamburguesa|otra\s+burger|ver\s+m[aá]s|ver\s+mas|m[aá]s|mas|quiero\s+otra|quiero\s+otro|dame\s+otra|dame\s+otro|como\s+sumo)$/i.test(cleanNormSelecting) ||
-              /\b(opciones|catalogo|cat[aá]logo|carta|menu|men[uú]|que\s+tienen|que\s+hay|que\s+mas\s+hay|que\s+mas\s+tienen)\b/i.test(cleanNormSelecting) ||
+              /^(si|sí|dale|ok|claro|por\s+fa|por\s+favor)?\s*(quiero|quisiera|deseo|voy\s+a)?\s*(sumar|sumas|suma|sumo|agregar|agrega|agrego|meter|pedir)\b/i.test(cleanNormSelecting) ||
+              /^(si|sí|dale|ok|claro|por\s+favor)?\s*(algo\s+m[aá]s|otra\s+cosa|m[aá]s|mas)\b/i.test(cleanNormSelecting) ||
+              /^(otro|otra|otros|otras|otro\s+n[uú]mero|otro\s+numero|otro\s+producto|otra\s+hamburguesa|otra\s+burger|ver\s+m[aá]s|ver\s+mas|quiero\s+otra|quiero\s+otro|dame\s+otra|dame\s+otro|como\s+sumo|como\s+pido)$/i.test(cleanNormSelecting) ||
+              /\b(opciones|catalogo|cat[aá]logo|carta|menu|men[uú]|productos|que\s+tienen|que\s+hay|que\s+mas\s+hay|que\s+mas\s+tienen|como\s+veo|ver\s+productos|mostrar\s+productos)\b/i.test(cleanNormSelecting) ||
               cleanNormSelecting.startsWith('sumar') ||
               cleanNormSelecting.startsWith('agregar') ||
               cleanNormSelecting.startsWith('otro ') ||
@@ -2387,8 +2971,10 @@ class WhatsAppBotServer {
             if (isAddMoreTrigger) {
               session.catalogPage = session.catalogPage || 1;
               const catalogText = buildCatalogMessage(prods, session.catalogPage, 8, false);
-              const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}`).join('\n');
-              const reply = `🛒 *Tu pedido actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n🍟 *Elegí qué hamburguesa, promo o agregado querés sumar:*\n\n${catalogText}\n\n───────────────────\n👉 *Para sumar:* Respondé con el NÚMERO (1 al ${prods.length}) o escribí su nombre.\n👉 O respondé *LISTO* para elegir cómo recibirlo.`;
+              const itemsList = session.items.length > 0
+                ? session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${((Number(it.price) || 0) * (it.qty || 1)).toLocaleString('es-AR')}`).join('\n')
+                : '_Carrito vacío._';
+              const reply = `🛒 *Tu pedido actual sigue guardado:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n🍟 *¿Qué querés sumar? Podés:*\n• Escribir el *NOMBRE* directamente (ej: *"1 Coca"*, *"papas"*).\n• Escribir el *NÚMERO* de la opción (1 al ${prods.length}).\n• Escribir una categoría: *HAMBURGUESAS*, *BEBIDAS*, *PAPAS*, *LOMITOS*, *PANCHOS* o *PROMOS*.\n• O escribir *CARTA* para ver todas las opciones.\n\n👉 Si ya terminaste, respondé *LISTO* para avanzar con la entrega.`;
               await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
               continue;
             }
@@ -2429,6 +3015,32 @@ class WhatsAppBotServer {
           }
 
           // -------------------------------------------------------------
+          // DETECCIÓN Y CONSULTA DIRECTA CON IA (PREGUNTAS, INGREDIENTES, DUDAS, RECOMENDACIONES)
+          // Se activa prioritariamente cuando el cliente hace una pregunta gastronómica o del local
+          // -------------------------------------------------------------
+          if (isCustomerInquiry(text)) {
+            try {
+              const biz = getBusinessContext();
+              const aiReply = await geminiBotService.generateReply(text, {
+                customerName: msg.pushName || '',
+                customerPhone: remoteJid,
+                availableProducts: prods,
+                businessInfo: biz,
+                currentOrder: session.items || [],
+                orderStep: session.step
+              });
+
+              if (aiReply) {
+                console.log(`✨ [WHATSAPP IA]: Respondiendo consulta inteligente a ${remoteJid}: "${text}"`);
+                await this.safeSendMessage(remoteJid, { text: aiReply }, msg.key);
+                continue;
+              }
+            } catch (aiErr) {
+              console.warn('[WHATSAPP BOT AI ERROR]:', aiErr);
+            }
+          }
+
+          // -------------------------------------------------------------
           // COMANDO: CONSULTA DIRECTA DE PROMOS ("promos", "ver promos", "ofertas")
           // -------------------------------------------------------------
           const cleanNormText = normalizeSearchText(lower);
@@ -2453,15 +3065,13 @@ class WhatsAppBotServer {
           }
 
           // -------------------------------------------------------------
-          // MENÚ PRINCIPAL Y SALUDOS (ALTA PRIORIDAD EN MODO IDLE)
-          // Si el cliente saluda ("hola", "buenas", etc.) o solicita el menú,
-          // se envía la plantilla de menú estructurada con opciones 1 a 5
-          // (NO debe intervenir la IA en el menú principal ni en saludos)
+          // MENÚ PRINCIPAL Y SALUDOS PUROS (ALTA PRIORIDAD EN MODO IDLE)
+          // Solo responde con el menú estructurado si el cliente envía un saludo puro sin consultas
           // -------------------------------------------------------------
-          const isGreetingRegex = /^(hola|buenas|buen\s*dia|buenos\s*dias|buenas\s*tardes|buenas\s*noches|que\s*tal|holis|hey|saludos)(\s.*)?$/i;
+          const isPureGreetingRegex = /^(hola|buenas|buen\s*dia|buenos\s*dias|buenas\s*tardes|buenas\s*noches|que\s*tal|holis|hey|saludos)[.!, ]*$/i;
           const isMenuCommand = [
             'menu', 'menú', 'inicio', 'comenzar', 'start', 'opciones', 'ayuda', '#menu'
-          ].includes(lower) || isGreetingRegex.test(lower);
+          ].includes(lower) || isPureGreetingRegex.test(lower.trim());
 
           if (isMenuCommand && session.step === 'IDLE') {
             session.catalogPage = 1;
@@ -2559,7 +3169,7 @@ class WhatsAppBotServer {
             if (lower === '4' || lower === 'carta' || lower === 'catalogo' || lower === 'catálogo') {
               const tpls4 = getBotTemplates();
               const biz4 = getBusinessContext();
-              const menuMode = tpls4.menu_mode || 'catalog';
+              const menuMode = tpls4.menu_mode || 'templates';
               if (menuMode === 'catalog') {
                 // MODO CATÁLOGO ONLINE: envía link al catálogo web con fotos obligatoriamente
                 const catalogUrl = (biz4.catalogo_url || biz4.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
@@ -2569,6 +3179,7 @@ class WhatsAppBotServer {
                 // MODO PLANTILLAS CLÁSICO: menú numerado de texto
                 session.step = 'SELECTING';
                 session.catalogPage = 1;
+                if (!Array.isArray(session.items)) session.items = [];
                 const reply = buildCatalogMessage(prods, 1, 8, false);
                 await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
               }
@@ -2590,7 +3201,7 @@ class WhatsAppBotServer {
             if (lower === 'comprar' || lower === 'pedir' || lower === 'hacer pedido' || lower === 'quiero pedir' || lower === 'hacer una orden' || lower === 'quiero una hamburguesa') {
               const tplsCmp = getBotTemplates();
               const bizCmp = getBusinessContext();
-              const menuModeCmp = tplsCmp.menu_mode || 'catalog';
+              const menuModeCmp = tplsCmp.menu_mode || 'templates';
               if (menuModeCmp === 'catalog') {
                 const catalogUrl = (bizCmp.catalogo_url || bizCmp.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
                 const catalogLink = `🛒 *¡Para realizar tu pedido usá obligatoriamente nuestra Carta Digital con fotos!* 🍔📸\n\n👉 ${catalogUrl}/#catalog\n\nAllí podés ver fotos reales de cada producto, elegir tus adicionales favoritos y enviar tu pedido directo a la cocina con un click. ¡Te esperamos! 🔥`;
@@ -2598,9 +3209,33 @@ class WhatsAppBotServer {
               } else {
                 session.step = 'SELECTING';
                 session.catalogPage = 1;
+                if (!Array.isArray(session.items)) session.items = [];
                 const reply = buildCatalogMessage(prods, 1, 8, false);
                 await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
               }
+              continue;
+            }
+          }
+
+          // -------------------------------------------------------------
+          // MODO PLANTILLAS: CONSULTA POR CATEGORÍA O LISTADO DE CATEGORÍAS (IDLE)
+          // (ej: "muestrame que hamburguesas tienen", "ver bebidas", "que papas hay", "lomitos", etc.)
+          // -------------------------------------------------------------
+          const tplsIdle = getBotTemplates();
+          const menuModeIdle = tplsIdle.menu_mode || 'templates';
+          if (menuModeIdle === 'templates') {
+            if (isCategoriesListQuery(text)) {
+              const catSummaryMsg = buildCategoriesSummaryMessage(prods);
+              await this.safeSendMessage(remoteJid, { text: catSummaryMsg }, msg.key);
+              continue;
+            }
+
+            const matchedCatQuery = detectCategoryQuery(text, prods);
+            if (matchedCatQuery) {
+              session.step = 'SELECTING';
+              if (!Array.isArray(session.items)) session.items = [];
+              const catReply = buildCategoryCatalogMessage(matchedCatQuery, prods, session.items, session.total);
+              await this.safeSendMessage(remoteJid, { text: catReply }, msg.key);
               continue;
             }
           }
@@ -2610,17 +3245,23 @@ class WhatsAppBotServer {
           // -------------------------------------------------------------
           const initialNum = parseInt(lower.replace(/\D/g, ''), 10);
           let matchedProd = null;
+          let parsedDirectQty = 1;
+
           if (!isNaN(initialNum) && initialNum >= 1 && initialNum <= prods.length && !lower.includes('hamburguesa') && !lower.includes('burger') && /^(pedir|comprar|la|el|nro|numero)?\s*\d+$/i.test(lower)) {
             matchedProd = prods[initialNum - 1];
+            parsedDirectQty = 1;
           } else {
             matchedProd = directProdCheck || findProductByText(lower, prods);
+            if (matchedProd) {
+              parsedDirectQty = parseCustomerQuantity(lower, matchedProd.name);
+            }
           }
 
           const isPureMenuDigitInIdle = session.step === 'IDLE' && /^[0-5]$/.test(cleanNormText);
 
           if (matchedProd && !isPureMenuDigitInIdle) {
             const tplsDirect = getBotTemplates();
-            const menuModeDirect = tplsDirect.menu_mode || 'catalog';
+            const menuModeDirect = tplsDirect.menu_mode || 'templates';
             if (menuModeDirect === 'catalog') {
               // MODO CATÁLOGO ONLINE: no se permite pedir por texto ni plantillas
               const biz = getBusinessContext();
@@ -2631,34 +3272,35 @@ class WhatsAppBotServer {
             }
 
             session.step = 'SELECTING';
-            if (!session.items) session.items = [];
+            if (!Array.isArray(session.items)) session.items = [];
             
             const existingIdx = session.items.findIndex(it => it.id === matchedProd.id);
             if (existingIdx !== -1) {
-              session.items[existingIdx].qty = (session.items[existingIdx].qty || 1) + 1;
+              session.items[existingIdx].qty = (session.items[existingIdx].qty || 1) + parsedDirectQty;
               session.items[existingIdx].quantity = session.items[existingIdx].qty;
             } else {
               session.items.push({
                 id: matchedProd.id,
                 name: matchedProd.name,
-                price: Number(matchedProd.price),
+                price: Number(matchedProd.price) || 0,
                 freeShipping: Boolean(matchedProd.freeShipping),
-                qty: 1,
-                quantity: 1,
+                qty: parsedDirectQty,
+                quantity: parsedDirectQty,
                 modifiers: []
               });
             }
 
-            session.subtotal = session.items.reduce((acc, it) => acc + (it.price * (it.qty || 1)), 0);
+            session.subtotal = session.items.reduce((acc, it) => acc + ((Number(it.price) || 0) * (it.qty || 1)), 0);
             session.total = session.subtotal;
 
-            const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
+            const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${((Number(it.price) || 0) * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
 
             const modsHint = matchedProd.modifiers && matchedProd.modifiers.length > 0 
               ? `\n👉 *Modificadores disponibles:* ${matchedProd.modifiers.join(', ')}`
               : `\n👉 *¿Algún cambio?* (Ej: Sin cebolla, Extra cheddar)`;
 
-            const reply = `✅ *¡Excelente elección! Sumaste ${matchedProd.name}* 🍔 (+$${Number(matchedProd.price).toLocaleString('es-AR')})\n\n🛒 *Tu pedido actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n👉 ¿Querés sumar otra burger o bebida? *(Escribí su número)*${modsHint}\n👉 O respondé *LISTO* para elegir forma de entrega.`;
+            const qtyStr = parsedDirectQty > 1 ? ` (x${parsedDirectQty})` : '';
+            const reply = `✅ *¡Excelente elección! Sumaste ${matchedProd.name}${qtyStr}* 🍔 (+$${((Number(matchedProd.price) || 0) * parsedDirectQty).toLocaleString('es-AR')})\n\n🛒 *Tu pedido actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n👉 *¿Querés sumar algo más?*\n• Podés pedir directamente por *nombre* (ej: *"1 Coca"*, *"papas"*) o por *número*.\n• Escribí *CARTA* (o *HAMBURGUESAS*, *BEBIDAS*, etc.) para ver la lista sin perder tu carrito.${modsHint}\n👉 O respondé *LISTO* para elegir forma de entrega.`;
             await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
             continue;
           }
@@ -2775,7 +3417,7 @@ class WhatsAppBotServer {
           // SALUDO POR DEFECTO O RECORDATORIO DE PEDIDO EN CURSO
           if (session.step === 'SELECTING' && session.items && session.items.length > 0) {
             const itemsList = session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}${it.modifiers?.length ? ' [' + it.modifiers.join(', ') + ']' : ''}`).join('\n');
-            const fallbackReply = `🛒 *Tu pedido actual:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n👉 Respondé con el *NÚMERO* (1 al ${prods.length}) o escribí su nombre para sumar otro producto.\n👉 ¿Algún cambio? (Ej: Sin cebolla, Extra cheddar)\n👉 O respondé *LISTO* para elegir la forma de entrega.`;
+            const fallbackReply = `🛒 *Tu pedido actual sigue guardado:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n👉 *Para sumar:* Respondé con el *NÚMERO* (1 al ${prods.length}) o escribí su *NOMBRE* (ej: *"1 Coca"*, *"papas"*).\n👉 Escribí *CARTA* (o *HAMBURGUESAS*, *BEBIDAS*, etc.) para ver opciones.\n👉 ¿Algún cambio? (Ej: Sin cebolla, Extra cheddar)\n👉 O respondé *LISTO* para elegir la forma de entrega.`;
             await this.safeSendMessage(remoteJid, { text: fallbackReply }, msg.key);
             continue;
           }
@@ -2920,8 +3562,6 @@ setInterval(checkRemoteCommands, 15000);
 // (o pulse el botón de notificar en KDS), el bot envíe los mensajes
 // =========================================================
 let isSyncingCloudOrders = false;
-const cloudNotifiedStatusCache = new Set();
-const cloudLastForceNotifyTime = new Map();
 const SERVER_BOOT_TIME = Date.now();
 let isCloudOrdersInitialSeedDone = false;
 
@@ -2952,7 +3592,7 @@ async function syncCloudOrderStatuses() {
         const updatedTime = new Date(ord.updated_at || ord.created_at || 0).getTime();
         const isOldOrder = (SERVER_BOOT_TIME - updatedTime) > 10 * 60 * 1000;
         if (isOldOrder || notified.includes(normSt)) {
-          cloudNotifiedStatusCache.add(`${ord.id}:${normSt}`);
+          markStatusNotified(ord, normSt);
         }
       }
       isCloudOrdersInitialSeedDone = true;
@@ -2983,7 +3623,7 @@ async function syncCloudOrderStatuses() {
       }
 
       // Si no es forzado y ya fue notificado tanto en caché como en la base de datos, omitir
-      if (!isForced && (cloudNotifiedStatusCache.has(cacheKey) || notifiedList.includes(normalizedStatus))) {
+      if (!isForced && (isStatusAlreadyNotified(ord, normalizedStatus) || notifiedList.includes(normalizedStatus))) {
         continue;
       }
 
@@ -3015,16 +3655,19 @@ async function syncCloudOrderStatuses() {
 
       const hasContact = normalizedOrder.remoteJid || normalizedOrder.customer?.phone || normalizedOrder.phone;
       if (!hasContact) {
-        cloudNotifiedStatusCache.add(cacheKey);
+        markStatusNotified(ord, normalizedStatus);
         continue;
       }
+
+      // Marcar preventivamente antes del envío para bloquear concurrencia
+      markStatusNotified(ord, normalizedStatus);
 
       console.log(`☁️ [SUPABASE CLOUD]: Cambio de estado detectado en orden #${normalizedOrder.orderNumber} (${ord.id}) -> '${normalizedStatus}'${isForced ? ' (FORZADO MANUAL)' : ''}. Disparando notificación WhatsApp...`);
 
       const notifyRes = await botServer.sendOrderStatusNotification(normalizedOrder, normalizedStatus, isForced);
-      if (notifyRes && notifyRes.success) {
-        cloudNotifiedStatusCache.add(cacheKey);
+      markStatusNotified(ord, normalizedStatus);
 
+      if (notifyRes && (notifyRes.success || notifyRes.reason === 'takeaway_delivered_no_notify')) {
         const updatedNotified = Array.from(new Set([...notifiedList, normalizedStatus]));
         const updatedTimestamps = {
           ...timestamps,
@@ -3056,7 +3699,7 @@ async function syncCloudOrderStatuses() {
           }
         } catch (_) {}
       } else if (notifyRes && notifyRes.reason === 'no_phone') {
-        cloudNotifiedStatusCache.add(cacheKey);
+        markStatusNotified(ord, normalizedStatus);
       }
     }
   } catch (err) {
@@ -3153,6 +3796,174 @@ app.post('/api/human-mode/pause', (req, res) => {
   const normalizedJid = jid.includes('@') ? jid : `${jid.replace(/\D/g, '')}@s.whatsapp.net`;
   pauseBotForCustomer(normalizedJid, durationMs, 'panel_administrador');
   res.json({ success: true, jid: normalizedJid, minutes: Math.round(durationMs / 60000) });
+});
+
+// =========================================================
+// ENDPOINTS DE MONITOREO Y CONTROL DE CHATS EN VIVO (POS / CAJERO)
+// =========================================================
+
+// 1. Obtener lista de todos los chats activos ordenados por actividad reciente
+app.get('/api/bot/live-chats', (req, res) => {
+  try {
+    const now = Date.now();
+    const result = [];
+
+    for (const [jid, chat] of liveChatsMap.entries()) {
+      const pauseData = humanPausedChats.get(jid);
+      const isPaused = pauseData && now < pauseData.pausedUntil;
+      const remainingPauseMinutes = isPaused ? Math.ceil((pauseData.pausedUntil - now) / 60000) : 0;
+      const session = customerSessions.get(jid) || null;
+
+      result.push({
+        jid: chat.jid,
+        phone: chat.phone,
+        name: chat.name || `+${chat.phone}`,
+        unreadCount: chat.unreadCount || 0,
+        lastMessageAt: chat.lastMessageAt || chat.createdAt || now,
+        lastMessageText: chat.lastMessageText || '',
+        lastSender: chat.lastSender || 'customer',
+        messageCount: (chat.messages || []).length,
+        isPaused: Boolean(isPaused),
+        remainingPauseMinutes,
+        pauseReason: isPaused ? pauseData.reason : null,
+        cartItems: (session && Array.isArray(session.items)) ? session.items : [],
+        session: session ? {
+          step: session.step || 'IDLE',
+          items: session.items || [],
+          subtotal: session.subtotal || 0,
+          total: session.total || 0,
+          shippingMethod: session.shippingMethod || 'local',
+          shippingAddress: session.shippingAddress || '',
+          customerName: session.customerName || '',
+          paymentMethod: session.paymentMethod || 'efectivo'
+        } : null
+      });
+    }
+
+    result.sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
+
+    res.json({
+      success: true,
+      botOnline: botServer.status === 'connected',
+      chats: result,
+      total: result.length,
+      timestamp: now
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 2. Obtener historial de mensajes de un chat específico (y marcar como leído)
+app.get('/api/bot/live-chats/:jid/messages', (req, res) => {
+  try {
+    const { jid } = req.params;
+    const normalizedJid = jid.includes('@') ? jid : `${jid.replace(/\D/g, '')}@s.whatsapp.net`;
+    const chat = liveChatsMap.get(normalizedJid);
+
+    if (!chat) {
+      return res.json({ success: true, messages: [], chat: null, session: null });
+    }
+
+    // Resetear contador de no leídos al abrir
+    chat.unreadCount = 0;
+    scheduleSaveLiveChats();
+
+    const pauseData = humanPausedChats.get(normalizedJid);
+    const now = Date.now();
+    const isPaused = pauseData && now < pauseData.pausedUntil;
+
+    res.json({
+      success: true,
+      jid: normalizedJid,
+      name: chat.name,
+      phone: chat.phone,
+      isPaused: Boolean(isPaused),
+      remainingPauseMinutes: isPaused ? Math.ceil((pauseData.pausedUntil - now) / 60000) : 0,
+      messages: chat.messages || [],
+      session: customerSessions.get(normalizedJid) || null
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 3. Enviar mensaje manual desde el panel del cajero al cliente
+app.post('/api/bot/live-chats/:jid/send', async (req, res) => {
+  try {
+    const { jid } = req.params;
+    const { text } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: 'El texto del mensaje no puede estar vacío.' });
+    }
+
+    if (!botServer.sock || botServer.status !== 'connected') {
+      return res.status(503).json({ error: 'El bot de WhatsApp no está conectado actualmente.' });
+    }
+
+    const normalizedJid = jid.includes('@') ? jid : `${jid.replace(/\D/g, '')}@s.whatsapp.net`;
+
+    // Pausar bot automáticamente para evitar conflicto con la atención humana del cajero
+    const configuredMinutes = Number(getBotTemplates().human_mode_sleep_minutes) || 25;
+    pauseBotForCustomer(normalizedJid, configuredMinutes * 60 * 1000, 'cajero_pos');
+
+    // Despacho real en WhatsApp
+    const sentMsg = await botServer.sock.sendMessage(normalizedJid, { text: text.trim() });
+    if (sentMsg?.key?.id) {
+      botSentMessageIds.add(sentMsg.key.id);
+    }
+
+    // Registrar en liveChatsMap
+    recordLiveChatMessage({
+      jid: normalizedJid,
+      from: 'cashier',
+      text: text.trim(),
+      originalMsgKey: sentMsg?.key
+    });
+
+    res.json({
+      success: true,
+      jid: normalizedJid,
+      pausedMinutes: configuredMinutes,
+      timestamp: Date.now()
+    });
+  } catch (err) {
+    console.error('❌ Error enviando mensaje manual desde POS:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Pausar o reanudar bot para un cliente específico
+app.post('/api/bot/live-chats/:jid/toggle-pause', (req, res) => {
+  try {
+    const { jid } = req.params;
+    const { pause, minutes } = req.body;
+    const normalizedJid = jid.includes('@') ? jid : `${jid.replace(/\D/g, '')}@s.whatsapp.net`;
+
+    if (pause) {
+      const configuredMinutes = Number(getBotTemplates().human_mode_sleep_minutes) || 25;
+      const durMs = (Number(minutes) || configuredMinutes) * 60 * 1000;
+      pauseBotForCustomer(normalizedJid, durMs, 'cajero_panel');
+      res.json({ success: true, isPaused: true, remainingMinutes: Math.round(durMs / 60000) });
+    } else {
+      resumeBotForCustomer(normalizedJid);
+      res.json({ success: true, isPaused: false });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 5. Resetear sesión y vaciar carrito del cliente
+app.post('/api/bot/live-chats/:jid/reset-session', (req, res) => {
+  try {
+    const { jid } = req.params;
+    const normalizedJid = jid.includes('@') ? jid : `${jid.replace(/\D/g, '')}@s.whatsapp.net`;
+    customerSessions.delete(normalizedJid);
+    res.json({ success: true, message: 'Sesión reseteada correctamente.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Endpoint para obtener plantillas del bot

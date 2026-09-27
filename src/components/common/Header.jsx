@@ -13,7 +13,8 @@ import {
   AlertCircle, 
   Cloud, 
   Sun, 
-  Moon
+  Moon,
+  MessageSquare
 } from 'lucide-react';
 import { supabaseSync } from '../../services/supabaseClient';
 
@@ -23,6 +24,7 @@ export default function Header({
   currentTab, 
   setCurrentTab, 
   pendingKitchenCount, 
+  activeWhatsAppCount = 0,
   cashShift, 
   settings,
   theme,
@@ -97,6 +99,20 @@ export default function Header({
         >
           <UtensilsCrossed size={17} />
           <span>Menú</span>
+        </button>
+
+        <button 
+          className={`nav-tab-btn ${currentTab === 'whatsapp' ? 'active' : ''}`}
+          onClick={() => setCurrentTab('whatsapp')}
+          title="Monitoreo y Control de WhatsApp Bot en Vivo (F6)"
+        >
+          <MessageSquare size={17} style={{ color: currentTab === 'whatsapp' ? '#25D366' : 'inherit' }} />
+          <span>WhatsApp Live</span>
+          {activeWhatsAppCount > 0 && (
+            <span className="nav-badge-count" style={{ background: '#25D366', color: '#052e16' }}>
+              {activeWhatsAppCount}
+            </span>
+          )}
         </button>
       </nav>
 
@@ -238,6 +254,22 @@ export default function Header({
           <UtensilsCrossed size={19} />
         </div>
         <span className="mobile-nav-label">Menú</span>
+      </button>
+
+      <button 
+        type="button"
+        className={`mobile-nav-item ${currentTab === 'whatsapp' ? 'active' : ''}`}
+        onClick={() => setCurrentTab('whatsapp')}
+      >
+        <div className="mobile-nav-icon-box">
+          <MessageSquare size={19} style={{ color: currentTab === 'whatsapp' ? '#25D366' : 'inherit' }} />
+          {activeWhatsAppCount > 0 && (
+            <span className="mobile-nav-badge" style={{ background: '#25D366', color: '#052e16' }}>
+              {activeWhatsAppCount}
+            </span>
+          )}
+        </div>
+        <span className="mobile-nav-label">WhatsApp</span>
       </button>
     </nav>
     </>

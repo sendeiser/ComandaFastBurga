@@ -606,7 +606,15 @@ export const storageService = {
   getDeletedOrderIds() {
     try {
       const raw = localStorage.getItem(KEYS.DELETED_ORDER_IDS);
-      return raw ? new Set(JSON.parse(raw)) : new Set();
+      if (!raw) return new Set();
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return new Set();
+      // Filtrar IDs legacy cortos como 'CMD-1', 'CMD-2' que son números de comanda correlativos y no IDs únicos
+      const cleaned = parsed.filter(id => !/^CMD-\d+$/i.test(String(id)));
+      if (cleaned.length !== parsed.length) {
+        localStorage.setItem(KEYS.DELETED_ORDER_IDS, JSON.stringify(cleaned));
+      }
+      return new Set(cleaned);
     } catch (_) {
       return new Set();
     }
@@ -620,6 +628,8 @@ export const storageService = {
 
   markOrderDeleted(orderId) {
     if (!orderId) return;
+    // Nunca marcar como eliminado un número de comanda correlativo simple para evitar envenenar comandas futuras
+    if (/^CMD-\d+$/i.test(String(orderId))) return;
     try {
       const deleted = this.getDeletedOrderIds();
       deleted.add(String(orderId));

@@ -1,5 +1,72 @@
 [
   {
+    "id": "ord-1790547206879",
+    "code": "CMD-5",
+    "orderNumber": 5,
+    "channel": "whatsapp",
+    "tableNumber": "",
+    "customer": {
+      "name": "Mm",
+      "phone": "119434635178176",
+      "remoteJid": "119434635178176@lid",
+      "address": "Retiro en Local (Mostrador)"
+    },
+    "deliveryType": "local",
+    "deliveryFee": 0,
+    "subtotal": 38000,
+    "total": 38000,
+    "paymentMethod": "efectivo",
+    "paymentStatus": "pendiente_efectivo",
+    "paymentConfirmed": true,
+    "items": [
+      {
+        "id": "item-1",
+        "name": "CHEESE",
+        "price": 10000,
+        "unitPrice": 10000,
+        "qty": 1,
+        "quantity": 1,
+        "modifiers": [
+          "Sin mayonesa"
+        ],
+        "notes": "",
+        "freeShipping": false
+      },
+      {
+        "id": "item-2",
+        "name": "BAJONERA",
+        "price": 12000,
+        "unitPrice": 12000,
+        "qty": 1,
+        "quantity": 1,
+        "modifiers": [],
+        "notes": "",
+        "freeShipping": false
+      },
+      {
+        "id": "item-3",
+        "name": "LOMITO COMPLETO",
+        "price": 16000,
+        "unitPrice": 16000,
+        "qty": 1,
+        "quantity": 1,
+        "modifiers": [],
+        "notes": "",
+        "freeShipping": false
+      }
+    ],
+    "status": "cocina",
+    "statusTimestamps": {
+      "createdAt": "2026-09-27T22:13:26.878Z",
+      "cookingAt": "2026-09-27T22:13:26.878Z",
+      "readyAt": null,
+      "deliveredAt": null
+    },
+    "createdAt": "2026-09-27T22:13:26.878Z",
+    "updatedAt": 1790547206880,
+    "source": "whatsapp_bot"
+  },
+  {
     "id": "ord-1790382986697",
     "orderNumber": 15,
     "channel": "whatsapp",

@@ -11,7 +11,9 @@ export default function FastOrderPad({
   settings, 
   onSaveOrder,
   cashShift,
-  onOpenCashModal
+  onOpenCashModal,
+  initialOrderToLoad,
+  onClearInitialOrder
 }) {
   const isCashOpen = Boolean(cashShift && !cashShift.isClosed);
   const [selectedCategory, setSelectedCategory] = useState('Todas');
@@ -291,6 +293,15 @@ export default function FastOrderPad({
       };
     }));
   };
+
+  useEffect(() => {
+    if (initialOrderToLoad && Array.isArray(initialOrderToLoad.items) && initialOrderToLoad.items.length > 0) {
+      handleApplyWhatsAppImport(initialOrderToLoad);
+      if (typeof onClearInitialOrder === 'function') {
+        onClearInitialOrder();
+      }
+    }
+  }, [initialOrderToLoad]);
 
   const handleKickDrawer = () => {
     printerService.kickCashDrawer(settings);

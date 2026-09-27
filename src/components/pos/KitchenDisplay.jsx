@@ -78,6 +78,13 @@ export default function KitchenDisplay({
   const cookingOrders = activeOrders.filter(o => o.status === 'cocina');
   const readyOrders = activeOrders.filter(o => o.status === 'listo');
 
+  // En vista móvil, si no hay comandas marchando en cocina pero sí hay pedidos pendientes, mostrar la columna de pendientes
+  useEffect(() => {
+    if (cookingOrders.length === 0 && pendingOrders.length > 0 && mobileColumnTab === 'cocina') {
+      setMobileColumnTab('pendiente');
+    }
+  }, [cookingOrders.length, pendingOrders.length]);
+
   
   const getSafeItems = (items) => {
     if (Array.isArray(items)) return items;
