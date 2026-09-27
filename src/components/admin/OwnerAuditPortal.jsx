@@ -58,7 +58,10 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout, t
     setIsMobileAccordionOpen(false);
   }, [activeTab]);
 
-  const [rangeType, setRangeType] = useState('today'); // 'today' | 'yesterday' | 'week' | 'month' | 'all'
+  const [rangeType, setRangeType] = useState('today'); // 'today' | 'yesterday' | 'week' | 'month' | 'custom' | 'all'
+  const [selectedShiftId, setSelectedShiftId] = useState('all');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
 
   // Turnos históricos y pedidos cancelados reactivos
   const [shifts, setShifts] = useState(() => storageService.getCashShiftsHistory());
@@ -124,15 +127,25 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout, t
     }
   };
 
-  // Filtrado reactivo de órdenes
+  // Turno específico seleccionado (si aplica)
+  const selectedShift = useMemo(() => {
+    if (!selectedShiftId || selectedShiftId === 'all') return null;
+    return shifts.find(s => s.id === selectedShiftId) || null;
+  }, [shifts, selectedShiftId]);
+
+  // Filtrado reactivo de órdenes (por turno específico o por período de fechas)
   const filteredOrders = useMemo(() => {
-    return auditService.filterOrdersByRange(orders, rangeType);
-  }, [orders, rangeType]);
+    if (selectedShift) {
+      return auditService.filterOrdersByShift(orders, selectedShift);
+    }
+    return auditService.filterOrdersByRange(orders, rangeType, customStart, customEnd);
+  }, [orders, selectedShift, rangeType, customStart, customEnd]);
 
   // Cálculos consolidados
   const kpis = useMemo(() => {
-    return auditService.calculateFinancialKpis(filteredOrders, shifts);
-  }, [filteredOrders, shifts]);
+    const relevantShifts = selectedShift ? [selectedShift] : shifts;
+    return auditService.calculateFinancialKpis(filteredOrders, relevantShifts);
+  }, [filteredOrders, selectedShift, shifts]);
 
   // Analítica de productos
   const productAnalytics = useMemo(() => {
@@ -560,8 +573,8 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout, t
             </div>
           </div>
 
-          {/* TOOLBAR: DATE FILTER & EXPORT BUTTONS */}
-          {activeTab !== 'bot' && activeTab !== 'database' && (
+          {/* TOOLBAR: DATE FILTER & EXPORT BUTTONS (Para módulos de Auditoría de Cajas, Seguridad y Menú) */}
+          {activeTab !== 'bot' && activeTab !== 'database' && activeTab !== 'kpis' && (
             <div 
               className="admin-period-bar tactile-card"
               style={{
@@ -626,7 +639,24 @@ export default function OwnerAuditPortal({ orders = [], onBackToPos, onLogout, t
 
           {/* TAB CONTENTS */}
           <div className="admin-tab-content-container" style={{ flex: 1 }}>
-            {activeTab === 'kpis' && <AuditKpisTab kpis={kpis} onOpenBot={handleOpenBot} />}
+            {activeTab === 'kpis' && (
+              <AuditKpisTab 
+                kpis={kpis} 
+                orders={filteredOrders}
+                allOrders={orders}
+                shifts={shifts}
+                rangeType={rangeType}
+                setRangeType={setRangeType}
+                selectedShiftId={selectedShiftId}
+                setSelectedShiftId={setSelectedShiftId}
+                selectedShift={selectedShift}
+                customStart={customStart}
+                setCustomStart={setCustomStart}
+                customEnd={customEnd}
+                setCustomEnd={setCustomEnd}
+                onOpenBot={handleOpenBot} 
+              />
+            )}
             {activeTab === 'shifts' && <AuditCashShiftsTab shifts={shifts} onExportCsv={handleExportShifts} />}
             {activeTab === 'security' && <AuditSecurityTab cancelledOrders={cancelledOrders} orders={orders} />}
             {activeTab === 'menu' && <AuditMenuAnalytics analytics={productAnalytics} />}

@@ -41,22 +41,38 @@ export const auditService = {
     });
   },
 
-  // KPIs Financieros Consolidados
+  // Filtrar órdenes de un turno de caja específico
+  filterOrdersByShift(orders = [], shift = null) {
+    if (!shift) return orders;
+    const start = shift.openedAt ? new Date(shift.openedAt).getTime() : 0;
+    const end = shift.closedAt ? new Date(shift.closedAt).getTime() : Date.now();
+
+    return orders.filter(order => {
+      const orderTime = new Date(order.createdAt || Date.now()).getTime();
+      return orderTime >= start && orderTime <= end;
+    });
+  },
+
+  // KPIs Financieros Consolidados con Estadísticas de Eficiencia
   calculateFinancialKpis(orders = [], shifts = []) {
     const totalOrders = orders.length;
-    const grossRevenue = orders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
-    const subtotalRevenue = orders.reduce((sum, o) => sum + (Number(o.subtotal) || 0), 0);
-    const totalDeliveryFees = orders.reduce((sum, o) => sum + (Number(o.deliveryFee) || 0), 0);
-    const avgTicket = totalOrders > 0 ? Math.round(grossRevenue / totalOrders) : 0;
+    const activeOrders = orders.filter(o => o.status !== 'cancelado');
+    const cancelledOrders = orders.filter(o => o.status === 'cancelado');
 
-    // Desglose de pagos
+    const grossRevenue = activeOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+    const subtotalRevenue = activeOrders.reduce((sum, o) => sum + (Number(o.subtotal) || Number(o.total) || 0), 0);
+    const totalDeliveryFees = activeOrders.reduce((sum, o) => sum + (Number(o.deliveryFee) || 0), 0);
+    const avgTicket = activeOrders.length > 0 ? Math.round(grossRevenue / activeOrders.length) : 0;
+    const completionRate = totalOrders > 0 ? Math.round((activeOrders.length / totalOrders) * 100) : 100;
+
+    // Desglose de pagos (solo comandas válidas/activas)
     const payments = {
       cash: { total: 0, count: 0 },
       transfer: { total: 0, count: 0, confirmed: 0, pending: 0 },
       card: { total: 0, count: 0 }
     };
 
-    orders.forEach(o => {
+    activeOrders.forEach(o => {
       const tot = Number(o.total) || 0;
       const m = o.paymentMethod || 'efectivo';
       if (m === 'efectivo') {
@@ -78,17 +94,23 @@ export const auditService = {
 
     // Desglose de canales
     const channels = {
-      whatsapp: { total: 0, count: 0 },
-      mostrador: { total: 0, count: 0 },
-      mesa: { total: 0, count: 0 }
+      whatsapp: { total: 0, count: 0, avg: 0 },
+      mostrador: { total: 0, count: 0, avg: 0 },
+      mesa: { total: 0, count: 0, avg: 0 }
     };
 
-    orders.forEach(o => {
+    activeOrders.forEach(o => {
       const tot = Number(o.total) || 0;
       const ch = o.channel || 'whatsapp';
       if (channels[ch]) {
         channels[ch].total += tot;
         channels[ch].count += 1;
+      }
+    });
+
+    Object.keys(channels).forEach(ch => {
+      if (channels[ch].count > 0) {
+        channels[ch].avg = Math.round(channels[ch].total / channels[ch].count);
       }
     });
 
@@ -98,8 +120,47 @@ export const auditService = {
       return sum + exp;
     }, 0);
 
+    // Tiempos promedio de cocina y entrega
+    let totalPrepMinutes = 0;
+    let prepCount = 0;
+    let totalDeliveryMinutes = 0;
+    let deliveryCount = 0;
+
+    activeOrders.forEach(o => {
+      const ts = o.statusTimestamps || {};
+      const created = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+      const ready = ts.readyAt ? new Date(ts.readyAt).getTime() : 0;
+      const delivered = ts.deliveredAt ? new Date(ts.deliveredAt).getTime() : 0;
+
+      if (created > 0 && ready > created) {
+        const mins = Math.round((ready - created) / 60000);
+        if (mins > 0 && mins < 240) {
+          totalPrepMinutes += mins;
+          prepCount++;
+        }
+      }
+
+      if (created > 0 && delivered > created) {
+        const mins = Math.round((delivered - created) / 60000);
+        if (mins > 0 && mins < 360) {
+          totalDeliveryMinutes += mins;
+          deliveryCount++;
+        }
+      }
+    });
+
+    const avgPrepTimeMin = prepCount > 0 ? Math.round(totalPrepMinutes / prepCount) : 18;
+    const avgDeliveryTimeMin = deliveryCount > 0 ? Math.round(totalDeliveryMinutes / deliveryCount) : 32;
+
+    const totalItemsCount = activeOrders.reduce((sum, o) => {
+      return sum + (o.items || []).reduce((sub, i) => sub + (Number(i.qty) || 1), 0);
+    }, 0);
+
     return {
       totalOrders,
+      activeOrdersCount: activeOrders.length,
+      cancelledOrdersCount: cancelledOrders.length,
+      completionRate,
       grossRevenue,
       subtotalRevenue,
       totalDeliveryFees,
@@ -107,8 +168,113 @@ export const auditService = {
       payments,
       channels,
       totalExpenses,
-      netCashInHand: payments.cash.total - totalExpenses
+      netCashInHand: payments.cash.total - totalExpenses,
+      totalItemsCount,
+      avgPrepTimeMin,
+      avgDeliveryTimeMin
     };
+  },
+
+  // Distribución de ventas y comandas por hora (Horarios Pico / Rush Hours)
+  getHourlyDistribution(orders = []) {
+    const validOrders = orders.filter(o => o.status !== 'cancelado');
+    const hoursMap = {};
+    for (let h = 0; h < 24; h++) {
+      hoursMap[h] = { hour: h, count: 0, revenue: 0 };
+    }
+
+    validOrders.forEach(o => {
+      const d = new Date(o.createdAt || Date.now());
+      const h = d.getHours();
+      hoursMap[h].count += 1;
+      hoursMap[h].revenue += Number(o.total) || 0;
+    });
+
+    // Identificar hora pico
+    let maxCount = 0;
+    let peakHour = 21;
+    Object.values(hoursMap).forEach(item => {
+      if (item.count > maxCount) {
+        maxCount = item.count;
+        peakHour = item.hour;
+      }
+    });
+
+    // Filtrar franjas horarias con actividad o las horas gastronómicas habituales (11hs a 02hs)
+    const hoursList = [];
+    // Recorrer 11 a 23 y 0 a 2
+    const relevantHours = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0, 1, 2];
+    const totalRev = validOrders.reduce((acc, o) => acc + (Number(o.total) || 0), 0);
+
+    relevantHours.forEach(h => {
+      const data = hoursMap[h] || { hour: h, count: 0, revenue: 0 };
+      const pct = totalRev > 0 ? Math.round((data.revenue / totalRev) * 100) : 0;
+      hoursList.push({
+        hour: h,
+        label: `${String(h).padStart(2, '0')}:00`,
+        count: data.count,
+        revenue: data.revenue,
+        percentage: pct,
+        isPeak: h === peakHour && maxCount > 0
+      });
+    });
+
+    return {
+      hoursList,
+      peakHour: maxCount > 0 ? `${String(peakHour).padStart(2, '0')}:00 hs` : 'Sin datos',
+      peakOrders: maxCount,
+      peakPercentage: totalRev > 0 && maxCount > 0 ? Math.round((hoursMap[peakHour].revenue / totalRev) * 100) : 0
+    };
+  },
+
+  // Tendencia de Ventas (Evolución diaria u horaria para gráfica de curva)
+  getSalesTrend(orders = [], rangeType = 'today', isSingleShift = false) {
+    const validOrders = orders.filter(o => o.status !== 'cancelado');
+    const isSingleDayOrShift = rangeType === 'today' || rangeType === 'yesterday' || isSingleShift;
+
+    if (isSingleDayOrShift) {
+      // Agrupar por franja horaria de 2 horas
+      const slots = [
+        { label: '12:00', start: 11, end: 13, revenue: 0, count: 0 },
+        { label: '14:00', start: 13, end: 15, revenue: 0, count: 0 },
+        { label: '16:00', start: 15, end: 17, revenue: 0, count: 0 },
+        { label: '18:00', start: 17, end: 19, revenue: 0, count: 0 },
+        { label: '20:00', start: 19, end: 21, revenue: 0, count: 0 },
+        { label: '22:00', start: 21, end: 23, revenue: 0, count: 0 },
+        { label: '00:00', start: 23, end: 25, revenue: 0, count: 0 }
+      ];
+
+      validOrders.forEach(o => {
+        const d = new Date(o.createdAt || Date.now());
+        const h = d.getHours();
+        const slot = slots.find(s => {
+          if (s.end === 25) return h === 23 || h === 0;
+          return h >= s.start && h < s.end;
+        });
+        if (slot) {
+          slot.revenue += Number(o.total) || 0;
+          slot.count += 1;
+        }
+      });
+
+      return slots;
+    }
+
+    // Agrupar por días
+    const daysMap = {};
+    validOrders.forEach(o => {
+      const d = new Date(o.createdAt || Date.now());
+      const dayKey = d.toISOString().slice(0, 10); // YYYY-MM-DD
+      const shortLabel = d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'numeric' });
+      if (!daysMap[dayKey]) {
+        daysMap[dayKey] = { label: shortLabel, fullDate: dayKey, revenue: 0, count: 0 };
+      }
+      daysMap[dayKey].revenue += Number(o.total) || 0;
+      daysMap[dayKey].count += 1;
+    });
+
+    const list = Object.values(daysMap).sort((a, b) => a.fullDate.localeCompare(b.fullDate));
+    return list.length > 0 ? list : [{ label: 'Hoy', fullDate: new Date().toISOString().slice(0,10), revenue: 0, count: 0 }];
   },
 
   // Ranking de Productos y Modificadores
