@@ -63,19 +63,47 @@ function mapProductFromDB(p) {
 
 function mapCashShiftFromDB(r) {
   if (!r) return null;
+  let auditSales = 0;
+  let auditExpected = 0;
+  let auditDiff = null;
+  let cleanNotes = r.notes || '';
+  const auditMatch = cleanNotes.match(/\[AUDIT:\s*(\{.*?\})\]/);
+  if (auditMatch) {
+    try {
+      const parsed = JSON.parse(auditMatch[1]);
+      auditSales = Number(parsed.cashSales) || 0;
+      auditExpected = Number(parsed.expectedCash) || 0;
+      if (parsed.difference !== undefined && parsed.difference !== null) {
+        auditDiff = Number(parsed.difference);
+      }
+      cleanNotes = cleanNotes.replace(/\[AUDIT:\s*\{.*?\}\]\s*/, '').trim();
+    } catch (_) {}
+  }
+
+  const initial = Number(r.initial_cash) || 0;
+  const counted = r.counted_cash !== null && r.counted_cash !== undefined ? Number(r.counted_cash) : null;
+  const cashier = r.cashier_name || 'Cajero 1';
+  const cashSales = r.cash_sales !== undefined && r.cash_sales !== null ? Number(r.cash_sales) : auditSales;
+  const expenses = Array.isArray(r.expenses) ? r.expenses : [];
+  const totalExp = expenses.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+  const expected = r.expected_cash !== undefined && r.expected_cash !== null ? Number(r.expected_cash) : (auditExpected || (initial + cashSales - totalExp));
+  const diff = r.difference !== undefined && r.difference !== null ? Number(r.difference) : (auditDiff !== null ? auditDiff : (counted !== null ? counted - expected : null));
+
   return {
     id: r.id,
     openedAt: r.opened_at,
     closedAt: r.closed_at,
-    initialCash: Number(r.initial_cash) || 0,
-    countedCash: r.counted_cash !== null && r.counted_cash !== undefined ? Number(r.counted_cash) : null,
-    cashierName: r.cashier_name || 'Cajero 1',
-    expenses: Array.isArray(r.expenses) ? r.expenses : [],
-    notes: r.notes || '',
+    initialCash: initial,
+    countedCash: counted,
+    cashierName: cashier,
+    cashier: cashier,
+    expenses,
+    notes: cleanNotes,
+    rawNotes: r.notes || '',
     isClosed: Boolean(r.is_closed),
-    cashSales: Number(r.cash_sales) || 0,
-    expectedCash: Number(r.expected_cash) || 0,
-    difference: Number(r.difference) || 0,
+    cashSales,
+    expectedCash: expected,
+    difference: diff,
     updatedAt: r.created_at ? new Date(r.created_at).getTime() : Date.now()
   };
 }
@@ -712,11 +740,26 @@ export const supabaseSync = {
     if (!this.isConfigured()) return;
     try {
       const dbPatch = {};
+      if (patchData.initialCash !== undefined) dbPatch.initial_cash = Number(patchData.initialCash);
+      if (patchData.cashierName !== undefined || patchData.cashier !== undefined) {
+        dbPatch.cashier_name = patchData.cashierName || patchData.cashier;
+      }
       if (patchData.expenses !== undefined) dbPatch.expenses = patchData.expenses;
       if (patchData.closedAt !== undefined) dbPatch.closed_at = patchData.closedAt;
       if (patchData.countedCash !== undefined) dbPatch.counted_cash = patchData.countedCash !== null ? Number(patchData.countedCash) : null;
       if (patchData.isClosed !== undefined) dbPatch.is_closed = patchData.isClosed;
-      if (patchData.notes !== undefined) dbPatch.notes = patchData.notes;
+      if (patchData.notes !== undefined) {
+        let noteText = patchData.notes || '';
+        if (patchData.cashSales !== undefined || patchData.expectedCash !== undefined || patchData.difference !== undefined) {
+          const meta = {
+            cashSales: Number(patchData.cashSales) || 0,
+            expectedCash: Number(patchData.expectedCash) || 0,
+            difference: Number(patchData.difference) || 0
+          };
+          noteText = `[AUDIT: ${JSON.stringify(meta)}] ${noteText.replace(/\[AUDIT:\s*\{.*?\}\]\s*/, '')}`.trim();
+        }
+        dbPatch.notes = noteText;
+      }
 
       await fetch(this._url('cash_shifts', `id=eq.${id}`), {
         method: 'PATCH',

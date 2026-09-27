@@ -825,17 +825,47 @@ export const storageService = {
     if (!Array.isArray(cloudShifts) || cloudShifts.length === 0) return this.getCashShiftsHistory();
     const existing = this.getCashShiftsHistory();
     const map = new Map();
-    // Insert cloud shifts (closed shifts)
-    cloudShifts.filter(s => s && s.id && s.isClosed).forEach(s => map.set(s.id, s));
-    // Keep local shifts that are not in cloud yet
+
+    // Index existing local shifts
     existing.forEach(s => {
-      if (s && s.id && !map.has(s.id)) {
-        map.set(s.id, s);
+      if (s && s.id) {
+        map.set(s.id, {
+          ...s,
+          cashierName: s.cashierName || s.cashier || s.cashier_name || 'Cajero',
+          cashier: s.cashierName || s.cashier || s.cashier_name || 'Cajero'
+        });
       }
     });
+
+    // Merge cloud shifts
+    cloudShifts.forEach(cs => {
+      if (!cs || !cs.id) return;
+      const local = map.get(cs.id);
+      const cashierVal = cs.cashierName || cs.cashier || cs.cashier_name || local?.cashierName || local?.cashier || 'Cajero';
+
+      if (local) {
+        map.set(cs.id, {
+          ...local,
+          ...cs,
+          // Preserve local sales/expected/difference if cloud returned 0 or null
+          cashSales: (cs.cashSales && Number(cs.cashSales) > 0) ? Number(cs.cashSales) : (Number(local.cashSales) || 0),
+          expectedCash: (cs.expectedCash && Number(cs.expectedCash) > 0) ? Number(cs.expectedCash) : (Number(local.expectedCash) || 0),
+          difference: (cs.difference !== null && cs.difference !== undefined) ? cs.difference : local.difference,
+          cashierName: cashierVal,
+          cashier: cashierVal
+        });
+      } else {
+        map.set(cs.id, {
+          ...cs,
+          cashierName: cashierVal,
+          cashier: cashierVal
+        });
+      }
+    });
+
     const merged = Array.from(map.values()).sort((a, b) => {
-      const ta = a.openedAt ? new Date(a.openedAt).getTime() : 0;
-      const tb = b.openedAt ? new Date(b.openedAt).getTime() : 0;
+      const ta = (a.openedAt || a.opened_at) ? new Date(a.openedAt || a.opened_at).getTime() : 0;
+      const tb = (b.openedAt || b.opened_at) ? new Date(b.openedAt || b.opened_at).getTime() : 0;
       return tb - ta;
     });
     this.saveCashShiftsHistory(merged);
@@ -844,15 +874,20 @@ export const storageService = {
 
   getCashShiftsHistory() {
     const raw = localStorage.getItem(KEYS.CASH_SHIFTS_HISTORY);
-    if (!raw) {
-      localStorage.setItem(KEYS.CASH_SHIFTS_HISTORY, JSON.stringify(SAMPLE_MOCK_SHIFTS));
-      return SAMPLE_MOCK_SHIFTS;
+    let list = SAMPLE_MOCK_SHIFTS;
+    if (raw) {
+      try {
+        list = JSON.parse(raw);
+      } catch {
+        list = SAMPLE_MOCK_SHIFTS;
+      }
     }
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return SAMPLE_MOCK_SHIFTS;
-    }
+    if (!Array.isArray(list)) list = [];
+    return list.map(s => ({
+      ...s,
+      cashierName: s.cashierName || s.cashier || s.cashier_name || 'Cajero',
+      cashier: s.cashierName || s.cashier || s.cashier_name || 'Cajero'
+    }));
   },
 
   saveCashShift(shift) {

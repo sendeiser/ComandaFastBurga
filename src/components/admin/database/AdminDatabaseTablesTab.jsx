@@ -139,7 +139,8 @@ export default function AdminDatabaseTablesTab() {
         setOrders(storageService.getOrders());
       }
       if (cloudShifts && cloudShifts.length > 0) {
-        setShifts(cloudShifts);
+        const mergedShifts = storageService.syncCashShiftsFromCloud(cloudShifts);
+        setShifts(mergedShifts);
       }
     }
   }, []);
@@ -217,8 +218,8 @@ export default function AdminDatabaseTablesTab() {
       const q = searchQuery.toLowerCase();
       list = list.filter(s => 
         s.id?.toLowerCase().includes(q) ||
-        s.cashier?.toLowerCase().includes(q) ||
-        s.notes?.toLowerCase().includes(q)
+        (s.cashier || s.cashierName || s.cashier_name || '').toLowerCase().includes(q) ||
+        (s.notes || '').toLowerCase().includes(q)
       );
     }
     return list;
@@ -275,13 +276,17 @@ export default function AdminDatabaseTablesTab() {
         total: item.total || 0
       });
     } else if (activeTable === 'shifts') {
+      const cashierVal = item.cashierName || item.cashier || item.cashier_name || 'Cajero';
+      let cleanNotes = item.notes || '';
+      cleanNotes = cleanNotes.replace(/\[AUDIT:\s*\{.*?\}\]\s*/, '').trim();
+
       setFormData({
         id: item.id,
-        cashier: item.cashier || '',
-        initialCash: item.initialCash || 0,
-        countedCash: item.countedCash || 0,
-        notes: item.notes || '',
-        isClosed: item.isClosed ?? true
+        cashier: cashierVal,
+        initialCash: item.initialCash ?? item.initial_cash ?? 0,
+        countedCash: item.countedCash ?? item.counted_cash ?? 0,
+        notes: cleanNotes,
+        isClosed: item.isClosed !== undefined ? Boolean(item.isClosed) : Boolean(item.closedAt || item.closed_at)
       });
     }
   };
@@ -379,21 +384,39 @@ export default function AdminDatabaseTablesTab() {
           showToast(`✅ Comanda #${formData.orderNumber || editingItem.id} actualizada en BD y Supabase.`);
         }
       } else if (activeTable === 'shifts') {
+        const cashierVal = formData.cashier?.trim() || 'Cajero';
+        const initialVal = Number(formData.initialCash) || 0;
+        const countedVal = Number(formData.countedCash) || 0;
+        const notesVal = formData.notes?.trim() || '';
+        const isClosedVal = formData.isClosed !== undefined ? Boolean(formData.isClosed) : true;
+
         const shiftPayload = {
-          cashier: formData.cashier.trim() || 'Cajero',
-          initialCash: Number(formData.initialCash) || 0,
-          countedCash: Number(formData.countedCash) || 0,
-          notes: formData.notes.trim(),
-          isClosed: Boolean(formData.isClosed)
+          cashier: cashierVal,
+          cashierName: cashierVal,
+          initialCash: initialVal,
+          countedCash: countedVal,
+          notes: notesVal,
+          isClosed: isClosedVal
         };
 
         if (isCreating) {
           const newShiftItem = storageService.addCashShiftHistoryItem(shiftPayload);
-          supabaseSync.createCashShift({ ...shiftPayload, id: newShiftItem.id, openedAt: newShiftItem.openedAt, closedAt: newShiftItem.closedAt, isClosed: true });
+          supabaseSync.createCashShift({
+            ...shiftPayload,
+            id: newShiftItem.id,
+            openedAt: newShiftItem.openedAt,
+            closedAt: newShiftItem.closedAt,
+            isClosed: isClosedVal
+          });
           showToast(`✅ Turno de caja registrado en BD y Supabase.`);
         } else {
           storageService.updateCashShiftHistoryItem(editingItem.id, shiftPayload);
-          supabaseSync.updateCashShift(editingItem.id, { ...shiftPayload, isClosed: Boolean(shiftPayload.isClosed) });
+          supabaseSync.updateCashShift(editingItem.id, {
+            ...shiftPayload,
+            initialCash: initialVal,
+            cashierName: cashierVal,
+            isClosed: isClosedVal
+          });
           showToast(`✅ Turno de caja modificado en BD y Supabase.`);
         }
       }
@@ -1034,7 +1057,7 @@ export default function AdminDatabaseTablesTab() {
                   <th style={{ padding: '12px 14px' }}>Ventas Efectivo</th>
                   <th style={{ padding: '12px 14px' }}>Declarado</th>
                   <th style={{ padding: '12px 14px' }}>Diferencia</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'right' }}>Acciones</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'right', minWidth: '135px' }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -1046,49 +1069,121 @@ export default function AdminDatabaseTablesTab() {
                   </tr>
                 ) : (
                   filteredShifts.map(shift => {
-                    const diff = Number(shift.difference || 0);
-                    const diffColor = diff === 0 ? '#10b981' : diff > 0 ? '#3b82f6' : '#ef4444';
+                    const openDate = shift.openedAt || shift.opened_at;
+                    const closeDate = shift.closedAt || shift.closed_at;
+                    const isClosed = shift.isClosed !== undefined
+                      ? Boolean(shift.isClosed)
+                      : Boolean(closeDate || (shift.countedCash !== null && shift.countedCash !== undefined));
+
+                    const cashierName = shift.cashierName || shift.cashier || shift.cashier_name || 'Cajero';
+                    const initialCash = Number(shift.initialCash ?? shift.initial_cash ?? 0);
+
+                    // 1. Obtener o calcular ventas en efectivo del turno
+                    let salesCash = Number(shift.cashSales ?? shift.cash_sales ?? 0);
+                    if (salesCash === 0 && openDate) {
+                      const startTime = new Date(openDate).getTime();
+                      const endTime = closeDate ? new Date(closeDate).getTime() : Date.now();
+                      const matchingOrders = orders.filter(o => {
+                        if (o.paymentMethod !== 'efectivo' || o.status === 'cancelado') return false;
+                        const ordTime = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+                        return ordTime >= startTime && ordTime <= endTime;
+                      });
+                      salesCash = matchingOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+                    }
+
+                    // 2. Monto declarado
+                    const counted = (shift.countedCash !== null && shift.countedCash !== undefined)
+                      ? Number(shift.countedCash)
+                      : (shift.counted_cash !== null && shift.counted_cash !== undefined ? Number(shift.counted_cash) : null);
+
+                    // 3. Gastos
+                    const expenses = Array.isArray(shift.expenses)
+                      ? shift.expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
+                      : 0;
+
+                    // 4. Esperado teórico
+                    const expectedCash = (shift.expectedCash !== undefined && shift.expectedCash !== null && Number(shift.expectedCash) !== 0)
+                      ? Number(shift.expectedCash)
+                      : (initialCash + salesCash - expenses);
+
+                    // 5. Cálculo preciso de diferencia
+                    let diff = null;
+                    if (counted !== null && (isClosed || counted > 0)) {
+                      if (shift.difference !== undefined && shift.difference !== null && Number(shift.difference) !== 0) {
+                        diff = Number(shift.difference);
+                      } else {
+                        diff = counted - expectedCash;
+                      }
+                    }
+
+                    const diffColor = diff === null ? 'var(--text-muted)' : diff === 0 ? '#10b981' : diff > 0 ? '#3b82f6' : '#ef4444';
+
                     return (
                       <tr key={shift.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                         <td style={{ padding: '12px 14px' }}>
-                          <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>
-                            {new Date(shift.openedAt).toLocaleDateString()}
+                          <div style={{ fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>{openDate ? new Date(openDate).toLocaleDateString('es-AR') : 'Sin fecha'}</span>
+                            {!isClosed && (
+                              <span style={{
+                                fontSize: '0.62rem',
+                                background: 'rgba(245, 158, 11, 0.18)',
+                                color: 'var(--accent-amber)',
+                                border: '1px solid rgba(245, 158, 11, 0.35)',
+                                padding: '1px 5px',
+                                borderRadius: '4px',
+                                fontWeight: 900
+                              }}>
+                                ABIERTO
+                              </span>
+                            )}
                           </div>
                           <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                            {new Date(shift.openedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs
+                            {openDate ? new Date(openDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' hs' : ''}
+                            {closeDate ? ` a ${new Date(closeDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs` : ''}
                           </div>
                         </td>
                         <td style={{ padding: '12px 14px', fontWeight: 700 }}>
-                          {shift.cashier || 'Cajero'}
+                          {cashierName}
                         </td>
                         <td style={{ padding: '12px 14px' }}>
-                          {formatMoney(shift.initialCash)}
+                          {formatMoney(initialCash)}
                         </td>
-                        <td style={{ padding: '12px 14px' }}>
-                          {formatMoney(shift.cashSales)}
+                        <td style={{ padding: '12px 14px', color: salesCash > 0 ? 'var(--accent-emerald)' : 'inherit', fontWeight: salesCash > 0 ? 700 : 400 }}>
+                          {formatMoney(salesCash)}
                         </td>
                         <td style={{ padding: '12px 14px', fontWeight: 800 }}>
-                          {formatMoney(shift.countedCash)}
+                          {counted !== null ? (
+                            formatMoney(counted)
+                          ) : (
+                            <span style={{ color: 'var(--accent-amber)', fontStyle: 'italic', fontSize: '0.75rem', fontWeight: 700 }}>
+                              En curso
+                            </span>
+                          )}
                         </td>
                         <td style={{ padding: '12px 14px' }}>
-                          <span style={{
-                            padding: '3px 8px',
-                            borderRadius: '12px',
-                            fontSize: '0.72rem',
-                            fontWeight: 900,
-                            color: diffColor,
-                            background: `${diffColor}22`
-                          }}>
-                            {diff === 0 ? 'Exacto $0' : `${diff > 0 ? '+' : ''}${formatMoney(diff)}`}
-                          </span>
+                          {diff === null ? (
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>-</span>
+                          ) : (
+                            <span style={{
+                              padding: '3px 8px',
+                              borderRadius: '12px',
+                              fontSize: '0.72rem',
+                              fontWeight: 900,
+                              color: diffColor,
+                              background: diff === 0 ? 'rgba(16, 185, 129, 0.15)' : diff > 0 ? 'rgba(59, 130, 246, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                              border: `1px solid ${diff === 0 ? 'rgba(16, 185, 129, 0.3)' : diff > 0 ? 'rgba(59, 130, 246, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                            }}>
+                              {diff === 0 ? 'Exacto $0' : `${diff > 0 ? '+' : ''}${formatMoney(diff)}`}
+                            </span>
+                          )}
                         </td>
                         <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
                             <button
                               type="button"
                               onClick={() => handleOpenEdit(shift)}
                               className="qty-btn"
-                              style={{ height: '30px', padding: '0 8px', gap: '4px', fontSize: '0.75rem' }}
+                              style={{ height: '30px', padding: '0 10px', gap: '5px', fontSize: '0.75rem', whiteSpace: 'nowrap', width: 'auto' }}
                               title="Modificar turno"
                             >
                               <Edit2 size={13} />
@@ -1628,17 +1723,35 @@ export default function AdminDatabaseTablesTab() {
                   </div>
                 </div>
 
-                <div>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                    Notas del Turno:
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.notes || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                    className="search-input"
-                    style={{ width: '100%', height: '36px', fontSize: '0.85rem' }}
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                      Estado del Turno:
+                    </label>
+                    <select
+                      value={formData.isClosed ? 'cerrado' : 'abierto'}
+                      onChange={(e) => setFormData(prev => ({ ...prev, isClosed: e.target.value === 'cerrado' }))}
+                      className="search-input"
+                      style={{ width: '100%', height: '36px', fontSize: '0.85rem' }}
+                    >
+                      <option value="cerrado">Cerrado (Arqueado)</option>
+                      <option value="abierto">Abierto (En curso)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                      Notas del Turno:
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.notes || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                      placeholder="Sin observaciones"
+                      className="search-input"
+                      style={{ width: '100%', height: '36px', fontSize: '0.85rem' }}
+                    />
+                  </div>
                 </div>
               </div>
             )}
