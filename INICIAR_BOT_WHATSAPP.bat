@@ -74,12 +74,28 @@ echo ¿Como deseas iniciar el bot de WhatsApp?
 echo.
 echo   [1] Conectar normalmente (Usa la sesion guardada si ya estas vinculado)
 echo   [2] Vincular NUEVO celular (Muestra el CODIGO QR en pantalla para escanear)
+echo   [3] Actualizar Bot desde GitHub (Bajar ultimas mejoras del repositorio)
+echo   [4] Salir
 echo.
 set BOT_CHOICE=1
-set /p BOT_CHOICE="Elige una opcion [1 o 2] (Por defecto 1): "
+set /p BOT_CHOICE="Elige una opcion [1, 2, 3 o 4] (Por defecto 1): "
 
 if "%BOT_CHOICE%"=="2" goto :DO_RESET
+if "%BOT_CHOICE%"=="3" goto :DO_UPDATE
+if "%BOT_CHOICE%"=="4" exit /b 0
 goto :RUN_NORMAL
+
+:DO_UPDATE
+cls
+echo =====================================================================
+echo    [ACTUALIZACION] BUSCANDO MEJORAS EN GITHUB REPOSITORY
+echo =====================================================================
+echo.
+node server/botUpdateService.js update
+echo.
+echo Presiona cualquier tecla para volver al menu principal...
+pause >nul
+goto :ASK_MODE
 
 :DO_RESET
 cls
@@ -109,6 +125,15 @@ node server/whatsappBotServer.js
 goto :AFTER_BOT
 
 :AFTER_BOT
+if exist "%~dp0.restart_trigger" (
+    del /f /q "%~dp0.restart_trigger" 2>nul
+    echo.
+    echo =====================================================================
+    echo    [REINICIO AUTOMATICO] APLICANDO ACTUALIZACION DEL BOT...
+    echo =====================================================================
+    timeout /t 2 /nobreak >nul
+    goto :RUN_NORMAL
+)
 echo.
 echo ---------------------------------------------------------------------
 echo El servidor del bot se ha detenido.

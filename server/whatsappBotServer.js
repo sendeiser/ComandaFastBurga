@@ -13,6 +13,7 @@ import QRCode from 'qrcode';
 import qrcodeTerminal from 'qrcode-terminal';
 import pino from 'pino';
 import { geminiBotService } from './geminiBotService.js';
+import { botUpdateService } from './botUpdateService.js';
 import makeWASocket, { 
   useMultiFileAuthState, 
   fetchLatestBaileysVersion, 
@@ -1689,12 +1690,88 @@ class WhatsAppBotServer {
           // Ignorar canales informativos de WhatsApp
           if (remoteJid.includes('@newsletter')) continue;
 
-          // Si el mensaje fue enviado por el operador/dueño desde el propio teléfono físico
-          if (msg.key?.fromMe) {
-            if (msg.key?.id && botSentMessageIds.has(msg.key.id)) {
-              // Eco del propio bot: ignorar silenciosamente sin pausar la atención
+          // Si el mensaje fue enviado por el bot mismo (eco socket), ignorar
+          if (msg.key?.id && botSentMessageIds.has(msg.key.id)) {
+            continue;
+          }
+
+          const text = (msg.message?.conversation || msg.message?.extendedTextMessage?.text || '').trim();
+          const isImageMsg = !!msg.message?.imageMessage;
+          const lower = text.toLowerCase();
+
+          // -------------------------------------------------------------
+          // COMANDOS DE ADMINISTRACIÓN DE VERSIONES Y ACTUALIZACIÓN
+          // -------------------------------------------------------------
+          const isVersionCmd = lower === '#version' || lower === '#botversion' || lower === '#info';
+          const isUpdateCmd = lower === '#actualizar' || lower === '#update' || lower === '#actualizarbot';
+
+          if (isVersionCmd) {
+            console.log(`ℹ️ [COMANDO #VERSION]: Solicitado desde ${remoteJid}`);
+            try {
+              const info = await botUpdateService.checkUpdates();
+              const dateStr = info.remoteDate ? new Date(info.remoteDate).toLocaleString('es-AR') : 'N/A';
+              const reply = `🤖 *ComandaFast Bot - Estado de Versión*\n\n` +
+                `📌 *Commit Local:* \`${info.localCommit}\`\n` +
+                `🌐 *Último en GitHub:* \`${info.remoteCommit}\`\n` +
+                `📅 *Fecha:* ${dateStr}\n` +
+                `📝 *Mensaje:* ${info.remoteMessage || 'N/A'}\n` +
+                `📊 *Estado:* ${info.hasUpdate ? '⚠️ *¡Hay una nueva actualización disponible!*' : '✅ *El bot está al día*'}\n\n` +
+                (info.hasUpdate ? `👉 Para instalar las mejoras responde *#actualizar*` : '¡Tienes la versión más reciente funcionando!');
+              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
+            } catch (vErr) {
+              await this.safeSendMessage(remoteJid, { text: `❌ Error al consultar versión: ${vErr.message}` }, msg.key);
+            }
+            continue;
+          }
+
+          if (isUpdateCmd) {
+            const isFromMe = Boolean(msg.key?.fromMe);
+            const senderDigits = extractCleanDigits(remoteJid);
+            const vars = getStoredVariables();
+            const contactPhone = vars.find(v => v.key === 'telefono_contacto')?.value || '';
+            const contactDigits = extractCleanDigits(contactPhone);
+            const isAuthorized = isFromMe || (contactDigits && senderDigits.endsWith(contactDigits.slice(-8)));
+
+            if (!isAuthorized) {
+              console.warn(`⛔ [INTENTO NO AUTORIZADO DE ACTUALIZACIÓN]: ${remoteJid}`);
+              await this.safeSendMessage(remoteJid, { 
+                text: '🔒 *Acceso denegado:* El comando de actualización es exclusivo para el administrador del local.' 
+              }, msg.key);
               continue;
             }
+
+            console.log(`🔄 [COMANDO #ACTUALIZAR]: Iniciando actualización solicitada por ${remoteJid}...`);
+            await this.safeSendMessage(remoteJid, { 
+              text: '⏳ *Buscando e instalando actualizaciones desde el repositorio de GitHub...*\nPor favor aguarda unos instantes...' 
+            }, msg.key);
+
+            try {
+              const result = await botUpdateService.applyUpdate();
+              if (result.success) {
+                const restartNotice = result.requiresRestart 
+                  ? '\n\n🔄 *El servidor del bot se reiniciará en 3 segundos para aplicar todos los cambios.*' 
+                  : '';
+                await this.safeSendMessage(remoteJid, { 
+                  text: `✅ *¡Actualización completada!*\n\n${result.message}${restartNotice}` 
+                }, msg.key);
+                if (result.requiresRestart) {
+                  botUpdateService.scheduleRestart(3000);
+                }
+              } else {
+                await this.safeSendMessage(remoteJid, { 
+                  text: `⚠️ *No se pudo completar la actualización:*\n${result.error || result.message}` 
+                }, msg.key);
+              }
+            } catch (uErr) {
+              await this.safeSendMessage(remoteJid, { 
+                text: `❌ *Error al actualizar:* ${uErr.message}` 
+              }, msg.key);
+            }
+            continue;
+          }
+
+          // Si el mensaje fue enviado por el operador/dueño desde el propio teléfono físico
+          if (msg.key?.fromMe) {
             const isSelfChat = (this.connectedUser?.id && remoteJid.includes(this.connectedUser.id.split(':')[0])) ||
                                (this.connectedUser?.lid && remoteJid.includes(this.connectedUser.lid.split(':')[0])) ||
                                (this.connectedUser?.id && remoteJid === this.connectedUser.id) ||
@@ -1713,10 +1790,6 @@ class WhatsAppBotServer {
           if (msgTimestamp > 0 && (nowSec - msgTimestamp) > 90) {
             continue;
           }
-
-          const text = (msg.message?.conversation || msg.message?.extendedTextMessage?.text || '').trim();
-          const isImageMsg = !!msg.message?.imageMessage;
-          const lower = text.toLowerCase();
 
           // -------------------------------------------------------------
           // CONTROL DE ATENCIÓN HUMANA (MODO HUMANO / HAND-OVER)
@@ -3476,6 +3549,39 @@ app.get('/download/INICIAR_SISTEMA_COMPLETO.bat', (req, res) => {
     return res.download(filePath, 'INICIAR_SISTEMA_COMPLETO.bat');
   }
   res.status(404).send('Archivo no encontrado');
+});
+
+app.get('/download/ACTUALIZAR_BOT.bat', (req, res) => {
+  const filePath = path.join(process.cwd(), 'ACTUALIZAR_BOT.bat');
+  if (fs.existsSync(filePath)) {
+    return res.download(filePath, 'ACTUALIZAR_BOT.bat');
+  }
+  res.status(404).send('Archivo no encontrado');
+});
+
+// =========================================================
+// ENDPOINTS DE ACTUALIZACIÓN DEL REPOSITORIO (OTA / GIT)
+// =========================================================
+app.get('/api/bot/update/check', async (req, res) => {
+  try {
+    const info = await botUpdateService.checkUpdates();
+    res.json({ success: true, ...info });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/bot/update/apply', async (req, res) => {
+  try {
+    console.log('🔄 [BOT UPDATE] Solicitud de actualización recibida desde API Web...');
+    const result = await botUpdateService.applyUpdate();
+    if (result.success && result.requiresRestart) {
+      botUpdateService.scheduleRestart(3000);
+    }
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.get('/api/orders', (req, res) => {

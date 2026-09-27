@@ -28,7 +28,7 @@ fs.mkdirSync(path.join(OUTPUT_DIR, 'data', 'baileys_auth'), { recursive: true })
 
 // 2. Copia de código fuente
 console.log('[2/7] Copiando archivos de servidor y lógica del bot...');
-const serverFiles = ['whatsappBotServer.js', 'geminiBotService.js', 'printerServer.js'];
+const serverFiles = ['whatsappBotServer.js', 'geminiBotService.js', 'printerServer.js', 'botUpdateService.js'];
 serverFiles.forEach(file => {
   const src = path.join(ROOT_DIR, 'server', file);
   if (fs.existsSync(src)) {
@@ -205,14 +205,28 @@ echo ¿Como deseas iniciar el bot?
 echo.
 echo   [1] Iniciar normalmente (Mantiene tu sesion de WhatsApp guardada)
 echo   [2] Vincular NUEVO celular (Muestra el Codigo QR en esta ventana)
-echo   [3] Salir
+echo   [3] 🔄 Actualizar Bot desde GitHub (Bajar ultimas mejoras y funciones)
+echo   [4] Salir
 echo.
 set OP=1
-set /p OP="Elige 1, 2 o 3 (Por defecto 1): "
+set /p OP="Elige 1, 2, 3 o 4 (Por defecto 1): "
 
 if "%OP%"=="2" goto MODO_QR
-if "%OP%"=="3" exit /b 0
+if "%OP%"=="3" goto MODO_UPDATE
+if "%OP%"=="4" exit /b 0
 goto MODO_NORMAL
+
+:MODO_UPDATE
+cls
+echo =====================================================================
+echo    🔄 [ACTUALIZACION] BUSCANDO MEJORAS EN GITHUB
+echo =====================================================================
+echo.
+"%NODE_BIN%" server\\botUpdateService.js update
+echo.
+echo Presiona cualquier tecla para volver al menu principal...
+pause >nul
+goto MENU
 
 :MODO_QR
 cls
@@ -237,11 +251,52 @@ echo.
 goto FIN
 
 :FIN
+if exist "%~dp0.restart_trigger" (
+    del /f /q "%~dp0.restart_trigger" 2>nul
+    echo.
+    echo =====================================================================
+    echo    🔄 [REINICIO AUTOMATICO] APLICANDO ACTUALIZACION DEL BOT...
+    echo =====================================================================
+    timeout /t 2 /nobreak >nul
+    goto MODO_NORMAL
+)
 echo.
 pause
 `.replace(/\r?\n/g, '\r\n');
 
 fs.writeFileSync(path.join(OUTPUT_DIR, 'INICIAR_BOT.bat'), iniciarBatContent, 'utf-8');
+
+const actualizarBatContent = `@echo off
+chcp 65001 > nul
+title ComandaFast - Actualizar Bot WhatsApp
+color 0A
+cls
+
+cd /d "%~dp0"
+
+if exist "%~dp0node.exe" (
+    set "NODE_BIN=%~dp0node.exe"
+) else (
+    set "NODE_BIN=node"
+)
+
+echo =====================================================================
+echo    🍔 [ACTUALIZADOR] BOT WHATSAPP PORTATIL DE COMANDAFAST
+echo    Descarga e instala las ultimas mejoras directamente desde GitHub
+echo =====================================================================
+echo.
+
+"%NODE_BIN%" server\\botUpdateService.js update
+
+echo.
+echo =====================================================================
+echo Proceso finalizado. Puedes iniciar el bot con INICIAR_BOT.bat
+echo =====================================================================
+echo.
+pause
+`.replace(/\r?\n/g, '\r\n');
+
+fs.writeFileSync(path.join(OUTPUT_DIR, 'ACTUALIZAR_BOT.bat'), actualizarBatContent, 'utf-8');
 
 const detenerBatContent = `@echo off
 chcp 65001 > nul

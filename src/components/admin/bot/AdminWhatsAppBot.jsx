@@ -118,6 +118,12 @@ export default function AdminWhatsAppBot({ initialTab }) {
   const [aiTestLoading, setAiTestLoading] = useState(false);
   const [aiTestResult, setAiTestResult] = useState(null);
   const [showGroqKey, setShowGroqKey] = useState(false);
+
+  // Update State (GitHub Repo OTA)
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [applyingUpdate, setApplyingUpdate] = useState(false);
+  const [updateStatusMsg, setUpdateStatusMsg] = useState(null);
   const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showDeepSeekKey, setShowDeepSeekKey] = useState(false);
   const [aiSavedSuccess, setAiSavedSuccess] = useState(false);
@@ -805,6 +811,128 @@ call npm run dev
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
+
+  const handleDownloadUpdateScript = () => {
+    const batContent = `@echo off
+chcp 65001 > nul
+title ComandaFast - Actualizador de Bot WhatsApp desde GitHub
+color 0A
+cls
+
+echo =====================================================================
+echo    🍔 [COMANDAFAST BURGERS] - ACTUALIZADOR DE BOT WHATSAPP
+echo    Descarga las ultimas mejoras, correcciones y funciones desde GitHub
+echo =====================================================================
+echo.
+
+cd /d "%~dp0"
+
+where node >nul 2>nul
+if %errorlevel% neq 0 (
+    color 0C
+    echo [ERROR] Node.js no esta instalado o no se encuentra en el PATH.
+    echo Por favor descarga e instala Node.js desde: https://nodejs.org/
+    echo.
+    pause
+    exit /b 1
+)
+
+node server/botUpdateService.js update
+
+echo.
+echo =====================================================================
+echo    Proceso de actualizacion finalizado.
+echo =====================================================================
+echo.
+pause
+`.replace(/\r?\n/g, '\r\n');
+
+    const blob = new Blob([batContent], { type: 'application/x-bat;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ACTUALIZAR_BOT.bat';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCheckUpdate = useCallback(async () => {
+    setCheckingUpdate(true);
+    try {
+      if (BOT_SERVER_URL) {
+        const res = await fetch(`${BOT_SERVER_URL}/api/bot/update/check`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) {
+            setUpdateInfo(data);
+            if (data.hasUpdate) {
+              setUpdateStatusMsg({ type: 'warning', text: '¡Hay una nueva actualización disponible en GitHub!' });
+            } else {
+              setUpdateStatusMsg({ type: 'success', text: 'El bot está actualizado con la última versión de GitHub.' });
+            }
+            return;
+          }
+        }
+      }
+      
+      // Fallback directo a GitHub si el microservicio local aún no responde
+      const ghRes = await fetch('https://api.github.com/repos/sendeiser/ComandaFastBurga/commits/main');
+      if (ghRes.ok) {
+        const commit = await ghRes.json();
+        setUpdateInfo({
+          remoteCommit: commit.sha ? commit.sha.substring(0, 7) : 'N/A',
+          remoteMessage: commit.commit?.message?.split('\n')[0] || '',
+          remoteDate: commit.commit?.author?.date || null,
+          remoteAuthor: commit.commit?.author?.name || 'GitHub',
+          localCommit: 'Inicia el bot para ver versión local',
+          hasUpdate: null
+        });
+        setUpdateStatusMsg({ type: 'info', text: 'Último commit en GitHub consultado. Inicia el servidor del bot para ver versión local y sincronizar.' });
+      }
+    } catch (err) {
+      console.warn('[AdminWhatsAppBot] Error checking updates:', err);
+      setUpdateStatusMsg({ type: 'error', text: `No se pudo verificar: ${err.message}` });
+    } finally {
+      setCheckingUpdate(false);
+    }
+  }, []);
+
+  const handleApplyUpdate = async () => {
+    if (!window.confirm('¿Deseas descargar e instalar la última versión del Bot desde GitHub?\n\nTu sesión de WhatsApp y tus productos se mantendrán guardados.')) {
+      return;
+    }
+    setApplyingUpdate(true);
+    setUpdateStatusMsg({ type: 'info', text: 'Descargando e instalando actualización...' });
+    try {
+      if (BOT_SERVER_URL) {
+        const res = await fetch(`${BOT_SERVER_URL}/api/bot/update/apply`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          setUpdateStatusMsg({ 
+            type: 'success', 
+            text: `¡Actualización completada con éxito! ${data.message} ${data.requiresRestart ? '(El servidor se reiniciará automáticamente)' : ''}` 
+          });
+          setTimeout(handleCheckUpdate, 4000);
+        } else {
+          setUpdateStatusMsg({ type: 'error', text: `Error: ${data.error || data.message}` });
+        }
+      } else {
+        setUpdateStatusMsg({ type: 'error', text: 'El servidor local del Bot no está conectado en el puerto 3002.' });
+      }
+    } catch (err) {
+      setUpdateStatusMsg({ type: 'error', text: `Error de comunicación: ${err.message}` });
+    } finally {
+      setApplyingUpdate(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'connection' && serverOnline) {
+      handleCheckUpdate();
+    }
+  }, [activeTab, serverOnline, handleCheckUpdate]);
 
   const handleStartBot = async () => {
     setLoadingAction(true);
@@ -3491,6 +3619,189 @@ call npm run dev
                     <Download size={13} />
                     <span>Descargar INICIAR_SISTEMA_COMPLETO.bat</span>
                   </button>
+                </div>
+
+                {/* STANDALONE UPDATER SCRIPT */}
+                <div style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '0.85rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px'
+                }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <GitBranch size={15} style={{ color: 'var(--accent-blue)' }} />
+                    <span>Actualizador de Bot</span>
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    Descarga en 1 clic los últimos archivos desde GitHub manteniendo tu sesión.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDownloadUpdateScript}
+                    className="cat-pill-btn"
+                    style={{
+                      marginTop: '6px',
+                      height: '32px',
+                      fontSize: '0.75rem',
+                      gap: '6px',
+                      justifyContent: 'center',
+                      background: 'rgba(59, 130, 246, 0.15)',
+                      color: 'var(--accent-blue)',
+                      border: '1px solid var(--accent-blue)',
+                      fontWeight: 800
+                    }}
+                  >
+                    <Download size={13} />
+                    <span>Descargar ACTUALIZAR_BOT.bat</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* TARJETA DE ACTUALIZACIONES DESDE EL REPOSITORIO GITHUB */}
+            <div style={{
+              background: 'var(--bg-main)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-md)',
+              padding: '1.15rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.85rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <GitBranch size={17} style={{ color: 'var(--accent-blue)' }} />
+                  <span>Actualizaciones del Bot desde GitHub (OTA)</span>
+                </div>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    disabled={checkingUpdate || applyingUpdate}
+                    onClick={handleCheckUpdate}
+                    className="cat-pill-btn"
+                    style={{
+                      height: '28px',
+                      padding: '0 0.75rem',
+                      fontSize: '0.72rem',
+                      gap: '5px',
+                      background: 'rgba(59, 130, 246, 0.12)',
+                      color: 'var(--accent-blue)',
+                      border: '1px solid rgba(59, 130, 246, 0.3)',
+                      fontWeight: 700
+                    }}
+                  >
+                    <RefreshCw size={12} className={checkingUpdate ? 'spin-slow' : ''} />
+                    <span>{checkingUpdate ? 'Buscando...' : 'Buscar Actualizaciones'}</span>
+                  </button>
+                </div>
+              </div>
+
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+                Cuando hagas cambios en el repositorio de GitHub, podés sincronizar el Bot directamente desde este panel o ejecutando <strong>ACTUALIZAR_BOT.bat</strong>. Tus sesiones activas de WhatsApp (QR) y tus productos no se pierden.
+              </p>
+
+              {/* COMMIT / VERSION DETAILS */}
+              <div style={{
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '0.75rem 1rem',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: '0.75rem',
+                fontSize: '0.75rem'
+              }}>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block' }}>Versión Local Instalada:</span>
+                  <strong style={{ color: 'var(--text-primary)', fontFamily: 'monospace', fontSize: '0.82rem' }}>
+                    {updateInfo?.localCommit || (serverOnline ? 'Detectando...' : 'Servidor apagado')}
+                  </strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block' }}>Última Versión en GitHub:</span>
+                  <strong style={{ color: 'var(--accent-blue)', fontFamily: 'monospace', fontSize: '0.82rem' }}>
+                    {updateInfo?.remoteCommit || 'Consultar GitHub'}
+                  </strong>
+                </div>
+                {updateInfo?.remoteDate && (
+                  <div>
+                    <span style={{ color: 'var(--text-muted)', display: 'block' }}>Fecha de última mejora:</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>
+                      {new Date(updateInfo.remoteDate).toLocaleString('es-AR')}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {updateInfo?.remoteMessage && (
+                <div style={{
+                  fontSize: '0.75rem',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  borderLeft: '3px solid var(--accent-blue)',
+                  padding: '6px 10px',
+                  color: 'var(--text-secondary)'
+                }}>
+                  <strong>Último commit:</strong> {updateInfo.remoteMessage} {updateInfo.remoteAuthor ? `(por ${updateInfo.remoteAuthor})` : ''}
+                </div>
+              )}
+
+              {updateStatusMsg && (
+                <div style={{
+                  padding: '0.65rem 0.85rem',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.76rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: updateStatusMsg.type === 'success' ? 'rgba(16, 185, 129, 0.12)' :
+                              updateStatusMsg.type === 'warning' ? 'rgba(245, 158, 11, 0.12)' :
+                              updateStatusMsg.type === 'error' ? 'rgba(239, 68, 68, 0.12)' : 'rgba(59, 130, 246, 0.12)',
+                  color: updateStatusMsg.type === 'success' ? 'var(--accent-emerald)' :
+                         updateStatusMsg.type === 'warning' ? 'var(--accent-amber)' :
+                         updateStatusMsg.type === 'error' ? 'var(--accent-rose)' : 'var(--accent-blue)',
+                  border: `1px solid ${
+                    updateStatusMsg.type === 'success' ? 'rgba(16, 185, 129, 0.3)' :
+                    updateStatusMsg.type === 'warning' ? 'rgba(245, 158, 11, 0.3)' :
+                    updateStatusMsg.type === 'error' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(59, 130, 246, 0.3)'
+                  }`
+                }}>
+                  {updateStatusMsg.type === 'success' ? <CheckCircle2 size={16} /> :
+                   updateStatusMsg.type === 'warning' ? <AlertCircle size={16} /> :
+                   updateStatusMsg.type === 'error' ? <AlertCircle size={16} /> : <Info size={16} />}
+                  <span>{updateStatusMsg.text}</span>
+                </div>
+              )}
+
+              {/* ACTION BUTTON */}
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  disabled={applyingUpdate || !serverOnline || (updateInfo && !updateInfo.hasUpdate)}
+                  onClick={handleApplyUpdate}
+                  className="cat-pill-btn active"
+                  style={{
+                    height: '34px',
+                    padding: '0 1.1rem',
+                    fontSize: '0.78rem',
+                    gap: '6px',
+                    background: (updateInfo?.hasUpdate) ? 'var(--accent-emerald)' : 'rgba(16, 185, 129, 0.2)',
+                    color: (updateInfo?.hasUpdate) ? '#052e16' : 'var(--accent-emerald)',
+                    fontWeight: 800,
+                    opacity: (updateInfo && !updateInfo.hasUpdate && !applyingUpdate) ? 0.6 : 1,
+                    cursor: (updateInfo && !updateInfo.hasUpdate && !applyingUpdate) ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  <RefreshCw size={13} className={applyingUpdate ? 'spin-slow' : ''} />
+                  <span>{applyingUpdate ? 'Instalando Actualización...' : (updateInfo?.hasUpdate ? 'Actualizar Bot Ahora' : 'El Bot está al día')}</span>
+                </button>
+
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  {serverOnline 
+                    ? '💡 También podés escribir #actualizar en WhatsApp para actualizar remotamente.' 
+                    : '⚠️ El servidor del bot debe estar encendido para aplicar la actualización desde esta pantalla.'}
                 </div>
               </div>
             </div>
