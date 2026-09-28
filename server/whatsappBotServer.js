@@ -3155,6 +3155,35 @@ class WhatsAppBotServer {
 
             // 1. Ver carrito actual
             const cleanNormSelecting = normalizeSearchText(lower);
+
+            // COMANDO: VER MENÚ O CARTA DESDE MODO SELECTING
+            const isMenuOrCatalogQuery = /^(menu|menú|carta|catalogo|catálogo|ver\s+menu|ver\s+menú|ver\s+carta|ver\s+catalogo|inicio|comenzar)$/i.test(cleanNormSelecting);
+            if (isMenuOrCatalogQuery) {
+              if (session.items.length === 0) {
+                session.catalogPage = 1;
+                const menuReply = buildMainMenuMessage(msg.pushName);
+                await this.safeSendMessage(remoteJid, { text: menuReply }, msg.key);
+                continue;
+              } else {
+                const itemsBrief = session.items.map(it => `• ${it.name} (x${it.qty || 1})`).join(', ');
+                const cartHeader = `🛒 *Tu pedido actual sigue guardado:* ${itemsBrief} *(Subtotal: $${(session.total || session.subtotal || 0).toLocaleString('es-AR')})*\n\n`;
+
+                if (menuModeSel === 'catalog') {
+                  const biz = getBusinessContext();
+                  const catalogUrl = (biz.catalogo_url || biz.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
+                  const reply = `${cartHeader}📱 *¡Mirá nuestra Carta Digital con fotos para elegir qué sumar!* 📸\n👉 ${catalogUrl}/#catalog\n\n_O respondé *LISTO* para avanzar con la entrega._`;
+                  await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
+                  continue;
+                } else {
+                  session.catalogPage = session.catalogPage || 1;
+                  const catalogText = buildCatalogMessage(prods, session.catalogPage, 8, false);
+                  const reply = `${cartHeader}${catalogText}`;
+                  await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
+                  continue;
+                }
+              }
+            }
+
             if (/^(carrito|ver\s+carrito|mi\s+carrito|ver\s+pedido|mi\s+pedido|pedido\s+actual)$/i.test(cleanNormSelecting)) {
               if (session.items.length === 0) {
                 await this.safeSendMessage(remoteJid, {
@@ -3343,13 +3372,27 @@ class WhatsAppBotServer {
 
             if (isAddMoreTrigger) {
               session.catalogPage = session.catalogPage || 1;
-              const catalogText = buildCatalogMessage(prods, session.catalogPage, 8, false);
-              const itemsList = session.items.length > 0
-                ? session.items.map(it => `• ${it.name} (x${it.qty || 1}) - $${((Number(it.price) || 0) * (it.qty || 1)).toLocaleString('es-AR')}`).join('\n')
-                : '_Carrito vacío._';
-              const reply = `🛒 *Tu pedido actual sigue guardado:*\n${itemsList}\n\n💵 *Subtotal:* $${session.total.toLocaleString('es-AR')}\n\n🍟 *¿Qué querés sumar? Podés:*\n• Escribir el *NOMBRE* directamente (ej: *"1 Coca"*, *"papas"*).\n• Escribir el *NÚMERO* de la opción (1 al ${prods.length}).\n• Escribir una categoría: *HAMBURGUESAS*, *BEBIDAS*, *PAPAS*, *LOMITOS*, *PANCHOS* o *PROMOS*.\n• O escribir *CARTA* para ver todas las opciones.\n\n👉 Si ya terminaste, respondé *LISTO* para avanzar con la entrega.`;
-              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
-              continue;
+              if (session.items.length === 0) {
+                const menuReply = buildMainMenuMessage(msg.pushName);
+                await this.safeSendMessage(remoteJid, { text: menuReply }, msg.key);
+                continue;
+              }
+
+              const itemsBrief = session.items.map(it => `• ${it.name} (x${it.qty || 1})`).join(', ');
+              const cartHeader = `🛒 *Tu pedido actual sigue guardado:* ${itemsBrief} *(Subtotal: $${(session.total || session.subtotal || 0).toLocaleString('es-AR')})*\n\n`;
+
+              if (menuModeSel === 'catalog') {
+                const biz = getBusinessContext();
+                const catalogUrl = (biz.catalogo_url || biz.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
+                const reply = `${cartHeader}📱 *¡Mirá nuestra Carta Digital con fotos para elegir qué sumar!* 📸\n👉 ${catalogUrl}/#catalog\n\n_O respondé *LISTO* para finalizar tu pedido._`;
+                await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
+                continue;
+              } else {
+                const catalogText = buildCatalogMessage(prods, session.catalogPage, 8, false);
+                const reply = `${cartHeader}${catalogText}`;
+                await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
+                continue;
+              }
             }
           }
 
