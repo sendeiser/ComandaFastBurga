@@ -200,6 +200,23 @@ export const chatbotService = {
     return this.getCustomFlows();
   },
 
+  async fetchServerTemplates() {
+    try {
+      const botHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+      const res = await fetch(`http://${botHost}:3002/api/bot-templates`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.templates && typeof data.templates === 'object') {
+          const current = this.getSettings();
+          const merged = { ...current, ...data.templates };
+          localStorage.setItem(BOT_SETTINGS_KEY, JSON.stringify(merged));
+          return data.templates;
+        }
+      }
+    } catch (_) {}
+    return null;
+  },
+
   // 1. Obtener ajustes del bot
   getSettings() {
     try {
@@ -411,6 +428,18 @@ export const chatbotService = {
     return {
       cliente: persona.name || 'Cliente',
       nombre_local: storeName,
+      promos_alerta: `🏷️💥 *¡HOY TENEMOS PROMOS Y COMBOS ESPECIALES!* 🛵🍔\n• *2 Cheese* ($17.000)\n\n`,
+      catalogo_lista: `1️⃣ *2 Cheese* — $17.000 [🏷️ Promo]\n   _Incluye papas y delivery_\n2️⃣ *Burger Crispy* — $14.500\n   _Doble medallón, cheddar y cebolla crispy_`,
+      carrito_items: `• 1x 2 Cheese ($17.000)`,
+      subtotal: '17.000',
+      total: '17.000',
+      pedido_id: 'CMD-1234',
+      producto: '2 Cheese',
+      subtotal_item: '$17.000',
+      linea_descuento: '',
+      metodo_entrega: 'Envío a domicilio (Delivery)',
+      medio_pago: 'Transferencia Bancaria',
+      instrucciones_pago: 'Realizá la transferencia al alias: Burgachamical.nx',
       alias_banco: botVars.alias_banco || s.bank_alias || 'Burgachamical.nx',
       banco: botVars.banco || s.bank_name || 'Naranja X',
       titular: botVars.titular || s.bank_holder || 'Braian Carlos Zarate San Felipe',
@@ -1003,7 +1032,66 @@ export const chatbotService = {
     // -------------------------------------------------------------
     // MENÚ PRINCIPAL POR DEFECTO
     // -------------------------------------------------------------
-    reply = this.interpolateTemplate(settings.template_menu || DEFAULT_TEMPLATES.template_menu, commonVars);
+    const currentMenuMode = settings.menu_mode || 'catalog';
+    const prodsList = (availableProducts && availableProducts.length > 0)
+      ? availableProducts
+      : storageService.getProducts();
+
+    const promoProducts = prodsList.filter(p => 
+      (p.category || '').toLowerCase().includes('promo') ||
+      Boolean(p.discountBadge) ||
+      Boolean(p.originalPrice && Number(p.originalPrice) > Number(p.price))
+    );
+
+    let promosAlerta = '';
+    if (promoProducts.length > 0) {
+      const promoNames = promoProducts.slice(0, 3).map(p => `• *${p.name}* ($${Number(p.price).toLocaleString('es-AR')})`).join('\n');
+      promosAlerta = `🏷️💥 *¡HOY TENEMOS PROMOS Y COMBOS ESPECIALES!* 🛵🍔\n${promoNames}\n\n`;
+    }
+
+    if (currentMenuMode === 'catalog') {
+      const catalogUrl = (settings.store_website_url || window.location.origin).replace(/\/$/, '');
+      const clientName = persona.name ? persona.name.trim() : 'amigo/a';
+      const storeName = commonVars.nombre_local || "Burga's Chamical";
+      reply = `🍔 *¡Hola ${clientName}! Bienvenido a ${storeName}* 🔥\n\n` +
+        promosAlerta +
+        `📱 *¡Hacé tu pedido directo desde nuestra Carta Digital interactiva con fotos reales y precios!* 📸\n` +
+        `👉 ${catalogUrl}/#catalog\n\n` +
+        `Allí podés ver fotos reales de cada hamburguesa, armar tu combo con adicionales y enviar tu pedido a la cocina en un toque con un solo click. ¡Te esperamos! 🛵✨\n\n` +
+        `_Si necesitás consultar por un pedido en curso o hablar con nosotros, podés escribir *ESTADO* o *HUMANO*._`;
+      return { reply, newState };
+    }
+
+    // MODO PLANTILLAS CLÁSICO: directo al grano para pedir sin menú burocrático ni estado de pedido
+    newState.step = 'SELECTING_PRODUCTS';
+    newState.catalogPage = 1;
+    if (!Array.isArray(newState.items)) newState.items = [];
+
+    const catalogList = (prodsList.slice(0, 8).map((p, i) => {
+      const numBadge = formatItemNumber(i + 1);
+      const photoBadge = p.image ? ' 📸' : '';
+      let priceStr = `$${Number(p.price).toLocaleString('es-AR')}`;
+      if (p.originalPrice && Number(p.originalPrice) > Number(p.price)) {
+        priceStr = `~${Number(p.originalPrice).toLocaleString('es-AR')}~ $${Number(p.price).toLocaleString('es-AR')}`;
+      }
+      const desc = p.description ? `\n   _${p.description}_` : '';
+      return `${numBadge} *${p.name}* — ${priceStr}${photoBadge}${desc}`;
+    }).join('\n\n')) + (prodsList.length > 8 ? `\n\n⏩ _Mostrando las primeras 8 opciones de ${prodsList.length}. Escribí *SIGUIENTE* para ver más._` : '');
+
+    let rawTemplate = settings.template_menu || DEFAULT_TEMPLATES.template_menu;
+    if (!rawTemplate || rawTemplate.includes('Consultar estado') || rawTemplate.includes('1️⃣ 📋') || rawTemplate.includes('5️⃣ 👤')) {
+      rawTemplate = DEFAULT_TEMPLATES.template_menu;
+    }
+
+    if (!rawTemplate.includes('{promos_alerta}') && promosAlerta) {
+      rawTemplate = rawTemplate.replace(/(🔥|Bienvenido[^\n]*\n)/i, `$1\n${promosAlerta}`);
+    }
+
+    reply = this.interpolateTemplate(rawTemplate, {
+      ...commonVars,
+      promos_alerta: promosAlerta,
+      catalogo_lista: catalogList
+    });
     return { reply, newState };
   }
 };

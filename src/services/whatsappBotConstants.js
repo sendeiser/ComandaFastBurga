@@ -51,8 +51,7 @@ export const DEFAULT_TEMPLATES = {
   template_anti_loop_farewell: DEFAULT_ANTI_LOOP_RESPONSES.template_anti_loop_farewell,
   template_anti_loop_acknowledge: DEFAULT_ANTI_LOOP_RESPONSES.template_anti_loop_acknowledge,
 
-  // 1. Menú Principal y Opciones
-  template_menu: `🍔 *¡Hola {cliente}! Bienvenido a {nombre_local}* 🔥\n\n¿En qué podemos ayudarte hoy? *Respondé con el número de opción:*\n\n1️⃣ 📋 *Consultar estado de mi pedido*\n2️⃣ 💳 *Ver datos de transferencia bancaria / Alias*\n3️⃣ 📍 *Horarios y ubicación de nuestro local*\n4️⃣ 🍔 *Ver menú completo de hamburguesas y combos*\n5️⃣ 👤 *Hablar con un encargado del local*\n\n_O escribí directamente tu pedido (ej: *2 Dobles con queso sin cebolla y unas papas*)._`,
+  template_menu: `🍔 *¡Hola {cliente}! Bienvenido a {nombre_local}* 🔥\n\n{promos_alerta}¿Qué te preparamos hoy? *Elegí lo que más te guste:*\n\n{catalogo_lista}\n\n───────────────────\n👉 *Respondé con el NÚMERO (1, 2, 3...) o el nombre de lo que quieras pedir.*\n👉 Podés agregar aclaraciones como *Sin cebolla*, *Extra cheddar*, etc.\n\n_Si querés consultar horarios, datos de pago o un pedido en curso, escribí *HORARIOS*, *DATOS* o *ESTADO*._`,
   
   menu_response_1: `📋 *Estado de tu Pedido:* #{pedido_id}\n\n• *Estado:* {estado}\n• *Total:* \${total}\n• *Destino:* {direccion}\n\n_Para volver al menú, enviá la palabra *MENU*._`,
   
@@ -100,24 +99,28 @@ export const DEFAULT_TEMPLATES = {
 };
 
 export const ALL_TEMPLATE_NODES = [
-  { id: 'template_menu', label: 'Menú de Bienvenida Principal', category: 'menu', description: 'Mensaje inicial cuando el cliente saluda por primera vez' },
+  { id: 'template_menu', label: 'Menú y Bienvenida Principal', category: 'menu', description: 'Mensaje inicial con catálogo directo, selección rápida y alerta de promos del día' },
+  { id: 'template_welcome', label: 'Saludo de Bienvenida Alternativo', category: 'menu', description: 'Mensaje de saludo genérico o secundario' },
+  { id: 'template_buy_catalog', label: 'Catálogo de Compras', category: 'buy_flow', description: 'Inicio del flujo de selección de productos' },
+  { id: 'template_cart_item_added', label: 'Producto Agregado al Carrito', category: 'buy_flow', description: 'Confirmación cuando el cliente elige una hamburguesa' },
+  { id: 'template_cart_view', label: 'Vista de Pedido Actual', category: 'buy_flow', description: 'Desglose del carrito con opciones de modificar' },
+  { id: 'template_empty_cart', label: 'Aviso de Carrito Vacío', category: 'buy_flow', description: 'Mensaje cuando el cliente escribe LISTO sin productos agregados' },
+  { id: 'template_shipping_prompt', label: 'Pregunta de Entrega', category: 'buy_flow', description: 'Pregunta si es Take Away o Delivery' },
+  { id: 'template_address_prompt', label: 'Pregunta de Dirección', category: 'buy_flow', description: 'Solicitud de dirección para el repartidor' },
+  { id: 'template_name_prompt', label: 'Pregunta de Nombre de Cliente', category: 'buy_flow', description: 'Solicitud de nombre para registrar la comanda' },
+  { id: 'template_payment_prompt', label: 'Pregunta de Medio de Pago', category: 'buy_flow', description: 'Opciones de Efectivo, Transferencia o Mercado Pago' },
+  { id: 'template_order_summary', label: 'Resumen Previo a Confirmar', category: 'buy_flow', description: 'Pedido final para que el cliente responda SI' },
+  { id: 'template_order_confirmed', label: 'Pedido Confirmado a Cocina', category: 'buy_flow', description: 'Mensaje con el código de pedido #CMD' },
+  { id: 'template_order_cancelled', label: 'Aviso de Comanda Cancelada', category: 'buy_flow', description: 'Mensaje de confirmación cuando el cliente cancela el pedido' },
+  { id: 'template_order_preparing', label: 'KDS: En Preparación', category: 'notifications', description: 'Notificación cuando cocina toma el pedido' },
+  { id: 'template_order_ready', label: 'KDS: Pedido Listo', category: 'notifications', description: 'Notificación para que el cliente retire' },
+  { id: 'template_order_shipped', label: 'KDS: En Camino', category: 'notifications', description: 'Notificación cuando sale con el repartidor' },
+  { id: 'template_payment_proof', label: 'Aviso de Comprobante Recibido', category: 'notifications', description: 'Agradecimiento tras recibir captura de transferencia' },
   { id: 'menu_response_1', label: 'Respuesta: Consulta de Pedido', category: 'menu', description: 'Información del pedido activo del cliente' },
   { id: 'menu_response_2', label: 'Respuesta: Datos de Transferencia', category: 'menu', description: 'Alias bancario, CBU y titular de la cuenta' },
   { id: 'menu_response_3', label: 'Respuesta: Horarios y Ubicación', category: 'menu', description: 'Dirección física y turnos de atención del local' },
   { id: 'menu_response_4', label: 'Respuesta: Menú de Hamburguesas', category: 'menu', description: 'Listado de productos con precios para pedir' },
   { id: 'menu_response_5', label: 'Respuesta: Hablar con Asesor', category: 'menu', description: 'Mensaje de derivación al encargado humano' },
-  { id: 'template_buy_catalog', label: 'Catálogo de Compras', category: 'buy_flow', description: 'Inicio del flujo de selección de productos' },
-  { id: 'template_cart_item_added', label: 'Producto Agregado al Carrito', category: 'buy_flow', description: 'Confirmación cuando el cliente elige una hamburguesa' },
-  { id: 'template_cart_view', label: 'Vista de Pedido Actual', category: 'buy_flow', description: 'Desglose del carrito con opciones de modificar' },
-  { id: 'template_shipping_prompt', label: 'Pregunta de Entrega', category: 'buy_flow', description: 'Pregunta si es Take Away o Delivery' },
-  { id: 'template_address_prompt', label: 'Pregunta de Dirección', category: 'buy_flow', description: 'Solicitud de dirección para el repartidor' },
-  { id: 'template_payment_prompt', label: 'Pregunta de Medio de Pago', category: 'buy_flow', description: 'Opciones de Efectivo, Transferencia o Mercado Pago' },
-  { id: 'template_order_summary', label: 'Resumen Previo a Confirmar', category: 'buy_flow', description: 'Pedido final para que el cliente responda SI' },
-  { id: 'template_order_confirmed', label: 'Pedido Confirmado a Cocina', category: 'buy_flow', description: 'Mensaje con el código de pedido #CMD' },
-  { id: 'template_order_preparing', label: 'KDS: En Preparación', category: 'notifications', description: 'Notificación cuando cocina toma el pedido' },
-  { id: 'template_order_ready', label: 'KDS: Pedido Listo', category: 'notifications', description: 'Notificación para que el cliente retire' },
-  { id: 'template_order_shipped', label: 'KDS: En Camino', category: 'notifications', description: 'Notificación cuando sale con el repartidor' },
-  { id: 'template_payment_proof', label: 'Aviso de Comprobante Recibido', category: 'notifications', description: 'Agradecimiento tras recibir captura de transferencia' },
   { id: 'template_anti_loop_gratitude', label: 'Anti-Bucle: Agradecimientos', category: 'menu', description: 'Respuesta cordial cuando el cliente da las gracias' },
   { id: 'template_anti_loop_farewell', label: 'Anti-Bucle: Despedida', category: 'menu', description: 'Respuesta cordial cuando el cliente se despide' },
   { id: 'template_anti_loop_acknowledge', label: 'Anti-Bucle: Confirmación Breve', category: 'menu', description: 'Respuesta cordial ante OK, listo o dale' }

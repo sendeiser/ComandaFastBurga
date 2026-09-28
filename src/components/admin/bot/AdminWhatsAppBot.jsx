@@ -44,15 +44,27 @@ export default function AdminWhatsAppBot({ initialTab }) {
   }, [initialTab]);
 
   useEffect(() => {
-    // 1. Cargar plantillas actualizadas desde Supabase Cloud
+    // 1. Cargar plantillas actualizadas desde Supabase Cloud y servidor local
     chatbotService.fetchCloudTemplates().then(cloudTpls => {
-      if (cloudTpls) {
+      if (cloudTpls && typeof cloudTpls === 'object' && Object.keys(cloudTpls).length > 0) {
         setSettings(prev => {
           const merged = { ...prev, ...cloudTpls };
           if (merged[selectedNodeId]) {
             setCurrentNodeText(merged[selectedNodeId]);
           }
           return merged;
+        });
+      } else {
+        chatbotService.fetchServerTemplates().then(serverTpls => {
+          if (serverTpls && typeof serverTpls === 'object' && Object.keys(serverTpls).length > 0) {
+            setSettings(prev => {
+              const merged = { ...prev, ...serverTpls };
+              if (merged[selectedNodeId]) {
+                setCurrentNodeText(merged[selectedNodeId]);
+              }
+              return merged;
+            });
+          }
         });
       }
     });
@@ -375,16 +387,36 @@ export default function AdminWhatsAppBot({ initialTab }) {
     };
     setSettings(updated);
     await chatbotService.saveSettings(updated);
+    if (BOT_SERVER_URL) {
+      try {
+        await fetch(`${BOT_SERVER_URL}/api/bot-templates`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ templates: updated })
+        });
+      } catch (_) {}
+    }
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
   };
 
-  const handleResetTemplate = () => {
+  const handleResetTemplate = async () => {
     const defaultVal = DEFAULT_TEMPLATES[selectedNodeId] || '';
     setCurrentNodeText(defaultVal);
     const updated = { ...settings, [selectedNodeId]: defaultVal };
     setSettings(updated);
-    chatbotService.saveSettings(updated);
+    await chatbotService.saveSettings(updated);
+    if (BOT_SERVER_URL) {
+      try {
+        await fetch(`${BOT_SERVER_URL}/api/bot-templates`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ templates: updated })
+        });
+      } catch (_) {}
+    }
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 2500);
   };
 
   const handleToggleMenuMode = async (mode) => {
@@ -1442,7 +1474,7 @@ pause
               flexWrap: 'wrap'
             }}>
               <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800 }}>Variables disponibles:</span>
-              {['{cliente}', '{pedido_id}', '{total}', '{direccion}', '{alias_banco}', '{banco}', '{titular}', '{cbu}', '{horarios}', '{catalogo_lista}', '{carrito_items}', '{subtotal}'].map(v => (
+              {['{cliente}', '{nombre_local}', '{promos_alerta}', '{catalogo_lista}', '{carrito_items}', '{subtotal}', '{total}', '{pedido_id}', '{producto}', '{metodo_entrega}', '{medio_pago}', '{direccion}', '{horarios}', '{alias_banco}', '{banco}', '{titular}', '{cbu}'].map(v => (
                 <button
                   key={v}
                   type="button"

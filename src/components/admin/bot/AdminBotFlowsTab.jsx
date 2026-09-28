@@ -952,7 +952,7 @@ export default function AdminBotFlowsTab({ flows = [], onSaveFlows }) {
                   flexWrap: 'wrap'
                 }}>
                   <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800 }}>Insertar variable:</span>
-                  {['{cliente}', '{horarios}', '{direccion}', '{alias_banco}', '{banco}', '{titular}', '{catalogo_lista}'].map(v => (
+                  {['{cliente}', '{nombre_local}', '{promos_alerta}', '{horarios}', '{direccion}', '{alias_banco}', '{banco}', '{titular}', '{catalogo_lista}'].map(v => (
                     <button
                       key={v}
                       type="button"

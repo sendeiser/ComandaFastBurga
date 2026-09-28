@@ -633,7 +633,7 @@ const DEFAULT_SERVER_TEMPLATES = {
   template_anti_loop_gratitude: '¡De nada! 🙌 Que lo disfrutes un montón. Si querés consultar la carta o volver a pedir, escribí *MENU* cuando gustes. ¡Buen provecho! 🍔🔥',
   template_anti_loop_farewell: '¡Hasta la próxima! 👋 Gracias por contactarte con {nombre_local}. ¡Que tengas un excelente descanso! ✨🍔',
   template_anti_loop_acknowledge: '¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido.',
-  template_menu: `🍔 *¡Hola {cliente}! Bienvenido a {nombre_local}* 🔥\n\n¿En qué podemos ayudarte hoy? *Respondé con el número de opción:*\n\n🏷️ 0️⃣ *Ver Promociones y Ofertas especiales del día* 🛵💥\n1️⃣ 📋 *Consultar estado de mi pedido*\n2️⃣ 💳 *Ver datos de transferencia bancaria / Alias*\n3️⃣ 📍 *Horarios y ubicación de nuestro local*\n4️⃣ 🍔 *Ver menú completo de hamburguesas y combos*\n5️⃣ 👤 *Hablar con un encargado del local*\n\n👉 *O escribí PROMO, o el nombre de lo que quieras pedir (ej: Promo Clasica, Promo Doña Burga).*`,
+  template_menu: `🍔 *¡Hola {cliente}! Bienvenido a {nombre_local}* 🔥\n\n{promos_alerta}¿Qué te preparamos hoy? *Elegí lo que más te guste:*\n\n{catalogo_lista}\n\n───────────────────\n👉 *Respondé con el NÚMERO (1, 2, 3...) o el nombre de lo que quieras pedir.*\n👉 Podés agregar aclaraciones como *Sin cebolla*, *Extra cheddar*, etc.\n\n_Si querés consultar horarios, datos de pago o un pedido en curso, escribí *HORARIOS*, *DATOS* o *ESTADO*._`,
   menu_response_1: `📋 *Estado de tu Pedido:* #{pedido_id}\n\n• *Estado:* {estado}\n• *Total:* \${total}\n• *Destino:* {direccion}\n\n_Para volver al menú, enviá la palabra *MENU*._`,
   menu_response_2: `💳 *Datos para Transferencia Bancaria:* 🏦\n\n• *Alias:* \`{alias_banco}\`\n• *Banco:* {banco}\n• *Titular:* {titular}\n• *CBU:* \`{cbu}\`\n\n📸 *Una vez realizada la transferencia, podés enviar la captura o foto del comprobante por este mismo chat para comenzar a cocinar.*\n\n_Enviá *MENU* para volver al menú principal._`,
   menu_response_3: `📍 *Ubicación y Horarios de Atención:* 🕒\n\n🍔 *Dirección:* {direccion}\n⏰ *Horarios de Cocina:* {horarios}\n\n¡Te esperamos con las mejores burgers a la plancha! 🔥\n\n_Enviá *MENU* para volver al menú principal._`,
@@ -1109,12 +1109,26 @@ function normalizeSearchText(str) {
     .trim();
 }
 
+const SPANISH_WORD_NUMBERS = {
+  'un': '1', 'uno': '1', 'una': '1',
+  'dos': '2', 'tres': '3', 'cuatro': '4', 'cinco': '5',
+  'seis': '6', 'siete': '7', 'ocho': '8', 'nueve': '9', 'diez': '10'
+};
+
 function cleanTokens(txt) {
   return normalizeSearchText(txt)
-    .replace(/\b(promos?|promocion(es)?|ofertas?|descuentos?|combos?|quiero|dame|pedir|comprar|sumar|suma|agregar|agrega|mas|más|otro|otra|la|el|un|una|de|con|por favor|me das)\b/g, '')
+    .replace(/\b(promos?|promocion(es)?|ofertas?|descuentos?|combos?|quiero|quisiera|deseo|dame|anotame|traeme|trae|pedir|pido|comprar|sumar|suma|agregar|agrega|mas|más|otro|otra|otros|otras|la|las|el|los|un|una|uno|unos|unas|de|del|con|sin|por\s+favor|porfa|me\s+das|buenas\s+tardes|buenos\s+dias|buenas\s+noches|buenas|hola)\b/g, ' ')
     .replace(/[^a-z0-9]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function cleanTokensWithDigits(txt) {
+  let cleaned = cleanTokens(txt);
+  for (const [w, d] of Object.entries(SPANISH_WORD_NUMBERS)) {
+    cleaned = cleaned.replace(new RegExp('\\b' + w + '\\b', 'g'), d);
+  }
+  return cleaned;
 }
 
 function findProductByText(inputText, prodsList) {
@@ -1125,6 +1139,7 @@ function findProductByText(inputText, prodsList) {
   const isPromoSearch = /\b(promos?|promocion(es)?|ofertas?|descuentos?|combos?)\b/.test(rawNorm);
 
   const strippedText = cleanTokens(rawNorm);
+  const strippedDigits = cleanTokensWithDigits(rawNorm);
 
   const promoProds = prodsList.filter(p => normalizeSearchText(p.category) === 'promos');
   const regularProds = prodsList.filter(p => normalizeSearchText(p.category) !== 'promos');
@@ -1138,28 +1153,31 @@ function findProductByText(inputText, prodsList) {
     }
   }
 
-  // 1. Comparación por tokens limpios exactos (ignora conectores como "de", "con", "sumar", etc.)
-  if (strippedText) {
-    const promoTokenMatch = promoProds.find(p => cleanTokens(p.name) === strippedText);
+  // 1. Si es búsqueda de promo, priorizar promoProds con dígitos y texto normalizado
+  if (isPromoSearch) {
+    const promoMatch = promoProds.find(p => {
+      const pClean = cleanTokensWithDigits(p.name);
+      return pClean === strippedDigits || strippedDigits.includes(pClean) || pClean.includes(strippedDigits);
+    });
+    if (promoMatch) return promoMatch;
+  }
+
+  // 2. Comparación por tokens limpios exactos (con y sin conversión de dígitos)
+  if (strippedText || strippedDigits) {
+    const promoTokenMatch = promoProds.find(p => {
+      const pDigits = cleanTokensWithDigits(p.name);
+      return pDigits === strippedDigits || cleanTokens(p.name) === strippedText;
+    });
     if (promoTokenMatch) return promoTokenMatch;
 
     const regularTokenMatch = regularProds.find(p => cleanTokens(p.name) === strippedText);
     if (regularTokenMatch) return regularTokenMatch;
   }
 
-  // 2. Si es búsqueda de promo y coincide con nombre de promo
-  if (isPromoSearch && strippedText) {
-    const promoMatch = promoProds.find(p => {
-      const pTokens = cleanTokens(p.name);
-      return pTokens === strippedText || strippedText.includes(pTokens) || pTokens.includes(strippedText);
-    });
-    if (promoMatch) return promoMatch;
-  }
-
   // 3. Coincidencia exacta completa (rawNorm) con nombre de producto (priorizando promo)
   const exactFullPromo = promoProds.find(p => {
     const pNorm = normalizeSearchText(p.name);
-    return rawNorm === pNorm || rawNorm === `promo ${pNorm}` || rawNorm === `la ${pNorm}`;
+    return rawNorm === pNorm || rawNorm === `promo ${pNorm}` || rawNorm === `la ${pNorm}` || strippedDigits === cleanTokensWithDigits(p.name);
   });
   if (exactFullPromo) return exactFullPromo;
 
@@ -1170,16 +1188,19 @@ function findProductByText(inputText, prodsList) {
   if (exactFullRegular) return exactFullRegular;
 
   // 4. Coincidencia parcial con tokens limpios significativos (al menos 3 letras)
-  if (strippedText && strippedText.length >= 3) {
+  if (strippedDigits && strippedDigits.length >= 3) {
     if (isPromoSearch) {
-      const candPromo = promoProds.find(p => cleanTokens(p.name).includes(strippedText) || strippedText.includes(cleanTokens(p.name)));
+      const candPromo = promoProds.find(p => cleanTokensWithDigits(p.name).includes(strippedDigits) || strippedDigits.includes(cleanTokensWithDigits(p.name)));
       if (candPromo) return candPromo;
     }
+
+    const candPromoExact = promoProds.find(p => cleanTokensWithDigits(p.name) === strippedDigits);
+    if (candPromoExact) return candPromoExact;
 
     const candRegular = regularProds.find(p => cleanTokens(p.name).includes(strippedText) || strippedText.includes(cleanTokens(p.name)));
     if (candRegular) return candRegular;
 
-    const candAnyPromo = promoProds.find(p => cleanTokens(p.name).includes(strippedText) || strippedText.includes(cleanTokens(p.name)));
+    const candAnyPromo = promoProds.find(p => cleanTokensWithDigits(p.name).includes(strippedDigits) || strippedDigits.includes(cleanTokensWithDigits(p.name)));
     if (candAnyPromo) return candAnyPromo;
   }
 
@@ -1191,15 +1212,18 @@ function parseCustomerQuantity(text, matchedProdName = '') {
   const norm = normalizeSearchText(text);
   const prodNorm = normalizeSearchText(matchedProdName);
 
-  // Si el nombre del producto empieza con un número (ej: "2 Cheese"), no interpretarlo como cantidad repetida
-  const leadingNumMatch = norm.match(/^(\d+)\b/);
-  if (leadingNumMatch && prodNorm.startsWith(leadingNumMatch[1])) {
-    const doubleNumMatch = norm.match(/^(\d+|dos|tres|cuatro|cinco)\s+(?:de\s+)?(?:la\s+)?2\s*cheese/i);
-    if (doubleNumMatch) {
-      const wMap = { 'dos': 2, 'tres': 3, 'cuatro': 4, 'cinco': 5 };
-      const q = parseInt(doubleNumMatch[1], 10) || wMap[doubleNumMatch[1].toLowerCase()] || 1;
+  // Si el nombre del producto contiene números intrínsecos (ej: '2 Cheese', '4x4', '2 Clasicas')
+  const prodNumMatch = prodNorm.match(/\b(\d+)\b/);
+  if (prodNumMatch) {
+    // Buscar si el cliente especificó una cantidad MULTIPLICADORA previa (ej: '2 promos de 2 cheese', 'dos combos de 2 cheese', '3 de 2 cheese')
+    const multiMatch = norm.match(/\b(\d+|dos|tres|cuatro|cinco|seis)\s*(?:promos?|combos?|veces|unidades?|x)?\s*(?:de\s+)?(?:la\s+|el\s+)?(?:promo\s+|combo\s+)?(?:de\s+)?(?:2|dos|\d+)\s*[a-z]+/i);
+    if (multiMatch) {
+      const wMap = { 'dos': 2, 'tres': 3, 'cuatro': 4, 'cinco': 5, 'seis': 6 };
+      const val = multiMatch[1].toLowerCase();
+      const q = parseInt(val, 10) || wMap[val] || 1;
       return Math.min(20, Math.max(1, q));
     }
+    // Si no dijo cantidad multiplicadora, la cantidad de la promo es 1
     return 1;
   }
 
@@ -1231,36 +1255,79 @@ function isCustomerInquiry(text) {
   return (hasQuestionMarks || hasInquiryKeywords) && !hasBuyVerb;
 }
 
+function formatCatalogListForTemplate(prods, maxItems = 8) {
+  if (!Array.isArray(prods) || prods.length === 0) {
+    return '🍔 *La carta se encuentra en actualización.* Por favor consultá en unos minutos.';
+  }
+  const total = prods.length;
+  const slice = prods.slice(0, maxItems);
+  const items = slice.map((p, i) => {
+    const numBadge = formatItemNumber(i + 1);
+    const photoBadge = p.image ? ' 📸' : '';
+    let priceStr = `$${Number(p.price).toLocaleString('es-AR')}`;
+    if (p.originalPrice && Number(p.originalPrice) > Number(p.price)) {
+      priceStr = `~${Number(p.originalPrice).toLocaleString('es-AR')}~ $${Number(p.price).toLocaleString('es-AR')}`;
+    }
+    const promoBadge = p.discountBadge ? ` [🏷️ ${p.discountBadge}]` : '';
+    const freeShippingBadge = p.freeShipping ? ' [🛵 Envío Gratis]' : '';
+    const desc = p.description ? `\n   _${p.description}_` : '';
+    return `${numBadge} *${p.name}* — ${priceStr}${promoBadge}${freeShippingBadge}${photoBadge}${desc}`;
+  }).join('\n\n');
+
+  let moreTip = '';
+  if (total > maxItems) {
+    moreTip = `\n\n⏩ _Mostrando las primeras ${maxItems} opciones de ${total}. Escribí *SIGUIENTE* o el nombre de una categoría (*HAMBURGUESAS*, *BEBIDAS*, *LOMITOS*) para ver más._`;
+  }
+  return items + moreTip;
+}
+
 function buildMainMenuMessage(customerName = '') {
   const tpls = getBotTemplates();
   const biz = getBusinessContext();
   const storeName = biz.nombre_local || "Burga's Chamical";
   const clientName = customerName ? customerName.trim() : 'amigo/a';
-  const menuMode = tpls.menu_mode || 'catalog';
+  const menuMode = tpls.menu_mode || 'templates';
   const catalogUrl = (biz.catalogo_url || biz.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
 
-  if (menuMode === 'catalog') {
-    return `🍔 *¡Hola ${clientName}! Bienvenido a ${storeName}* 🔥\n\n` +
-      `📱 *Para hacer tu pedido, ingresá a nuestra Carta Digital interactiva con fotos:*\n` +
-      `👉 ${catalogUrl}/#catalog\n\n` +
-      `¿En qué podemos ayudarte hoy? *Respondé con el número de opción:*\n\n` +
-      `1️⃣ 📋 *Consultar estado de mi pedido*\n` +
-      `2️⃣ 💳 *Ver datos de transferencia bancaria / Alias*\n` +
-      `3️⃣ 📍 *Horarios y ubicación de nuestro local*\n` +
-      `4️⃣ 📱 *Ver Carta Digital con Fotos y Precios*\n` +
-      `5️⃣ 👤 *Hablar con un encargado del local*\n\n` +
-      `_Para pedir ingresá al link de arriba o escribí *4*._`;
+  const prods = getStoredProducts();
+  const promoProducts = prods.filter(p => 
+    (p.category || '').toLowerCase().includes('promo') ||
+    Boolean(p.discountBadge) ||
+    Boolean(p.originalPrice && Number(p.originalPrice) > Number(p.price))
+  );
+
+  let promosAlerta = '';
+  if (promoProducts.length > 0) {
+    const promoNames = promoProducts.slice(0, 3).map(p => `• *${p.name}* ($${Number(p.price).toLocaleString('es-AR')})`).join('\n');
+    promosAlerta = `🏷️💥 *¡HOY TENEMOS PROMOS Y COMBOS ESPECIALES!* 🛵🍔\n${promoNames}\n\n`;
   }
 
-  // MODO PLANTILLAS CLÁSICO
+  if (menuMode === 'catalog') {
+    // EN MODO CATÁLOGO ONLINE: no enviar el menú numerado de primera, solo la carta digital interactiva
+    return `🍔 *¡Hola ${clientName}! Bienvenido a ${storeName}* 🔥\n\n` +
+      promosAlerta +
+      `📱 *¡Hacé tu pedido directo desde nuestra Carta Digital interactiva con fotos reales y precios!* 📸\n` +
+      `👉 ${catalogUrl}/#catalog\n\n` +
+      `Allí podés ver fotos reales de cada hamburguesa, armar tu combo con adicionales y enviar tu pedido directo a la cocina en un toque. ¡Te esperamos! 🛵✨\n\n` +
+      `_Si necesitás consultar por un pedido en curso o hablar con nosotros, podés escribir *ESTADO* o *HUMANO*._`;
+  }
+
+  // MODO PLANTILLAS CLÁSICO: directo al grano para pedir sin menú burocrático
+  const catalogList = formatCatalogListForTemplate(prods, 8);
   let rawMenu = tpls.template_menu || DEFAULT_SERVER_TEMPLATES.template_menu;
-  if (!rawMenu || !rawMenu.includes('1️⃣') || !rawMenu.includes('5️⃣')) {
+  if (!rawMenu || rawMenu.includes('Consultar estado') || rawMenu.includes('1️⃣ 📋') || rawMenu.includes('5️⃣ 👤')) {
     rawMenu = DEFAULT_SERVER_TEMPLATES.template_menu;
+  }
+
+  if (!rawMenu.includes('{promos_alerta}') && promosAlerta) {
+    rawMenu = rawMenu.replace(/(🔥|Bienvenido[^\n]*\n)/i, `$1\n\n${promosAlerta}`);
   }
 
   return interpolateTemplate(rawMenu, {
     cliente: clientName,
     nombre_local: storeName,
+    promos_alerta: promosAlerta,
+    catalogo_lista: catalogList,
     ...biz
   });
 }
@@ -2028,8 +2095,18 @@ class WhatsAppBotServer {
     console.log('🤖 [WHATSAPP BOT] Inicializando conexión Multi-Device Baileys...');
 
     try {
+      if (this.sock) {
+        try {
+          this.sock.ev.removeAllListeners();
+          this.sock.end(undefined);
+        } catch (_) {}
+      }
       const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
-      const { version } = await fetchLatestBaileysVersion();
+      let version = [2, 3000, 1015901307];
+      try {
+        const fetched = await fetchLatestBaileysVersion();
+        if (fetched?.version) version = fetched.version;
+      } catch (_) {}
       const logger = pino({ level: 'silent' });
 
       this.sock = makeWASocket({
@@ -2838,8 +2915,8 @@ class WhatsAppBotServer {
               continue;
             }
 
-            // 2. Quitar / Eliminar producto del carrito (ej: "quitar 1", "sacar clásica")
-            const removeMatch = lower.match(/^(?:quitar|sacar|eliminar|borrar)\s+(.+)$/i);
+            // 2. Quitar / Eliminar producto del carrito (ej: "quitar 1", "quita el pancho", "sacar clásica")
+            const removeMatch = lower.match(/^(?:quitar|quita|quiteme|quítame|sacar|saca|sacame|sácame|eliminar|elimina|borrar|borra)\s+(.+)$/i);
             if (removeMatch) {
               const targetStr = removeMatch[1].trim();
               const targetIdx = parseInt(targetStr, 10);
@@ -3104,24 +3181,31 @@ class WhatsAppBotServer {
           // MENÚ PRINCIPAL Y SALUDOS PUROS (ALTA PRIORIDAD EN MODO IDLE)
           // Solo responde con el menú estructurado si el cliente envía un saludo puro sin consultas
           // -------------------------------------------------------------
-          const isPureGreetingRegex = /^(hola|buenas|buen\s*dia|buenos\s*dias|buenas\s*tardes|buenas\s*noches|que\s*tal|holis|hey|saludos)[.!, ]*$/i;
+          const cleanGreeting = lower.replace(/[!¡?¿,.]/g, ' ').replace(/\s+/g, ' ').trim();
+          const isPureGreeting = /^(hola|buenas|buen\s*d[ií]a|buenos\s*d[ií]as|buenas\s*tardes|buenas\s*noches|que\s*tal|holis|hey|saludos)(\s+(hola|buenas|buen\s*d[ií]a|buenos\s*d[ií]as|buenas\s*tardes|buenas\s*noches|que\s*tal|como\s*(estas|andas|va)|todo\s*bien|amigo|amiga|che))?$/i.test(cleanGreeting);
           const isMenuCommand = [
             'menu', 'menú', 'inicio', 'comenzar', 'start', 'opciones', 'ayuda', '#menu'
-          ].includes(lower) || isPureGreetingRegex.test(lower.trim());
+          ].includes(lower) || isPureGreeting;
 
-          if (isMenuCommand && session.step === 'IDLE') {
+          if (isMenuCommand && (session.step === 'IDLE' || session.step === 'SELECTING')) {
             session.catalogPage = 1;
+            const tplsMenu = getBotTemplates();
+            const currentMenuMode = tplsMenu.menu_mode || 'templates';
+            if (currentMenuMode === 'templates') {
+              session.step = 'SELECTING';
+              if (!Array.isArray(session.items)) session.items = [];
+            }
             const menuReply = buildMainMenuMessage(msg.pushName);
             await this.safeSendMessage(remoteJid, { text: menuReply }, msg.key);
             continue;
           }
 
           // -------------------------------------------------------------
-          // OPCIONES DEL MENÚ PRINCIPAL EN MODO IDLE (0, 1, 2, 3, 4, 5)
+          // COMANDOS DE INFORMACIÓN Y SERVICIO (ESTADO, ALIAS, HORARIOS, HUMANO, CARTA)
           // -------------------------------------------------------------
-          if (session.step === 'IDLE') {
-            // OPCIÓN 0: VER PROMOCIONES DEL DÍA
-            if (lower === '0' || lower === 'promo' || lower === 'promos' || lower === 'ofertas' || lower === 'combos') {
+          if (session.step === 'IDLE' || session.step === 'SELECTING') {
+            // CONSULTA DE PROMOCIONES DEL DÍA
+            if (lower === 'promo' || lower === 'promos' || lower === 'ofertas' || lower === 'combos') {
               const tpls0 = getBotTemplates();
               const menuMode0 = tpls0.menu_mode || 'catalog';
               if (menuMode0 === 'catalog') {
@@ -3137,8 +3221,8 @@ class WhatsAppBotServer {
               continue;
             }
 
-            // OPCIÓN 1: CONSULTAR ESTADO DE PEDIDO
-            if (lower === '1' || lower === 'estado' || lower === 'mi pedido' || lower === 'mi orden') {
+            // CONSULTAR ESTADO DE PEDIDO
+            if (lower === 'estado' || lower === 'mi pedido' || lower === 'mi orden' || lower === 'como viene mi pedido' || lower === 'seguimiento') {
               const cleanPhone = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '');
               const allOrders = getStoredOrders();
               // Buscar pedido activo de este cliente (últimas 24 horas y no entregado/cancelado)
@@ -3181,8 +3265,8 @@ class WhatsAppBotServer {
               }
             }
 
-            // OPCIÓN 2: DATOS BANCARIOS / TRANSFERENCIA
-            if (lower === '2' || lower === 'alias' || lower === 'cbu' || lower === 'transferencia' || lower === 'datos banco') {
+            // DATOS BANCARIOS / TRANSFERENCIA
+            if (lower === 'alias' || lower === 'cbu' || lower === 'transferencia' || lower === 'datos banco' || lower === 'datos') {
               const biz = getBusinessContext();
               const tpls = getBotTemplates();
               const rawTpl = tpls.menu_response_2 || `💳 *Datos para Transferencia Bancaria:* 🏦\n\n• *Alias:* \`{alias_banco}\`\n• *Banco:* {banco}\n• *Titular:* {titular}\n• *CBU:* \`{cbu}\`\n\n📸 *Una vez realizada la transferencia, podés enviar la captura o foto del comprobante por este mismo chat.*\n\n_Enviá *MENU* para volver al menú principal._`;
@@ -3191,8 +3275,8 @@ class WhatsAppBotServer {
               continue;
             }
 
-            // OPCIÓN 3: HORARIOS Y UBICACIÓN
-            if (lower === '3' || lower === 'horario' || lower === 'horarios' || lower === 'ubicacion' || lower === 'ubicación' || lower === 'direccion' || lower === 'dirección') {
+            // HORARIOS Y UBICACIÓN
+            if (lower === 'horario' || lower === 'horarios' || lower === 'ubicacion' || lower === 'ubicación' || lower === 'direccion' || lower === 'dirección' || lower === 'donde estan' || lower === 'donde queda') {
               const biz = getBusinessContext();
               const tpls = getBotTemplates();
               const rawTpl = tpls.menu_response_3 || `📍 *Ubicación y Horarios de Atención:* 🕒\n\n🍔 *Dirección:* {direccion}\n⏰ *Horarios de Cocina:* {horarios}\n\n¡Te esperamos con las mejores burgers a la plancha! 🔥\n\n_Enviá *MENU* para volver al menú principal._`;
@@ -3201,8 +3285,8 @@ class WhatsAppBotServer {
               continue;
             }
 
-            // OPCIÓN 4: VER CARTA COMPLETA / CATÁLOGO
-            if (lower === '4' || lower === 'carta' || lower === 'catalogo' || lower === 'catálogo') {
+            // VER CARTA COMPLETA / CATÁLOGO
+            if (lower === 'carta' || lower === 'catalogo' || lower === 'catálogo') {
               const tpls4 = getBotTemplates();
               const biz4 = getBusinessContext();
               const menuMode = tpls4.menu_mode || 'templates';
@@ -3222,8 +3306,8 @@ class WhatsAppBotServer {
               continue;
             }
 
-            // OPCIÓN 5: HABLAR CON UN ENCARGADO / HUMANO
-            if (lower === '5' || lower === 'humano' || lower === 'asesor' || lower === 'encargado' || lower === 'persona' || lower === 'operador') {
+            // HABLAR CON UN ENCARGADO / HUMANO
+            if (lower === 'humano' || lower === 'asesor' || lower === 'encargado' || lower === 'persona' || lower === 'operador') {
               const biz = getBusinessContext();
               const tpls = getBotTemplates();
               const rawTpl = tpls.menu_response_5 || `👤 *¡Entendido {cliente}! Un encargado de {nombre_local} te responderá a la brevedad.* 🍔\n\nPor favor dejanos tu consulta detallada para que podamos ayudarte lo antes posible. ¡Muchas gracias!`;
@@ -3240,7 +3324,7 @@ class WhatsAppBotServer {
               const menuModeCmp = tplsCmp.menu_mode || 'templates';
               if (menuModeCmp === 'catalog') {
                 const catalogUrl = (bizCmp.catalogo_url || bizCmp.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
-                const catalogLink = `🛒 *¡Para realizar tu pedido usá obligatoriamente nuestra Carta Digital con fotos!* 🍔📸\n\n👉 ${catalogUrl}/#catalog\n\nAllí podés ver fotos reales de cada producto, elegir tus adicionales favoritos y enviar tu pedido directo a la cocina con un click. ¡Te esperamos! 🔥`;
+                const catalogLink = `🛒 *¡Para realizar tu pedido ingresá a nuestra Carta Digital con fotos!* 🍔📸\n\n👉 ${catalogUrl}/#catalog\n\nAllí podés ver fotos reales de cada producto, elegir tus adicionales favoritos y enviar tu pedido directo a la cocina con un click. ¡Te esperamos! 🔥`;
                 await this.safeSendMessage(remoteJid, { text: catalogLink }, msg.key);
               } else {
                 session.step = 'SELECTING';
@@ -3254,7 +3338,7 @@ class WhatsAppBotServer {
           }
 
           // -------------------------------------------------------------
-          // MODO PLANTILLAS: CONSULTA POR CATEGORÍA O LISTADO DE CATEGORÍAS (IDLE)
+          // MODO PLANTILLAS: CONSULTA POR CATEGORÍA O LISTADO DE CATEGORÍAS (IDLE / SELECTING)
           // (ej: "muestrame que hamburguesas tienen", "ver bebidas", "que papas hay", "lomitos", etc.)
           // -------------------------------------------------------------
           const tplsIdle = getBotTemplates();
@@ -3293,9 +3377,7 @@ class WhatsAppBotServer {
             }
           }
 
-          const isPureMenuDigitInIdle = session.step === 'IDLE' && /^[0-5]$/.test(cleanNormText);
-
-          if (matchedProd && !isPureMenuDigitInIdle) {
+          if (matchedProd) {
             const tplsDirect = getBotTemplates();
             const menuModeDirect = tplsDirect.menu_mode || 'templates';
             if (menuModeDirect === 'catalog') {
@@ -3432,13 +3514,16 @@ class WhatsAppBotServer {
           // -------------------------------------------------------------
           try {
             const biz = getBusinessContext();
+            const tplsAI = getBotTemplates();
             const aiReply = await geminiBotService.generateReply(text, {
               customerName: msg.pushName || '',
               customerPhone: remoteJid,
               availableProducts: prods,
               businessInfo: biz,
               currentOrder: session.items || [],
-              orderStep: session.step
+              orderStep: session.step,
+              menuMode: tplsAI.menu_mode || 'catalog',
+              catalogUrl: (biz.catalogo_url || biz.sitio_web || 'https://comandafast.online').replace(/\/$/, '')
             });
 
             if (aiReply) {

@@ -34,6 +34,7 @@ pnpm-debug.log*
 # WhatsApp Bot Baileys Auth session
 data/baileys_auth/
 data/ai_config.json
+data/live_chats.json
 
 # Tool / Editor skill mirrors
 .claude/
