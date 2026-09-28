@@ -2,11 +2,11 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Laboratorio de Pruebas WhatsApp - ComandaFast</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg-main: #0c1317;
@@ -23,6 +23,7 @@
       --accent-emerald: #10b981;
       --accent-amber: #f59e0b;
       --accent-blue: #38bdf8;
+      --accent-purple: #a855f7;
       --border-color: #222d34;
       --border-subtle: rgba(255, 255, 255, 0.08);
     }
@@ -34,47 +35,66 @@
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
 
-    body {
+    /* VIEWPORT LOCK: NUNCA PERMITIR QUE EL BODY O HTML SE DESPLACE */
+    html, body {
+      width: 100%;
+      height: 100%;
+      height: 100vh;
+      height: 100dvh;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
       background-color: var(--bg-main);
       color: var(--text-primary);
-      height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .tester-layout {
       display: flex;
       flex-direction: column;
+      width: 100%;
+      height: 100%;
       overflow: hidden;
     }
 
     /* TOP NAVBAR */
     .top-navbar {
+      height: 56px;
+      flex-shrink: 0;
       background-color: var(--bg-panel-header);
       border-bottom: 1px solid var(--border-color);
-      padding: 10px 20px;
+      padding: 0 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      height: 60px;
-      z-index: 10;
+      z-index: 30;
     }
 
     .brand-section {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
     }
 
     .brand-icon {
-      font-size: 24px;
+      font-size: 22px;
       background: rgba(37, 211, 102, 0.15);
       border: 1px solid rgba(37, 211, 102, 0.3);
-      border-radius: 10px;
-      width: 40px;
-      height: 40px;
+      border-radius: 9px;
+      width: 36px;
+      height: 36px;
       display: flex;
       align-items: center;
       justify-content: center;
     }
 
     .brand-title {
-      font-size: 1.05rem;
+      font-size: 0.98rem;
       font-weight: 700;
       color: var(--text-primary);
       display: flex;
@@ -83,12 +103,12 @@
     }
 
     .badge-live {
-      font-size: 0.7rem;
-      font-weight: 600;
-      background: rgba(16, 185, 129, 0.2);
+      font-size: 0.68rem;
+      font-weight: 700;
+      background: rgba(16, 185, 129, 0.18);
       color: #34d399;
-      border: 1px solid rgba(16, 185, 129, 0.4);
-      padding: 2px 8px;
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      padding: 2px 7px;
       border-radius: 9999px;
       display: inline-flex;
       align-items: center;
@@ -97,11 +117,11 @@
 
     .badge-live::before {
       content: '';
-      width: 7px;
-      height: 7px;
+      width: 6px;
+      height: 6px;
       background-color: #10b981;
       border-radius: 50%;
-      box-shadow: 0 0 8px #10b981;
+      box-shadow: 0 0 6px #10b981;
       animation: pulse-dot 1.8s infinite;
     }
 
@@ -113,99 +133,110 @@
     .nav-actions {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
     }
 
     .btn-nav {
       background: var(--bg-input);
       color: var(--text-primary);
       border: 1px solid var(--border-subtle);
-      border-radius: 8px;
-      padding: 6px 14px;
-      font-size: 0.82rem;
+      border-radius: 7px;
+      padding: 6px 11px;
+      font-size: 0.78rem;
       font-weight: 600;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      transition: all 0.2s ease;
+      gap: 5px;
+      transition: all 0.15s ease;
       text-decoration: none;
+      white-space: nowrap;
     }
 
     .btn-nav:hover {
       background: #37464f;
       border-color: rgba(255, 255, 255, 0.2);
-      transform: translateY(-1px);
     }
 
     .btn-nav.accent {
       background: linear-gradient(135deg, #10b981 0%, #059669 100%);
       color: white;
       border: none;
-      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
     }
     .btn-nav.accent:hover {
       background: linear-gradient(135deg, #059669 0%, #047857 100%);
     }
 
-    /* MAIN CONTAINER */
+    /* MAIN CONTAINER: 2 COLUMNAS FLEXIBLES CON MIN-HEIGHT: 0 */
     .app-main {
-      flex: 1;
-      display: grid;
-      grid-template-columns: 1fr 340px;
-      height: calc(100vh - 60px);
-      overflow: hidden;
-    }
-
-    /* CHAT PANEL */
-    .chat-panel {
+      flex: 1 1 0px;
+      min-height: 0;
+      width: 100%;
       display: flex;
-      flex-direction: column;
-      height: 100%;
-      background: var(--bg-chat);
+      overflow: hidden;
       position: relative;
     }
 
+    /* COLUMNA CHAT (ZONA PRINCIPAL) */
+    .chat-panel {
+      flex: 1 1 0px;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background-color: var(--bg-chat);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* HEADER DEL CHAT */
     .chat-header {
+      height: 56px;
+      flex-shrink: 0;
       background: var(--bg-panel-header);
-      padding: 10px 18px;
+      padding: 0 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       border-bottom: 1px solid var(--border-color);
-      z-index: 5;
+      z-index: 10;
     }
 
     .chat-avatar-info {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
     }
 
     .chat-avatar {
-      width: 42px;
-      height: 42px;
+      width: 38px;
+      height: 38px;
       border-radius: 50%;
       background: #2a3942;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 22px;
+      font-size: 20px;
       border: 2px solid var(--accent-emerald);
+      flex-shrink: 0;
     }
 
     .chat-user-details h3 {
-      font-size: 0.95rem;
-      font-weight: 600;
+      font-size: 0.92rem;
+      font-weight: 700;
       color: var(--text-primary);
+      line-height: 1.2;
     }
 
     .chat-user-details p {
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       color: #34d399;
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
+      margin-top: 2px;
     }
 
     .chat-controls {
@@ -214,17 +245,43 @@
       gap: 8px;
     }
 
-    /* CHAT MESSAGES BODY */
+    .customer-pill {
+      background: #2a3942;
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 3px 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    .customer-pill input {
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 0.78rem;
+      font-weight: 600;
+      width: 110px;
+      outline: none;
+    }
+
+    /* CUERPO DE MENSAJES (ÚNICO LUGAR CON SCROLL VERTICAL) */
     .chat-messages {
-      flex: 1;
+      flex: 1 1 0px;
+      min-height: 0;
       overflow-y: auto;
-      padding: 20px 24px;
+      overflow-x: hidden;
+      padding: 16px 20px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-      background-size: 20px 20px;
-      scroll-behavior: smooth;
+      gap: 6px;
+      background-color: #0b141a;
+      background-image: 
+        radial-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+      background-size: 22px 22px;
+      position: relative;
     }
 
     .chat-messages::-webkit-scrollbar {
@@ -234,17 +291,20 @@
       background: rgba(255, 255, 255, 0.15);
       border-radius: 3px;
     }
+    .chat-messages::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
 
-    /* MESSAGE BUBBLES */
+    /* BURBUJAS DE MENSAJE */
     .msg-wrapper {
       display: flex;
       width: 100%;
-      margin-bottom: 4px;
-      animation: fadeInMsg 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      margin-bottom: 2px;
+      animation: fadeInMsg 0.15s ease-out;
     }
 
     @keyframes fadeInMsg {
-      from { opacity: 0; transform: translateY(6px); }
+      from { opacity: 0; transform: translateY(4px); }
       to { opacity: 1; transform: translateY(0); }
     }
 
@@ -257,38 +317,40 @@
     }
 
     .msg-bubble {
-      max-width: 72%;
-      padding: 10px 14px;
-      border-radius: 12px;
-      font-size: 0.88rem;
-      line-height: 1.48;
+      max-width: 76%;
+      min-width: 90px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 0.86rem;
+      line-height: 1.45;
       position: relative;
       word-break: break-word;
       white-space: pre-wrap;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
     }
 
     .msg-wrapper.in .msg-bubble {
       background-color: var(--bubble-in);
       color: var(--text-primary);
-      border-top-left-radius: 3px;
+      border-top-left-radius: 2px;
     }
 
     .msg-wrapper.out .msg-bubble {
       background-color: var(--bubble-out);
       color: #ffffff;
-      border-top-right-radius: 3px;
+      border-top-right-radius: 2px;
     }
 
     .msg-time {
-      font-size: 0.68rem;
+      font-size: 0.66rem;
       color: rgba(255, 255, 255, 0.55);
       float: right;
-      margin-left: 10px;
-      margin-top: 5px;
+      margin-left: 8px;
+      margin-top: 4px;
       display: flex;
       align-items: center;
       gap: 3px;
+      user-select: none;
     }
 
     .msg-bubble strong {
@@ -302,23 +364,26 @@
     }
 
     .msg-bubble code {
-      background: rgba(0, 0, 0, 0.3);
+      background: rgba(0, 0, 0, 0.35);
       padding: 1px 5px;
       border-radius: 4px;
-      font-family: monospace;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       color: #38bdf8;
+      font-size: 0.83rem;
     }
 
-    /* TYPING INDICATOR */
-    .typing-indicator {
+    /* TYPING INDICATOR DENTRO DEL CONTENEDOR DE MENSAJES */
+    .typing-row {
       display: none;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
       background: var(--bubble-in);
       padding: 8px 14px;
-      border-radius: 12px;
+      border-radius: 10px;
+      border-top-left-radius: 2px;
       width: fit-content;
-      margin-bottom: 6px;
+      margin-top: 4px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
     }
 
     .typing-dot {
@@ -337,16 +402,53 @@
       40% { transform: scale(1); opacity: 1; }
     }
 
-    /* QUICK CHIPS BAR */
+    /* BOTÓN FLOTANTE: IR AL FINAL (SCROLL TO BOTTOM) */
+    .btn-scroll-bottom {
+      position: absolute;
+      bottom: 120px;
+      right: 20px;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: var(--bg-panel-header);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 25;
+      transition: all 0.2s ease;
+    }
+
+    .btn-scroll-bottom:hover {
+      background: #2a3942;
+      transform: translateY(-2px);
+    }
+
+    /* FOOTER FIJO DEL CHAT: CONTIENE CHIPS Y BARRA DE ENTRADA */
+    .chat-footer {
+      flex-shrink: 0;
+      background: var(--bg-panel-header);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      z-index: 20;
+    }
+
+    /* BARRA DE CHIPS DE ACCIONES RÁPIDAS (SCROLL HORIZONTAL ÚNICAMENTE) */
     .quick-chips-bar {
       background: #111b21;
-      border-top: 1px solid var(--border-color);
-      padding: 8px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 7px 14px;
       display: flex;
-      gap: 8px;
+      align-items: center;
+      gap: 6px;
       overflow-x: auto;
       white-space: nowrap;
       scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
     }
     .quick-chips-bar::-webkit-scrollbar { display: none; }
 
@@ -354,15 +456,17 @@
       background: var(--bg-input);
       color: var(--text-primary);
       border: 1px solid var(--border-subtle);
-      border-radius: 16px;
-      padding: 5px 12px;
-      font-size: 0.78rem;
+      border-radius: 14px;
+      padding: 4px 11px;
+      font-size: 0.75rem;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.15s ease;
       display: inline-flex;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
+      flex-shrink: 0;
+      user-select: none;
     }
 
     .chip-btn:hover {
@@ -371,31 +475,49 @@
       color: #34d399;
       transform: translateY(-1px);
     }
+    .chip-btn:active {
+      transform: translateY(0);
+    }
 
-    /* CHAT INPUT FORM */
+    .chip-btn.emerald {
+      border-color: rgba(16, 185, 129, 0.35);
+      color: #34d399;
+    }
+    .chip-btn.amber {
+      border-color: rgba(245, 158, 11, 0.35);
+      color: #fbbf24;
+    }
+    .chip-btn.rose {
+      border-color: rgba(239, 68, 68, 0.35);
+      color: #f87171;
+    }
+
+    /* BARRA DE INPUT FIJA */
     .chat-input-bar {
+      height: 58px;
       background: var(--bg-panel-header);
-      padding: 12px 18px;
+      padding: 0 14px;
       display: flex;
       align-items: center;
-      gap: 12px;
-      border-top: 1px solid var(--border-color);
+      gap: 10px;
     }
 
     .chat-input-field {
       flex: 1;
+      height: 40px;
       background: var(--bg-input);
       border: 1px solid transparent;
       color: var(--text-primary);
-      font-size: 0.92rem;
-      padding: 10px 16px;
+      font-size: 0.9rem;
+      padding: 0 14px;
       border-radius: 8px;
       outline: none;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, background-color 0.2s;
     }
 
     .chat-input-field:focus {
       border-color: var(--accent-emerald);
+      background-color: #30414b;
     }
 
     .btn-send {
@@ -403,14 +525,15 @@
       color: white;
       border: none;
       border-radius: 50%;
-      width: 44px;
-      height: 44px;
+      width: 40px;
+      height: 40px;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       transition: transform 0.15s, background-color 0.2s;
-      box-shadow: 0 2px 10px rgba(16, 185, 129, 0.4);
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+      flex-shrink: 0;
     }
 
     .btn-send:hover {
@@ -422,43 +545,68 @@
       transform: scale(0.95);
     }
 
-    /* SIDEBAR INSPECTOR */
+    .btn-send:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* SIDEBAR INSPECTOR (COLUMNA DERECHA CON SCROLL PROPIO) */
     .sidebar-inspector {
+      width: 350px;
+      flex-shrink: 0;
+      height: 100%;
+      min-height: 0;
       background: var(--bg-panel);
       border-left: 1px solid var(--border-color);
       display: flex;
       flex-direction: column;
-      height: 100%;
       overflow-y: auto;
+      overflow-x: hidden;
+      z-index: 10;
+    }
+
+    .sidebar-inspector::-webkit-scrollbar {
+      width: 5px;
+    }
+    .sidebar-inspector::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 3px;
     }
 
     .inspector-header {
-      padding: 16px;
+      padding: 14px 16px;
       background: var(--bg-panel-header);
       border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 5;
     }
 
     .inspector-header h2 {
-      font-size: 0.92rem;
+      font-size: 0.88rem;
       font-weight: 700;
       color: var(--text-primary);
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
 
     .inspector-section {
-      padding: 16px;
+      padding: 14px 16px;
       border-bottom: 1px solid var(--border-color);
     }
 
     .section-title {
-      font-size: 0.72rem;
+      font-size: 0.7rem;
       text-transform: uppercase;
       font-weight: 700;
       letter-spacing: 0.05em;
       color: var(--text-secondary);
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -469,35 +617,35 @@
       align-items: center;
       gap: 6px;
       padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 0.8rem;
-      font-weight: 700;
+      border-radius: 7px;
+      font-size: 0.78rem;
+      font-weight: 800;
       width: 100%;
       justify-content: center;
     }
     .step-badge.idle { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
     .step-badge.selecting { background: rgba(56, 189, 248, 0.18); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
-    .step-badge.ask_shipping { background: rgba(245, 158, 11, 0.18); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
-    .step-badge.confirm_pending { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+    .step-badge.ask_shipping_method, .step-badge.ask_shipping { background: rgba(245, 158, 11, 0.18); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .step-badge.ask_payment, .step-badge.confirming { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
 
     .cart-box {
       background: #182229;
       border: 1px solid var(--border-subtle);
       border-radius: 8px;
-      padding: 12px;
+      padding: 10px 12px;
     }
 
     .cart-empty {
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       color: var(--text-muted);
       text-align: center;
-      padding: 12px 0;
+      padding: 10px 0;
     }
 
     .cart-item {
       display: flex;
       justify-content: space-between;
-      font-size: 0.82rem;
+      font-size: 0.8rem;
       padding: 5px 0;
       border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
     }
@@ -506,19 +654,19 @@
     .cart-total-line {
       display: flex;
       justify-content: space-between;
-      margin-top: 10px;
+      margin-top: 8px;
       padding-top: 8px;
       border-top: 1px solid rgba(255, 255, 255, 0.15);
-      font-size: 0.9rem;
-      font-weight: 700;
+      font-size: 0.88rem;
+      font-weight: 800;
       color: #34d399;
     }
 
     .info-grid {
       display: grid;
       grid-template-columns: 1fr;
-      gap: 8px;
-      font-size: 0.8rem;
+      gap: 6px;
+      font-size: 0.78rem;
     }
     .info-row {
       display: flex;
@@ -528,16 +676,17 @@
     .info-row span:last-child {
       color: var(--text-primary);
       font-weight: 600;
+      text-align: right;
     }
 
-    /* KDS NOTICE */
+    /* KDS NOTICE CARD */
     .kds-card {
       background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.05) 100%);
       border: 1px solid rgba(16, 185, 129, 0.3);
       border-radius: 8px;
-      padding: 12px;
-      font-size: 0.78rem;
-      line-height: 1.4;
+      padding: 10px 12px;
+      font-size: 0.76rem;
+      line-height: 1.45;
       color: #d1fae5;
     }
 
@@ -547,169 +696,204 @@
       text-decoration: underline;
     }
 
+    /* RESPONSIVE TOGGLE SIDEBAR */
     @media (max-width: 900px) {
-      .app-main {
-        grid-template-columns: 1fr;
-      }
       .sidebar-inspector {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 320px;
+        box-shadow: -4px 0 20px rgba(0,0,0,0.5);
         display: none;
+      }
+      .sidebar-inspector.show {
+        display: flex;
       }
     }
   </style>
 </head>
 <body>
 
-  <!-- NAVBAR -->
-  <header class="top-navbar">
-    <div class="brand-section">
-      <div class="brand-icon">🍔</div>
-      <div>
-        <div class="brand-title">
-          ComandaFast Bot Tester
-          <span class="badge-live" id="botStatusBadge">Conectado (Puerto 3002)</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="nav-actions">
-      <button type="button" class="btn-nav" id="btnResetSession" title="Reiniciar memoria y carrito del cliente">
-        🔄 Reiniciar Sesión
-      </button>
-      <button type="button" class="btn-nav" id="btnClearChat" title="Limpiar mensajes en pantalla">
-        🧹 Limpiar Chat
-      </button>
-      <a href="http://localhost:5173" target="_blank" class="btn-nav accent" title="Abrir sistema POS / Cocina">
-        📋 Abrir ComandaFast POS / KDS ↗
-      </a>
-    </div>
-  </header>
-
-  <!-- MAIN -->
-  <div class="app-main">
+  <div class="tester-layout">
     
-    <!-- CHAT PANEL -->
-    <div class="chat-panel">
-      <!-- Chat Header -->
-      <div class="chat-header">
-        <div class="chat-avatar-info">
-          <div class="chat-avatar">🤖</div>
-          <div class="chat-user-details">
-            <h3 id="storeNameLabel">Burga's Chamical Bot</h3>
-            <p><span style="display:inline-block;width:8px;height:8px;background:#10b981;border-radius:50%"></span> En línea • Multi-Device Baileys</p>
-          </div>
-        </div>
-
-        <div class="chat-controls">
-          <div style="font-size:0.75rem;color:var(--text-secondary);display:flex;align-items:center;gap:6px">
-            👤 Simulando a: 
-            <input type="text" id="inputCustomerName" value="Martín Gómez" style="background:#2a3942;color:#fff;border:1px solid #37464f;border-radius:5px;padding:3px 8px;font-size:0.75rem;width:120px;" title="Nombre del cliente simulado" />
+    <!-- TOP NAVBAR (SIEMPRE FIJA ARRIBA) -->
+    <header class="top-navbar">
+      <div class="brand-section">
+        <div class="brand-icon">🍔</div>
+        <div>
+          <div class="brand-title">
+            ComandaFast Bot Tester
+            <span class="badge-live" id="botStatusBadge">En Vivo (3002)</span>
           </div>
         </div>
       </div>
 
-      <!-- Messages Area -->
-      <div class="chat-messages" id="chatMessagesContainer">
-        <!-- Messages will be rendered dynamically here -->
-      </div>
-
-      <!-- Typing Indicator -->
-      <div class="typing-indicator" id="typingIndicator" style="margin-left: 24px;">
-        <span class="typing-dot"></span>
-        <span class="typing-dot"></span>
-        <span class="typing-dot"></span>
-      </div>
-
-      <!-- Quick Chips Bar -->
-      <div class="quick-chips-bar">
-        <button type="button" class="chip-btn" onclick="sendQuickText('MENU')">🍔 MENÚ</button>
-        <button type="button" class="chip-btn" onclick="sendQuickText('1')">1️⃣ CHEESE</button>
-        <button type="button" class="chip-btn" onclick="sendQuickText('2')">2️⃣ BAJONERA</button>
-        <button type="button" class="chip-btn" onclick="sendQuickText('CARTA')">📋 CARTA COMPLETA</button>
-        <button type="button" class="chip-btn" onclick="sendQuickText('LISTO')">🛒 LISTO (Avanzar)</button>
-        <button type="button" class="chip-btn" onclick="sendQuickText('1')">🛍️ 1 (Retiro Local)</button>
-        <button type="button" class="chip-btn" onclick="sendQuickText('2')">🛵 2 (Delivery)</button>
-        <button type="button" class="chip-btn" onclick="sendQuickText('1')">💵 1 (Efectivo)</button>
-        <button type="button" class="chip-btn" onclick="sendQuickText('2')">💳 2 (Transferencia)</button>
-        <button type="button" class="chip-btn" onclick="sendQuickText('SI')">✅ SI (Confirmar)</button>
-        <button type="button" class="chip-btn" onclick="sendQuickText('CANCELAR')">❌ CANCELAR</button>
-      </div>
-
-      <!-- Input Bar -->
-      <form class="chat-input-bar" id="chatInputForm">
-        <input 
-          type="text" 
-          class="chat-input-field" 
-          id="chatInputField" 
-          placeholder="Escribí un mensaje al bot... (Ej: Hola, 1, Quiero una burger con papas)" 
-          autocomplete="off" 
-          autofocus 
-        />
-        <button type="submit" class="btn-send" title="Enviar mensaje">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="22" y1="2" x2="11" y2="13"></line>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-          </svg>
+      <div class="nav-actions">
+        <button type="button" class="btn-nav" id="btnToggleSound" title="Silenciar / Activar sonido">
+          <span id="soundIcon">🔊</span>
         </button>
-      </form>
+        <button type="button" class="btn-nav" id="btnResetSession" title="Reiniciar memoria y carrito del cliente">
+          🔄 Reiniciar Sesión
+        </button>
+        <button type="button" class="btn-nav" id="btnClearChat" title="Limpiar pantalla de mensajes">
+          🧹 Limpiar
+        </button>
+        <button type="button" class="btn-nav" id="btnToggleSidebar" title="Mostrar / Ocultar Inspector lateral">
+          🔍 Inspector
+        </button>
+        <a href="http://localhost:5173" target="_blank" class="btn-nav accent" title="Abrir sistema POS / Cocina">
+          📋 Abrir POS / KDS ↗
+        </a>
+      </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <div class="app-main">
+      
+      <!-- CHAT PANEL -->
+      <section class="chat-panel">
+        
+        <!-- Chat Header Fijo -->
+        <div class="chat-header">
+          <div class="chat-avatar-info">
+            <div class="chat-avatar">🤖</div>
+            <div class="chat-user-details">
+              <h3 id="storeNameLabel">Burga's Chamical Bot</h3>
+              <p><span style="display:inline-block;width:7px;height:7px;background:#10b981;border-radius:50%"></span> En línea • Multi-Device Baileys</p>
+            </div>
+          </div>
+
+          <div class="chat-controls">
+            <div class="customer-pill" title="Nombre del cliente simulado">
+              <span>👤 Cliente:</span>
+              <input type="text" id="inputCustomerName" value="Martín Gómez" placeholder="Tu Nombre" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Mensajes (Área con scroll vertical exclusivo) -->
+        <div class="chat-messages" id="chatMessagesContainer">
+          <!-- Dynamic messages -->
+          <div class="typing-row" id="typingIndicator">
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+          </div>
+        </div>
+
+        <!-- Botón flotante para volver abajo -->
+        <button type="button" class="btn-scroll-bottom" id="btnScrollBottom" title="Bajar al último mensaje">
+          ↓
+        </button>
+
+        <!-- FOOTER FIJO: ACCIONES RÁPIDAS + ENTRADA DE TEXTO -->
+        <footer class="chat-footer">
+          
+          <!-- Quick Action Chips -->
+          <div class="quick-chips-bar">
+            <button type="button" class="chip-btn emerald" onclick="sendQuickText('MENU')">🍔 MENÚ</button>
+            <button type="button" class="chip-btn" onclick="sendQuickText('1')">1️⃣ CHEESE</button>
+            <button type="button" class="chip-btn" onclick="sendQuickText('2')">2️⃣ BAJONERA</button>
+            <button type="button" class="chip-btn" onclick="sendQuickText('CARTA')">📋 CARTA COMPLETA</button>
+            <button type="button" class="chip-btn amber" onclick="sendQuickText('LISTO')">🛒 LISTO (Avanzar)</button>
+            <button type="button" class="chip-btn" onclick="sendQuickText('1')">🛍️ 1 (Retiro Local)</button>
+            <button type="button" class="chip-btn" onclick="sendQuickText('2')">🛵 2 (Delivery)</button>
+            <button type="button" class="chip-btn emerald" onclick="sendQuickText('1')">💵 1 (Efectivo)</button>
+            <button type="button" class="chip-btn emerald" onclick="sendQuickText('2')">💳 2 (Transferencia)</button>
+            <button type="button" class="chip-btn emerald" onclick="sendQuickText('SI')">✅ SI (Confirmar)</button>
+            <button type="button" class="chip-btn rose" onclick="sendQuickText('CANCELAR')">❌ CANCELAR</button>
+          </div>
+
+          <!-- Input Bar (Fijo abajo, nunca se mueve) -->
+          <form class="chat-input-bar" id="chatInputForm">
+            <input 
+              type="text" 
+              class="chat-input-field" 
+              id="chatInputField" 
+              placeholder="Escribí un mensaje al bot... (Ej: Hola, 1, Quiero una burger)" 
+              autocomplete="off" 
+            />
+            <button type="submit" class="btn-send" id="btnSendMsg" title="Enviar mensaje">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </form>
+
+        </footer>
+
+      </section>
+
+      <!-- SIDEBAR INSPECTOR (COLUMNA DERECHA) -->
+      <aside class="sidebar-inspector" id="sidebarInspector">
+        <div class="inspector-header">
+          <h2>🔍 Inspector de Sesión</h2>
+          <span style="font-size:0.7rem;color:var(--text-muted)">Tiempo Real</span>
+        </div>
+
+        <!-- Paso Conversacional -->
+        <div class="inspector-section">
+          <div class="section-title">Paso Conversacional</div>
+          <div class="step-badge idle" id="sessionStepBadge">IDLE (Inactivo)</div>
+        </div>
+
+        <!-- Carrito -->
+        <div class="inspector-section">
+          <div class="section-title">
+            <span>Carrito en Memoria</span>
+            <span id="cartCountBadge" style="color:#38bdf8;font-weight:700">0 items</span>
+          </div>
+          <div class="cart-box" id="cartItemsBox">
+            <div class="cart-empty">El carrito está vacío.</div>
+          </div>
+        </div>
+
+        <!-- Variables del Negocio -->
+        <div class="inspector-section">
+          <div class="section-title">Variables Activas del Local</div>
+          <div class="info-grid">
+            <div class="info-row">
+              <span>Local:</span>
+              <span id="infoStoreName">Burga's Chamical</span>
+            </div>
+            <div class="info-row">
+              <span>Demora:</span>
+              <span id="infoDelay">30 a 45 min</span>
+            </div>
+            <div class="info-row">
+              <span>Horarios:</span>
+              <span id="infoHours">Martes a Domingos 19:30 hs</span>
+            </div>
+            <div class="info-row">
+              <span>Productos:</span>
+              <span id="infoProductsCount">32 sincronizados</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Simulación Pedido Web -->
+        <div class="inspector-section">
+          <div class="section-title">Test Rápido Catálogo Web</div>
+          <button type="button" class="btn-nav" id="btnSimulateWebOrder" style="width:100%;justify-content:center;font-size:0.75rem;padding:7px 10px;" title="Simular pedido entrante desde la carta web #catalog">
+            🛒 Inyectar Pedido Catálogo Web
+          </button>
+        </div>
+
+        <!-- Integración Cocina -->
+        <div class="inspector-section">
+          <div class="section-title">Circuito de Cocina KDS</div>
+          <div class="kds-card">
+            🔥 <strong>Sincronización en Vivo:</strong><br>
+            Al confirmar con <strong>"SI"</strong>, el bot crea la orden en 
+            <a href="http://localhost:5173" target="_blank">ComandaFast POS</a>.
+            Cuando un cocinero presione <strong>¡Listo!</strong> o <strong>Despachar</strong> en el KDS, verás llegar el aviso automático aquí en segundos.
+          </div>
+        </div>
+      </aside>
+
     </div>
-
-    <!-- SIDEBAR INSPECTOR -->
-    <aside class="sidebar-inspector">
-      <div class="inspector-header">
-        <h2>🔍 Inspector de Sesión en Vivo</h2>
-      </div>
-
-      <!-- Estado Actual -->
-      <div class="inspector-section">
-        <div class="section-title">Paso Conversacional</div>
-        <div class="step-badge idle" id="sessionStepBadge">IDLE (Inactivo)</div>
-      </div>
-
-      <!-- Carrito en Vivo -->
-      <div class="inspector-section">
-        <div class="section-title">
-          <span>Carrito en Memoria</span>
-          <span id="cartCountBadge" style="color:#38bdf8">0 items</span>
-        </div>
-        <div class="cart-box" id="cartItemsBox">
-          <div class="cart-empty">El carrito está vacío.</div>
-        </div>
-      </div>
-
-      <!-- Datos del Local -->
-      <div class="inspector-section">
-        <div class="section-title">Variables Activas del Local</div>
-        <div class="info-grid">
-          <div class="info-row">
-            <span>Local:</span>
-            <span id="infoStoreName">Burga's Chamical</span>
-          </div>
-          <div class="info-row">
-            <span>Demora:</span>
-            <span id="infoDelay">30 a 45 min</span>
-          </div>
-          <div class="info-row">
-            <span>Horarios:</span>
-            <span id="infoHours">20:00 a 00:30 hs</span>
-          </div>
-          <div class="info-row">
-            <span>Productos:</span>
-            <span id="infoProductsCount">32 cargados</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Integración KDS -->
-      <div class="inspector-section">
-        <div class="section-title">Prueba de Circuito Completo</div>
-        <div class="kds-card">
-          🔥 <strong>Integración Real con Cocina:</strong><br>
-          Cuando confirmes tu pedido con <strong>"SI"</strong>, el bot inyectará la comanda directamente al 
-          <a href="http://localhost:5173" target="_blank">Tablero KDS</a>. 
-          Al hacer click en <strong>¡Listo!</strong> o <strong>Despachar</strong> en la cocina, verás la notificación llegar automáticamente a este chat.
-        </div>
-      </div>
-    </aside>
 
   </div>
 
@@ -725,37 +909,84 @@
     const cartItemsBox = document.getElementById('cartItemsBox');
     const botStatusBadge = document.getElementById('botStatusBadge');
     const storeNameLabel = document.getElementById('storeNameLabel');
+    const btnScrollBottom = document.getElementById('btnScrollBottom');
+    const btnSendMsg = document.getElementById('btnSendMsg');
+    const sidebarInspector = document.getElementById('sidebarInspector');
 
     let currentMessages = [];
     let isSending = false;
+    let soundEnabled = localStorage.getItem('cf_bot_tester_sound') !== 'false';
+    let userHasScrolledUp = false;
 
-    // Sonido suave de mensaje recibido usando Web Audio API
+    // Actualizar icono de sonido
+    function updateSoundIcon() {
+      document.getElementById('soundIcon').textContent = soundEnabled ? '🔊' : '🔇';
+    }
+    updateSoundIcon();
+
+    document.getElementById('btnToggleSound').addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      localStorage.setItem('cf_bot_tester_sound', String(soundEnabled));
+      updateSoundIcon();
+    });
+
+    document.getElementById('btnToggleSidebar').addEventListener('click', () => {
+      if (window.innerWidth <= 900) {
+        sidebarInspector.classList.toggle('show');
+      } else {
+        sidebarInspector.style.display = (sidebarInspector.style.display === 'none') ? 'flex' : 'none';
+      }
+    });
+
+    // Sonido suave de mensaje usando Web Audio API
     function playChime() {
+      if (!soundEnabled) return;
       try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = 'sine';
         osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
-        osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.12); // A5
-        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+        osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1); // A5
+        gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.22);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start();
-        osc.stop(audioCtx.currentTime + 0.26);
+        osc.stop(audioCtx.currentTime + 0.23);
       } catch (_) {}
     }
 
+    // Scroll inteligente exclusivo del contenedor de mensajes
+    function scrollToBottom(force = false) {
+      if (!messagesContainer) return;
+      if (force || !userHasScrolledUp) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+    }
+
+    // Detectar si el usuario scrolleó hacia arriba para no robarle la vista
+    messagesContainer.addEventListener('scroll', () => {
+      const threshold = 80;
+      const atBottom = (messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight) <= threshold;
+      userHasScrolledUp = !atBottom;
+      btnScrollBottom.style.display = userHasScrolledUp ? 'flex' : 'none';
+    });
+
+    btnScrollBottom.addEventListener('click', () => {
+      userHasScrolledUp = false;
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      btnScrollBottom.style.display = 'none';
+    });
+
     function formatText(txt) {
       if (!txt) return '';
-      // Escape HTML
       let escaped = txt
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
 
-      // WhatsApp markdown
+      // WhatsApp Markdown
       escaped = escaped.replace(/\*(.*?)\*/g, '<strong>$1</strong>');
       escaped = escaped.replace(/_(.*?)_/g, '<em>$1</em>');
       escaped = escaped.replace(/`(.*?)`/g, '<code>$1</code>');
@@ -764,20 +995,23 @@
 
     function renderMessages(msgs) {
       if (!Array.isArray(msgs)) return;
-      const isInitial = messagesContainer.children.length === 0;
       const hadNewMessages = msgs.length > currentMessages.length;
-
       currentMessages = msgs;
+
+      // Preservar typingIndicator
+      const typingEl = typingIndicator;
       messagesContainer.innerHTML = '';
 
       if (msgs.length === 0) {
-        messagesContainer.innerHTML = `
-          <div style="text-align:center;color:var(--text-muted);font-size:0.85rem;margin-top:40px;">
-            👋 <strong>¡Bienvenido al Laboratorio de Pruebas en Vivo!</strong><br><br>
-            Este chat interactúa con el proceso del bot que está encendido en tu PC.<br>
-            Probá enviar <code>HOLA</code> o hacer click en los botones rápidos de abajo.
-          </div>
+        const welcome = document.createElement('div');
+        welcome.style.cssText = 'text-align:center;color:var(--text-muted);font-size:0.82rem;margin:auto 0;padding:20px;line-height:1.6;';
+        welcome.innerHTML = `
+          👋 <strong>¡Bienvenido al Laboratorio en Vivo de ComandaFast!</strong><br><br>
+          Este chat interactúa con el servidor de WhatsApp encendido en tu PC.<br>
+          Probá enviar <code>HOLA</code> o hacé click en los botones de abajo.
         `;
+        messagesContainer.appendChild(welcome);
+        messagesContainer.appendChild(typingEl);
         return;
       }
 
@@ -786,11 +1020,13 @@
         const wrapper = document.createElement('div');
         wrapper.className = `msg-wrapper ${isOut ? 'out' : 'in'}`;
 
-        const timeStr = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-        
+        const timeStr = m.timestamp 
+          ? new Date(m.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) 
+          : new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+
         let imageHtml = '';
         if (m.imageUrl) {
-          imageHtml = `<img src="${m.imageUrl}" style="max-width:100%;border-radius:8px;margin-bottom:6px;display:block;" />`;
+          imageHtml = `<img src="${m.imageUrl}" style="max-width:100%;border-radius:6px;margin-bottom:6px;display:block;" />`;
         }
 
         wrapper.innerHTML = `
@@ -799,16 +1035,19 @@
             <div>${formatText(m.text || '')}</div>
             <div class="msg-time">
               ${timeStr}
-              ${isOut ? '<span style="color:#53bdeb">✓✓</span>' : ''}
+              ${isOut ? '<span style="color:#53bdeb;margin-left:2px;">✓✓</span>' : ''}
             </div>
           </div>
         `;
         messagesContainer.appendChild(wrapper);
       });
 
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      // Asegurar que el typingIndicator esté siempre al final
+      messagesContainer.appendChild(typingEl);
 
-      if (!isInitial && hadNewMessages) {
+      scrollToBottom(false);
+
+      if (hadNewMessages) {
         playChime();
       }
     }
@@ -821,7 +1060,7 @@
         }
         if (biz.demora) document.getElementById('infoDelay').textContent = biz.demora;
         if (biz.horarios) document.getElementById('infoHours').textContent = biz.horarios;
-        if (biz.productsCount) document.getElementById('infoProductsCount').textContent = biz.productsCount + ' cargados';
+        if (biz.productsCount) document.getElementById('infoProductsCount').textContent = biz.productsCount + ' sincronizados';
       }
 
       if (!session) {
@@ -876,8 +1115,8 @@
           }
           updateSessionInspector(data.session, data.businessInfo);
           if (data.botStatus === 'connected') {
-            botStatusBadge.textContent = 'Conectado (Puerto 3002)';
-            botStatusBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+            botStatusBadge.textContent = 'En Vivo (3002)';
+            botStatusBadge.style.background = 'rgba(16, 185, 129, 0.18)';
             botStatusBadge.style.color = '#34d399';
           }
         }
@@ -887,16 +1126,18 @@
     async function sendMessage(text) {
       if (!text || isSending) return;
       isSending = true;
+      btnSendMsg.disabled = true;
       typingIndicator.style.display = 'flex';
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      scrollToBottom(true);
 
-      // Add optimistic customer message
+      // Optimistic message
       const optimisticMsg = {
         from: 'customer',
         text,
         timestamp: Date.now()
       };
       renderMessages([...currentMessages, optimisticMsg]);
+      scrollToBottom(true);
 
       try {
         const res = await fetch('/api/bot/tester/message', {
@@ -905,7 +1146,7 @@
           body: JSON.stringify({
             text,
             jid: TEST_JID,
-            name: inputCustomerName.value || 'Cliente Tester'
+            name: (inputCustomerName.value || '').trim() || 'Martín Gómez'
           })
         });
 
@@ -913,23 +1154,25 @@
         if (data.success) {
           renderMessages(data.messages);
           updateSessionInspector(data.session);
+          scrollToBottom(true);
         }
       } catch (err) {
         console.error('Error enviando mensaje al tester:', err);
       } finally {
         isSending = false;
+        btnSendMsg.disabled = false;
         typingIndicator.style.display = 'none';
-        inputField.focus();
+        // FOCUS PREVINIENDO SCROLL GLOBAL
+        inputField.focus({ preventScroll: true });
       }
     }
 
     function sendQuickText(text) {
-      inputField.value = text;
       sendMessage(text);
       inputField.value = '';
     }
 
-    // FORM SUBMIT
+    // SUBMIT FORMULARIO
     inputForm.addEventListener('submit', (e) => {
       e.preventDefault();
       const val = inputField.value.trim();
@@ -938,9 +1181,16 @@
       sendMessage(val);
     });
 
-    // RESET SESSION BUTTON
+    // SIMULAR PEDIDO DE CATÁLOGO WEB
+    document.getElementById('btnSimulateWebOrder').addEventListener('click', () => {
+      const clientName = (inputCustomerName.value || '').trim() || 'Martín Gómez';
+      const webOrderText = `🛍️ *Mi Pedido — ComandaFast*\n• 1x 4x4 — $ 15.000,00\n💵 *Subtotal:* $ 15.000,00\n💰 *TOTAL:* $ 15.000,00\n🚀 *Tipo de entrega:* Para llevar (Mostrador)\n💳 *Forma de pago:* Efectivo\n👤 *Nombre:* ${clientName}`;
+      sendMessage(webOrderText);
+    });
+
+    // RESET SESSION
     document.getElementById('btnResetSession').addEventListener('click', async () => {
-      if (!confirm('¿Deseas reiniciar la sesión y vaciar el carrito del cliente de prueba?')) return;
+      if (!confirm('¿Deseas reiniciar la memoria y vaciar el carrito del cliente de prueba?')) return;
       try {
         await fetch('/api/bot/tester/reset', {
           method: 'POST',
@@ -948,25 +1198,38 @@
           body: JSON.stringify({ jid: TEST_JID, clearMessages: false })
         });
         await fetchState();
-        alert('✅ Sesión y carrito reiniciados a estado inicial.');
       } catch (_) {}
     });
 
-    // CLEAR CHAT BUTTON
+    // CLEAR CHAT
     document.getElementById('btnClearChat').addEventListener('click', async () => {
+      if (!confirm('¿Limpiar los mensajes de este chat?')) return;
       try {
         await fetch('/api/bot/tester/reset', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ jid: TEST_JID, clearMessages: true })
         });
+        currentMessages = [];
         renderMessages([]);
       } catch (_) {}
     });
 
-    // Polling suave cada 1.5s para detectar cambios de estado de cocina KDS en vivo
-    setInterval(fetchState, 1500);
-    fetchState();
+    // INICIALIZACIÓN
+    fetchState().then(() => {
+      scrollToBottom(true);
+      inputField.focus({ preventScroll: true });
+    });
+
+    // Polling continuo cada 2.5s para recibir notificaciones del KDS y cambios de la cocina
+    setInterval(fetchState, 2500);
+
+    // Salvaguarda: Asegurar que el viewport permanezca en (0,0)
+    window.addEventListener('scroll', () => {
+      if (window.scrollY !== 0 || window.scrollX !== 0) {
+        window.scrollTo(0, 0);
+      }
+    });
   </script>
 </body>
 </html>

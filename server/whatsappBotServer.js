@@ -2334,6 +2334,7 @@ class WhatsAppBotServer {
             const orderNum = (await getLatestOrderNumber()) + 1;
             const uniqueOrderId = parsedCatalogOrder.id || ('ord-' + Date.now());
             const displayCode = `CMD-${orderNum}`;
+            const orderId = orderNum;
             const biz = getBusinessContext();
 
             const chosenMethod = parsedCatalogOrder.paymentMethod || 'pendiente';
