@@ -9,6 +9,10 @@ import express from 'express';
 import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import QRCode from 'qrcode';
 import qrcodeTerminal from 'qrcode-terminal';
 import pino from 'pino';
@@ -1494,18 +1498,19 @@ function recordLiveChatMessage({ jid, name, from, text, isImage, imageUrl, origi
     chat.unreadCount = (chat.unreadCount || 0) + 1;
   }
 
-  const msgId = originalMsgKey?.id || `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-  if (!chat.messages) chat.messages = [];
-  if (!chat.messages.some(m => m.id === msgId)) {
-    chat.messages.push({
-      id: msgId,
-      from, // 'customer' | 'bot' | 'cashier'
-      text: text || '',
-      isImage: Boolean(isImage),
-      imageUrl: imageUrl || null,
-      timestamp: Date.now()
-    });
+  let msgId = originalMsgKey?.id;
+  if (!msgId || (chat.messages && chat.messages.some(m => m.id === msgId))) {
+    msgId = `${from}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
   }
+  if (!chat.messages) chat.messages = [];
+  chat.messages.push({
+    id: msgId,
+    from, // 'customer' | 'bot' | 'cashier'
+    text: text || '',
+    isImage: Boolean(isImage),
+    imageUrl: imageUrl || null,
+    timestamp: Date.now()
+  });
 
   if (chat.messages.length > 60) {
     chat.messages = chat.messages.slice(-60);
@@ -1716,6 +1721,23 @@ class WhatsAppBotServer {
    *  5. Despacho real del mensaje
    */
   async safeSendMessage(remoteJid, content, originalMsgKey = null, customDelay = null) {
+    // Si es un chat simulado del Tester, registrar en liveChats y omitir envío por red Baileys
+    const isSimulatorJid = !remoteJid || remoteJid.startsWith('sim_') || remoteJid.startsWith('test_') || remoteJid.includes('tester');
+    if (isSimulatorJid) {
+      const textContent = typeof content === 'string' 
+        ? content 
+        : (content?.text || (content?.caption ? `📸 ${content.caption}` : (content?.image ? '📸 Foto enviada' : '')));
+      recordLiveChatMessage({
+        jid: remoteJid,
+        from: 'bot',
+        text: textContent,
+        isImage: Boolean(content?.image),
+        imageUrl: typeof content?.image === 'string' ? content.image : (content?.image?.url || null),
+        originalMsgKey
+      });
+      return { key: { remoteJid, id: `bot-${Date.now()}` } };
+    }
+
     if (!this.sock) {
       console.warn(`[WHATSAPP BOT] Socket no inicializado para enviar a ${remoteJid}`);
       return null;
@@ -2087,10 +2109,23 @@ class WhatsAppBotServer {
       // Escuchar mensajes entrantes con máquina conversacional de pedidos
       this.sock.ev.on('messages.upsert', async (chatUpdate) => {
         if (!chatUpdate.messages || chatUpdate.messages.length === 0) return;
+        await this.processMessagesList(chatUpdate.messages);
+      });
 
-        const prods = getStoredProducts();
+      return { status: this.status, qrCode: this.qrCode };
+    } catch (err) {
+      console.error('[WHATSAPP BOT] Error al iniciar socket:', err);
+      this.status = 'disconnected';
+      this.isStarting = false;
+      return { status: 'disconnected', error: err.message };
+    }
+  }
 
-        for (const msg of chatUpdate.messages) {
+  async processMessagesList(messagesList) {
+    if (!Array.isArray(messagesList) || messagesList.length === 0) return;
+    const prods = getStoredProducts();
+
+    for (const msg of messagesList) {
           const remoteJid = msg.key?.remoteJid;
           if (!remoteJid) continue;
 
@@ -3425,15 +3460,6 @@ class WhatsAppBotServer {
           const fallbackMenu = buildMainMenuMessage(msg.pushName);
           await this.safeSendMessage(remoteJid, { text: fallbackMenu }, msg.key);
         }
-      });
-
-      return { status: this.status, qrCode: this.qrCode };
-    } catch (err) {
-      console.error('[WHATSAPP BOT] Error al iniciar socket:', err);
-      this.status = 'disconnected';
-      this.isStarting = false;
-      return { status: 'disconnected', error: err.message };
-    }
   }
 
   async logout() {
@@ -4408,6 +4434,104 @@ app.get('/api/orders', (req, res) => {
     }
   }
   res.json({ success: true, orders, timestamp: Date.now() });
+});
+
+// =========================================================
+// ENDPOINTS PARA EL LABORATORIO DE PRUEBAS DEL BOT (TESTER)
+// =========================================================
+app.get('/tester', (req, res) => {
+  const testerPath = path.join(__dirname, 'tester.html');
+  if (fs.existsSync(testerPath)) {
+    res.sendFile(testerPath);
+  } else {
+    res.status(404).send('tester.html no encontrado');
+  }
+});
+
+app.post('/api/bot/tester/message', async (req, res) => {
+  try {
+    const { text, jid = 'sim_cliente@s.whatsapp.net', name = 'Cliente Tester' } = req.body || {};
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({ success: false, error: 'Texto requerido' });
+    }
+    const normalizedJid = jid.includes('@') ? jid : `${jid.replace(/\D/g, '')}@s.whatsapp.net`;
+    const fakeMsg = {
+      key: { remoteJid: normalizedJid, id: `test-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, fromMe: false },
+      message: { conversation: text.trim() },
+      messageTimestamp: Math.floor(Date.now() / 1000),
+      pushName: name.trim() || 'Cliente Tester'
+    };
+
+    await botServer.processMessagesList([fakeMsg]);
+
+    const chat = liveChatsMap.get(normalizedJid);
+    const session = customerSessions.get(normalizedJid) || null;
+    res.json({
+      success: true,
+      jid: normalizedJid,
+      messages: chat?.messages || [],
+      session: session ? {
+        step: session.step,
+        items: session.items || [],
+        subtotal: session.subtotal || 0,
+        total: session.total || 0,
+        shippingMethod: session.shippingMethod,
+        shippingAddress: session.shippingAddress,
+        customerName: session.customerName,
+        paymentMethod: session.paymentMethod
+      } : null
+    });
+  } catch (err) {
+    console.error('[TESTER API ERROR]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/bot/tester/state', (req, res) => {
+  const jid = req.query.jid || 'sim_cliente@s.whatsapp.net';
+  const normalizedJid = jid.includes('@') ? jid : `${jid.replace(/\D/g, '')}@s.whatsapp.net`;
+  const chat = liveChatsMap.get(normalizedJid);
+  const session = customerSessions.get(normalizedJid) || null;
+  const vars = getBusinessContext();
+  const prods = getStoredProducts();
+  res.json({
+    success: true,
+    botStatus: botServer.status,
+    botUser: botServer.connectedUser,
+    jid: normalizedJid,
+    messages: chat?.messages || [],
+    session: session ? {
+      step: session.step,
+      items: session.items || [],
+      subtotal: session.subtotal || 0,
+      total: session.total || 0,
+      shippingMethod: session.shippingMethod,
+      shippingAddress: session.shippingAddress,
+      customerName: session.customerName,
+      paymentMethod: session.paymentMethod
+    } : null,
+    businessInfo: {
+      nombre_local: vars.nombre_local,
+      direccion: vars.direccion,
+      horarios: vars.horarios,
+      demora: vars.demora,
+      alias_banco: vars.alias_banco,
+      productsCount: prods.length
+    }
+  });
+});
+
+app.post('/api/bot/tester/reset', (req, res) => {
+  const { jid = 'sim_cliente@s.whatsapp.net', clearMessages = false } = req.body || {};
+  const normalizedJid = jid.includes('@') ? jid : `${jid.replace(/\D/g, '')}@s.whatsapp.net`;
+  resetCustomerSession(normalizedJid);
+  if (clearMessages && liveChatsMap.has(normalizedJid)) {
+    const chat = liveChatsMap.get(normalizedJid);
+    chat.messages = [];
+    chat.lastMessageText = '';
+    scheduleSaveLiveChats();
+  }
+  res.json({ success: true, jid: normalizedJid, message: 'Sesión reiniciada con éxito' });
 });
 
 const server = app.listen(PORT, async () => {

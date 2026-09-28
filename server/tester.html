@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Laboratorio de Pruebas WhatsApp - ComandaFast</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #0c1317;
+      --bg-panel: #111b21;
+      --bg-panel-header: #202c33;
+      --bg-input: #2a3942;
+      --bg-chat: #0b141a;
+      --bubble-out: #005c4b;
+      --bubble-in: #202c33;
+      --text-primary: #e9edef;
+      --text-secondary: #8696a0;
+      --text-muted: #667781;
+      --accent-green: #25d366;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-blue: #38bdf8;
+      --border-color: #222d34;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-primary);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* TOP NAVBAR */
+    .top-navbar {
+      background-color: var(--bg-panel-header);
+      border-bottom: 1px solid var(--border-color);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 60px;
+      z-index: 10;
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      font-size: 24px;
+      background: rgba(37, 211, 102, 0.15);
+      border: 1px solid rgba(37, 211, 102, 0.3);
+      border-radius: 10px;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .brand-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-live {
+      font-size: 0.7rem;
+      font-weight: 600;
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      padding: 2px 8px;
+      border-radius: 9999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .badge-live::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      background-color: #10b981;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #10b981;
+      animation: pulse-dot 1.8s infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-nav {
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+
+    .btn-nav:hover {
+      background: #37464f;
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-1px);
+    }
+
+    .btn-nav.accent {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+      border: none;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+    }
+    .btn-nav.accent:hover {
+      background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    }
+
+    /* MAIN CONTAINER */
+    .app-main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      height: calc(100vh - 60px);
+      overflow: hidden;
+    }
+
+    /* CHAT PANEL */
+    .chat-panel {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background: var(--bg-chat);
+      position: relative;
+    }
+
+    .chat-header {
+      background: var(--bg-panel-header);
+      padding: 10px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      z-index: 5;
+    }
+
+    .chat-avatar-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .chat-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: #2a3942;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      border: 2px solid var(--accent-emerald);
+    }
+
+    .chat-user-details h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .chat-user-details p {
+      font-size: 0.75rem;
+      color: #34d399;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .chat-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* CHAT MESSAGES BODY */
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+      background-size: 20px 20px;
+      scroll-behavior: smooth;
+    }
+
+    .chat-messages::-webkit-scrollbar {
+      width: 6px;
+    }
+    .chat-messages::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 3px;
+    }
+
+    /* MESSAGE BUBBLES */
+    .msg-wrapper {
+      display: flex;
+      width: 100%;
+      margin-bottom: 4px;
+      animation: fadeInMsg 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes fadeInMsg {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .msg-wrapper.in {
+      justify-content: flex-start;
+    }
+
+    .msg-wrapper.out {
+      justify-content: flex-end;
+    }
+
+    .msg-bubble {
+      max-width: 72%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 0.88rem;
+      line-height: 1.48;
+      position: relative;
+      word-break: break-word;
+      white-space: pre-wrap;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+
+    .msg-wrapper.in .msg-bubble {
+      background-color: var(--bubble-in);
+      color: var(--text-primary);
+      border-top-left-radius: 3px;
+    }
+
+    .msg-wrapper.out .msg-bubble {
+      background-color: var(--bubble-out);
+      color: #ffffff;
+      border-top-right-radius: 3px;
+    }
+
+    .msg-time {
+      font-size: 0.68rem;
+      color: rgba(255, 255, 255, 0.55);
+      float: right;
+      margin-left: 10px;
+      margin-top: 5px;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .msg-bubble strong {
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .msg-bubble em {
+      font-style: italic;
+      color: rgba(255, 255, 255, 0.85);
+    }
+
+    .msg-bubble code {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-family: monospace;
+      color: #38bdf8;
+    }
+
+    /* TYPING INDICATOR */
+    .typing-indicator {
+      display: none;
+      align-items: center;
+      gap: 5px;
+      background: var(--bubble-in);
+      padding: 8px 14px;
+      border-radius: 12px;
+      width: fit-content;
+      margin-bottom: 6px;
+    }
+
+    .typing-dot {
+      width: 7px;
+      height: 7px;
+      background: var(--text-secondary);
+      border-radius: 50%;
+      animation: typingBounce 1.4s infinite ease-in-out both;
+    }
+
+    .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+    .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+    @keyframes typingBounce {
+      0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+
+    /* QUICK CHIPS BAR */
+    .quick-chips-bar {
+      background: #111b21;
+      border-top: 1px solid var(--border-color);
+      padding: 8px 16px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      white-space: nowrap;
+      scrollbar-width: none;
+    }
+    .quick-chips-bar::-webkit-scrollbar { display: none; }
+
+    .chip-btn {
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 5px 12px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .chip-btn:hover {
+      background: #37464f;
+      border-color: var(--accent-emerald);
+      color: #34d399;
+      transform: translateY(-1px);
+    }
+
+    /* CHAT INPUT FORM */
+    .chat-input-bar {
+      background: var(--bg-panel-header);
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .chat-input-field {
+      flex: 1;
+      background: var(--bg-input);
+      border: 1px solid transparent;
+      color: var(--text-primary);
+      font-size: 0.92rem;
+      padding: 10px 16px;
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .chat-input-field:focus {
+      border-color: var(--accent-emerald);
+    }
+
+    .btn-send {
+      background: var(--accent-emerald);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.15s, background-color 0.2s;
+      box-shadow: 0 2px 10px rgba(16, 185, 129, 0.4);
+    }
+
+    .btn-send:hover {
+      background: #059669;
+      transform: scale(1.05);
+    }
+
+    .btn-send:active {
+      transform: scale(0.95);
+    }
+
+    /* SIDEBAR INSPECTOR */
+    .sidebar-inspector {
+      background: var(--bg-panel);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow-y: auto;
+    }
+
+    .inspector-header {
+      padding: 16px;
+      background: var(--bg-panel-header);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .inspector-header h2 {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .inspector-section {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .section-title {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .step-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      width: 100%;
+      justify-content: center;
+    }
+    .step-badge.idle { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+    .step-badge.selecting { background: rgba(56, 189, 248, 0.18); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+    .step-badge.ask_shipping { background: rgba(245, 158, 11, 0.18); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .step-badge.confirm_pending { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+
+    .cart-box {
+      background: #182229;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .cart-empty {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 12px 0;
+    }
+
+    .cart-item {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      padding: 5px 0;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+    }
+    .cart-item:last-child { border-bottom: none; }
+
+    .cart-total-line {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #34d399;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      font-size: 0.8rem;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-secondary);
+    }
+    .info-row span:last-child {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    /* KDS NOTICE */
+    .kds-card {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.05) 100%);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.78rem;
+      line-height: 1.4;
+      color: #d1fae5;
+    }
+
+    .kds-card a {
+      color: #34d399;
+      font-weight: 700;
+      text-decoration: underline;
+    }
+
+    @media (max-width: 900px) {
+      .app-main {
+        grid-template-columns: 1fr;
+      }
+      .sidebar-inspector {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <header class="top-navbar">
+    <div class="brand-section">
+      <div class="brand-icon">🍔</div>
+      <div>
+        <div class="brand-title">
+          ComandaFast Bot Tester
+          <span class="badge-live" id="botStatusBadge">Conectado (Puerto 3002)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-actions">
+      <button type="button" class="btn-nav" id="btnResetSession" title="Reiniciar memoria y carrito del cliente">
+        🔄 Reiniciar Sesión
+      </button>
+      <button type="button" class="btn-nav" id="btnClearChat" title="Limpiar mensajes en pantalla">
+        🧹 Limpiar Chat
+      </button>
+      <a href="http://localhost:5173" target="_blank" class="btn-nav accent" title="Abrir sistema POS / Cocina">
+        📋 Abrir ComandaFast POS / KDS ↗
+      </a>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <div class="app-main">
+    
+    <!-- CHAT PANEL -->
+    <div class="chat-panel">
+      <!-- Chat Header -->
+      <div class="chat-header">
+        <div class="chat-avatar-info">
+          <div class="chat-avatar">🤖</div>
+          <div class="chat-user-details">
+            <h3 id="storeNameLabel">Burga's Chamical Bot</h3>
+            <p><span style="display:inline-block;width:8px;height:8px;background:#10b981;border-radius:50%"></span> En línea • Multi-Device Baileys</p>
+          </div>
+        </div>
+
+        <div class="chat-controls">
+          <div style="font-size:0.75rem;color:var(--text-secondary);display:flex;align-items:center;gap:6px">
+            👤 Simulando a: 
+            <input type="text" id="inputCustomerName" value="Martín Gómez" style="background:#2a3942;color:#fff;border:1px solid #37464f;border-radius:5px;padding:3px 8px;font-size:0.75rem;width:120px;" title="Nombre del cliente simulado" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Messages Area -->
+      <div class="chat-messages" id="chatMessagesContainer">
+        <!-- Messages will be rendered dynamically here -->
+      </div>
+
+      <!-- Typing Indicator -->
+      <div class="typing-indicator" id="typingIndicator" style="margin-left: 24px;">
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+      </div>
+
+      <!-- Quick Chips Bar -->
+      <div class="quick-chips-bar">
+        <button type="button" class="chip-btn" onclick="sendQuickText('MENU')">🍔 MENÚ</button>
+        <button type="button" class="chip-btn" onclick="sendQuickText('1')">1️⃣ CHEESE</button>
+        <button type="button" class="chip-btn" onclick="sendQuickText('2')">2️⃣ BAJONERA</button>
+        <button type="button" class="chip-btn" onclick="sendQuickText('CARTA')">📋 CARTA COMPLETA</button>
+        <button type="button" class="chip-btn" onclick="sendQuickText('LISTO')">🛒 LISTO (Avanzar)</button>
+        <button type="button" class="chip-btn" onclick="sendQuickText('1')">🛍️ 1 (Retiro Local)</button>
+        <button type="button" class="chip-btn" onclick="sendQuickText('2')">🛵 2 (Delivery)</button>
+        <button type="button" class="chip-btn" onclick="sendQuickText('1')">💵 1 (Efectivo)</button>
+        <button type="button" class="chip-btn" onclick="sendQuickText('2')">💳 2 (Transferencia)</button>
+        <button type="button" class="chip-btn" onclick="sendQuickText('SI')">✅ SI (Confirmar)</button>
+        <button type="button" class="chip-btn" onclick="sendQuickText('CANCELAR')">❌ CANCELAR</button>
+      </div>
+
+      <!-- Input Bar -->
+      <form class="chat-input-bar" id="chatInputForm">
+        <input 
+          type="text" 
+          class="chat-input-field" 
+          id="chatInputField" 
+          placeholder="Escribí un mensaje al bot... (Ej: Hola, 1, Quiero una burger con papas)" 
+          autocomplete="off" 
+          autofocus 
+        />
+        <button type="submit" class="btn-send" title="Enviar mensaje">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </form>
+    </div>
+
+    <!-- SIDEBAR INSPECTOR -->
+    <aside class="sidebar-inspector">
+      <div class="inspector-header">
+        <h2>🔍 Inspector de Sesión en Vivo</h2>
+      </div>
+
+      <!-- Estado Actual -->
+      <div class="inspector-section">
+        <div class="section-title">Paso Conversacional</div>
+        <div class="step-badge idle" id="sessionStepBadge">IDLE (Inactivo)</div>
+      </div>
+
+      <!-- Carrito en Vivo -->
+      <div class="inspector-section">
+        <div class="section-title">
+          <span>Carrito en Memoria</span>
+          <span id="cartCountBadge" style="color:#38bdf8">0 items</span>
+        </div>
+        <div class="cart-box" id="cartItemsBox">
+          <div class="cart-empty">El carrito está vacío.</div>
+        </div>
+      </div>
+
+      <!-- Datos del Local -->
+      <div class="inspector-section">
+        <div class="section-title">Variables Activas del Local</div>
+        <div class="info-grid">
+          <div class="info-row">
+            <span>Local:</span>
+            <span id="infoStoreName">Burga's Chamical</span>
+          </div>
+          <div class="info-row">
+            <span>Demora:</span>
+            <span id="infoDelay">30 a 45 min</span>
+          </div>
+          <div class="info-row">
+            <span>Horarios:</span>
+            <span id="infoHours">20:00 a 00:30 hs</span>
+          </div>
+          <div class="info-row">
+            <span>Productos:</span>
+            <span id="infoProductsCount">32 cargados</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Integración KDS -->
+      <div class="inspector-section">
+        <div class="section-title">Prueba de Circuito Completo</div>
+        <div class="kds-card">
+          🔥 <strong>Integración Real con Cocina:</strong><br>
+          Cuando confirmes tu pedido con <strong>"SI"</strong>, el bot inyectará la comanda directamente al 
+          <a href="http://localhost:5173" target="_blank">Tablero KDS</a>. 
+          Al hacer click en <strong>¡Listo!</strong> o <strong>Despachar</strong> en la cocina, verás la notificación llegar automáticamente a este chat.
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <script>
+    const TEST_JID = 'sim_cliente@s.whatsapp.net';
+    const messagesContainer = document.getElementById('chatMessagesContainer');
+    const inputForm = document.getElementById('chatInputForm');
+    const inputField = document.getElementById('chatInputField');
+    const inputCustomerName = document.getElementById('inputCustomerName');
+    const typingIndicator = document.getElementById('typingIndicator');
+    const sessionStepBadge = document.getElementById('sessionStepBadge');
+    const cartCountBadge = document.getElementById('cartCountBadge');
+    const cartItemsBox = document.getElementById('cartItemsBox');
+    const botStatusBadge = document.getElementById('botStatusBadge');
+    const storeNameLabel = document.getElementById('storeNameLabel');
+
+    let currentMessages = [];
+    let isSending = false;
+
+    // Sonido suave de mensaje recibido usando Web Audio API
+    function playChime() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+        osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.12); // A5
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.26);
+      } catch (_) {}
+    }
+
+    function formatText(txt) {
+      if (!txt) return '';
+      // Escape HTML
+      let escaped = txt
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+      // WhatsApp markdown
+      escaped = escaped.replace(/\*(.*?)\*/g, '<strong>$1</strong>');
+      escaped = escaped.replace(/_(.*?)_/g, '<em>$1</em>');
+      escaped = escaped.replace(/`(.*?)`/g, '<code>$1</code>');
+      return escaped;
+    }
+
+    function renderMessages(msgs) {
+      if (!Array.isArray(msgs)) return;
+      const isInitial = messagesContainer.children.length === 0;
+      const hadNewMessages = msgs.length > currentMessages.length;
+
+      currentMessages = msgs;
+      messagesContainer.innerHTML = '';
+
+      if (msgs.length === 0) {
+        messagesContainer.innerHTML = `
+          <div style="text-align:center;color:var(--text-muted);font-size:0.85rem;margin-top:40px;">
+            👋 <strong>¡Bienvenido al Laboratorio de Pruebas en Vivo!</strong><br><br>
+            Este chat interactúa con el proceso del bot que está encendido en tu PC.<br>
+            Probá enviar <code>HOLA</code> o hacer click en los botones rápidos de abajo.
+          </div>
+        `;
+        return;
+      }
+
+      msgs.forEach(m => {
+        const isOut = m.from === 'customer';
+        const wrapper = document.createElement('div');
+        wrapper.className = `msg-wrapper ${isOut ? 'out' : 'in'}`;
+
+        const timeStr = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+        
+        let imageHtml = '';
+        if (m.imageUrl) {
+          imageHtml = `<img src="${m.imageUrl}" style="max-width:100%;border-radius:8px;margin-bottom:6px;display:block;" />`;
+        }
+
+        wrapper.innerHTML = `
+          <div class="msg-bubble">
+            ${imageHtml}
+            <div>${formatText(m.text || '')}</div>
+            <div class="msg-time">
+              ${timeStr}
+              ${isOut ? '<span style="color:#53bdeb">✓✓</span>' : ''}
+            </div>
+          </div>
+        `;
+        messagesContainer.appendChild(wrapper);
+      });
+
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+      if (!isInitial && hadNewMessages) {
+        playChime();
+      }
+    }
+
+    function updateSessionInspector(session, biz) {
+      if (biz) {
+        if (biz.nombre_local) {
+          storeNameLabel.textContent = biz.nombre_local + ' Bot';
+          document.getElementById('infoStoreName').textContent = biz.nombre_local;
+        }
+        if (biz.demora) document.getElementById('infoDelay').textContent = biz.demora;
+        if (biz.horarios) document.getElementById('infoHours').textContent = biz.horarios;
+        if (biz.productsCount) document.getElementById('infoProductsCount').textContent = biz.productsCount + ' cargados';
+      }
+
+      if (!session) {
+        sessionStepBadge.className = 'step-badge idle';
+        sessionStepBadge.textContent = 'IDLE (Inactivo)';
+        cartCountBadge.textContent = '0 items';
+        cartItemsBox.innerHTML = '<div class="cart-empty">El carrito está vacío.</div>';
+        return;
+      }
+
+      const step = (session.step || 'IDLE').toUpperCase();
+      sessionStepBadge.textContent = step;
+      sessionStepBadge.className = `step-badge ${step.toLowerCase()}`;
+
+      const items = session.items || [];
+      cartCountBadge.textContent = `${items.length} ${items.length === 1 ? 'item' : 'items'}`;
+
+      if (items.length === 0) {
+        cartItemsBox.innerHTML = '<div class="cart-empty">El carrito está vacío.</div>';
+      } else {
+        let html = '';
+        let total = 0;
+        items.forEach(it => {
+          const qty = it.qty || it.quantity || 1;
+          const sub = (it.price || 0) * qty;
+          total += sub;
+          html += `
+            <div class="cart-item">
+              <span><strong>${qty}x</strong> ${it.name}</span>
+              <span>$${sub.toLocaleString('es-AR')}</span>
+            </div>
+          `;
+        });
+        html += `
+          <div class="cart-total-line">
+            <span>TOTAL:</span>
+            <span>$${total.toLocaleString('es-AR')}</span>
+          </div>
+        `;
+        cartItemsBox.innerHTML = html;
+      }
+    }
+
+    async function fetchState() {
+      try {
+        const res = await fetch(`/api/bot/tester/state?jid=${encodeURIComponent(TEST_JID)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.success) {
+          if (data.messages && data.messages.length !== currentMessages.length) {
+            renderMessages(data.messages);
+          }
+          updateSessionInspector(data.session, data.businessInfo);
+          if (data.botStatus === 'connected') {
+            botStatusBadge.textContent = 'Conectado (Puerto 3002)';
+            botStatusBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+            botStatusBadge.style.color = '#34d399';
+          }
+        }
+      } catch (_) {}
+    }
+
+    async function sendMessage(text) {
+      if (!text || isSending) return;
+      isSending = true;
+      typingIndicator.style.display = 'flex';
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+      // Add optimistic customer message
+      const optimisticMsg = {
+        from: 'customer',
+        text,
+        timestamp: Date.now()
+      };
+      renderMessages([...currentMessages, optimisticMsg]);
+
+      try {
+        const res = await fetch('/api/bot/tester/message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text,
+            jid: TEST_JID,
+            name: inputCustomerName.value || 'Cliente Tester'
+          })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          renderMessages(data.messages);
+          updateSessionInspector(data.session);
+        }
+      } catch (err) {
+        console.error('Error enviando mensaje al tester:', err);
+      } finally {
+        isSending = false;
+        typingIndicator.style.display = 'none';
+        inputField.focus();
+      }
+    }
+
+    function sendQuickText(text) {
+      inputField.value = text;
+      sendMessage(text);
+      inputField.value = '';
+    }
+
+    // FORM SUBMIT
+    inputForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const val = inputField.value.trim();
+      if (!val) return;
+      inputField.value = '';
+      sendMessage(val);
+    });
+
+    // RESET SESSION BUTTON
+    document.getElementById('btnResetSession').addEventListener('click', async () => {
+      if (!confirm('¿Deseas reiniciar la sesión y vaciar el carrito del cliente de prueba?')) return;
+      try {
+        await fetch('/api/bot/tester/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jid: TEST_JID, clearMessages: false })
+        });
+        await fetchState();
+        alert('✅ Sesión y carrito reiniciados a estado inicial.');
+      } catch (_) {}
+    });
+
+    // CLEAR CHAT BUTTON
+    document.getElementById('btnClearChat').addEventListener('click', async () => {
+      try {
+        await fetch('/api/bot/tester/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jid: TEST_JID, clearMessages: true })
+        });
+        renderMessages([]);
+      } catch (_) {}
+    });
+
+    // Polling suave cada 1.5s para detectar cambios de estado de cocina KDS en vivo
+    setInterval(fetchState, 1500);
+    fetchState();
+  </script>
+</body>
+</html>

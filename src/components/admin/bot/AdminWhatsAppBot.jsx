@@ -1107,6 +1107,17 @@ pause
       icon: ShieldCheck,
       color: '#ea580c',
       badge: null
+    },
+    {
+      id: 'tester',
+      label: '🧪 Laboratorio Web',
+      icon: Terminal,
+      color: '#10b981',
+      badge: (
+        <span className="bot-tab-badge emerald">
+          Link Aparte
+        </span>
+      )
     }
   ];
 
@@ -1160,6 +1171,34 @@ pause
         >
           <ChevronRight size={16} />
         </button>
+
+        {/* Botón Laboratorio en Link Aparte */}
+        <a
+          href="http://localhost:3002/tester"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            padding: '0.35rem 0.85rem',
+            borderRadius: '9999px',
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(6, 182, 212, 0.2))',
+            border: '1px solid rgba(16, 185, 129, 0.45)',
+            color: '#10b981',
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            textDecoration: 'none',
+            whiteSpace: 'nowrap',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+            transition: 'all 0.2s ease',
+            marginLeft: 'auto'
+          }}
+          title="Abrir Laboratorio de Pruebas en pestaña aparte"
+        >
+          <ExternalLink size={13} />
+          <span>🧪 Abrir Laboratorio</span>
+        </a>
 
         {/* Global Save Indicator */}
         {saveSuccess && (
@@ -3441,16 +3480,44 @@ pause
                   <span>{loadingAction ? 'Iniciando...' : 'Generar / Actualizar QR'}</span>
                 </button>
               ) : (
-                <button
-                  type="button"
-                  disabled={loadingAction}
-                  className="qty-btn"
-                  style={{ width: '100%', height: '36px', padding: '0 1rem', fontSize: '0.8rem', color: 'var(--accent-rose)', gap: '6px', justifyContent: 'center' }}
-                  onClick={handleLogoutBot}
-                >
-                  <Trash2 size={14} />
-                  <span>Desvincular WhatsApp</span>
-                </button>
+                <>
+                  <a
+                    href="http://localhost:3002/tester"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="cat-pill-btn active"
+                    style={{
+                      width: '100%',
+                      height: '38px',
+                      padding: '0 1rem',
+                      fontSize: '0.82rem',
+                      background: 'linear-gradient(135deg, #10b981, #059669)',
+                      color: '#ffffff',
+                      gap: '8px',
+                      justifyContent: 'center',
+                      fontWeight: 800,
+                      textDecoration: 'none',
+                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                    title="Abrir Laboratorio Web en pestaña aparte"
+                  >
+                    <ExternalLink size={15} />
+                    <span>🧪 Probar en Laboratorio Web</span>
+                  </a>
+
+                  <button
+                    type="button"
+                    disabled={loadingAction}
+                    className="qty-btn"
+                    style={{ width: '100%', height: '36px', padding: '0 1rem', fontSize: '0.8rem', color: 'var(--accent-rose)', gap: '6px', justifyContent: 'center' }}
+                    onClick={handleLogoutBot}
+                  >
+                    <Trash2 size={14} />
+                    <span>Desvincular WhatsApp</span>
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -3852,6 +3919,110 @@ pause
                 <span>Ver JSON</span>
                 <ExternalLink size={12} />
               </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB CONTENT: LABORATORIO WEB EN VIVO (TESTER) */}
+      {activeTab === 'tester' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
+          <div style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1.25rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1rem'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>🧪</span> Laboratorio de Pruebas WhatsApp en Vivo
+                  <span style={{ fontSize: '0.72rem', background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.4)', padding: '2px 8px', borderRadius: '9999px', fontWeight: 700 }}>
+                    Interacción Directa con el Bot (Puerto 3002)
+                  </span>
+                </h3>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  Este entorno simula un cliente de WhatsApp interactuando en tiempo real con el proceso del bot que está encendido en tu PC. Permite probar pedidos, menú, IA y el circuito con la cocina sin usar un celular secundario.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <a
+                  href="http://localhost:3002/tester"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="cat-pill-btn active"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    height: '38px',
+                    padding: '0 1.25rem',
+                    fontSize: '0.85rem',
+                    fontWeight: 800,
+                    textDecoration: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+                  }}
+                >
+                  <ExternalLink size={15} />
+                  <span>Abrir en Pestaña Aparte (Link Directo)</span>
+                </a>
+              </div>
+            </div>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: '0.75rem'
+            }}>
+              <div style={{ background: 'var(--bg-main)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '0.85rem' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Enlace Directo Aparte</div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-blue)', marginTop: '2px' }}>
+                  <a href="http://localhost:3002/tester" target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
+                    http://localhost:3002/tester ↗
+                  </a>
+                </div>
+              </div>
+
+              <div style={{ background: 'var(--bg-main)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '0.85rem' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Estado del Proceso</div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: serverOnline ? '#10b981' : '#f59e0b', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: serverOnline ? '#10b981' : '#f59e0b' }}></span>
+                  {serverOnline ? 'Bot Online y Respondiendo' : 'Iniciando / Verificando'}
+                </div>
+              </div>
+
+              <div style={{ background: 'var(--bg-main)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '0.85rem' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Circuito Cocina KDS</div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#34d399', marginTop: '2px' }}>
+                  Sincronizado en Tiempo Real
+                </div>
+              </div>
+            </div>
+
+            {/* IFRAME EMBEDDED PREVIEW */}
+            <div style={{
+              borderRadius: 'var(--radius-md)',
+              overflow: 'hidden',
+              border: '1px solid var(--border-subtle)',
+              height: '640px',
+              background: '#0c1317'
+            }}>
+              <iframe
+                src="http://localhost:3002/tester"
+                title="Laboratorio de Pruebas WhatsApp"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                  display: 'block'
+                }}
+              />
             </div>
           </div>
         </div>
