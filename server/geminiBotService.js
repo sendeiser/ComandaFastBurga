@@ -313,13 +313,30 @@ export class GeminiBotService {
 
     if (!groqKey && !geminiKey && !deepseekKey) return null;
 
-    const availableProds = context.availableProducts || [];
-    const promoProds = availableProds.filter(p => (p.category || '').toLowerCase() === 'promos');
-    const regularProds = availableProds.filter(p => (p.category || '').toLowerCase() !== 'promos');
+    const isProductAvailable = (p) => {
+      if (!p) return false;
+      if (p.available === false) return false;
+      if (p.is_active === false) return false;
+      if (p.stock !== null && p.stock !== undefined && !isNaN(Number(p.stock)) && Number(p.stock) <= 0) return false;
+      return true;
+    };
+
+    const allProds = context.availableProducts || [];
+    const inStockProds = allProds.filter(isProductAvailable);
+    const outOfStockProds = allProds.filter(p => !isProductAvailable(p));
+
+    const promoProds = inStockProds.filter(p => (p.category || '').toLowerCase() === 'promos' || Boolean(p.discountBadge));
+    const regularProds = inStockProds.filter(p => (p.category || '').toLowerCase() !== 'promos');
 
     const promosSummary = promoProds.length > 0 
       ? promoProds.map((p, idx) => `• [PROMO #${idx + 1}] ${p.name}: $${Number(p.price).toLocaleString('es-AR')}${p.originalPrice ? ` (Antes: $${p.originalPrice.toLocaleString('es-AR')})` : ''}${p.freeShipping ? ' [Incluye Envío Gratis]' : ''} - ${p.description || 'Elaborada artesanalmente'}${p.modifiers?.length ? ` (Modificadores: ${p.modifiers.join(', ')})` : ''}`).join('\n')
-      : 'No hay promociones especiales cargadas en este momento.';
+      : '⚠️ TODAS LAS PROMOCIONES Y COMBOS ESTÁN AGOTADOS POR EL MOMENTO (VÁLIDO ÚNICAMENTE HASTA AGOTAR STOCK). No hay promociones activas hoy.';
+
+    const outOfStockSummary = outOfStockProds.length > 0
+      ? outOfStockProds.map(p => `• ${p.name} (AGOTADO / HASTA AGOTAR STOCK)`).join('\n')
+      : 'Ninguno (todo el resto del menú en stock)';
+
+    const topAlternatives = regularProds.slice(0, 3).map((p, idx) => `${idx + 1}. ${p.name} ($${Number(p.price).toLocaleString('es-AR')})`).join(', ');
 
     const prodsSummary = regularProds.slice(0, 18).map((p, idx) => 
       `${idx + 1}. ${p.name} ($${Number(p.price).toLocaleString('es-AR')}) - ${p.description || 'Artesanal'}`
@@ -372,13 +389,22 @@ INFORMACIÓN DEL LOCAL:
 - Medios de Pago: Transferencias bancarias (Alias: ${alias}${bank}${cbu}), Efectivo al recibir, Mercado Pago.
 - Modalidades: Delivery propio en moto y Retiro en Mostrador (Take Away)${shipping}.
 
-PROMOCIONES Y COMBOS ACTIVOS:
+PROMOCIONES Y COMBOS ACTIVOS (EN STOCK):
 ${promosSummary}
 
-CARTA DE HAMBURGUESAS Y PRODUCTOS:
+PRODUCTOS Y PROMOS AGOTADOS (HASTA AGOTAR STOCK):
+${outOfStockSummary}
+
+CARTA DE HAMBURGUESAS Y PRODUCTOS DISPONIBLES:
 ${prodsSummary || 'Hamburguesas clásicas, dobles, triples, smash, crispy y opciones veggie.'}
 
 REGLAS DE ATENCIÓN:
+REGLA CRÍTICA DE STOCK Y PROMOCIONES AGOTADAS:
+- Si el cliente pregunta si quedaron promos, si hay promos, si tienen promos o si consulta por algún producto/promo agotado:
+  1. Si las promociones están agotadas (o el producto consultado está agotado), DEBES aclararle amable y claramente que las promociones se encuentran AGOTADAS por el momento (válido únicamente hasta agotar stock).
+  2. NUNCA afirmes que hay promociones si están agotadas ni ofrezcas productos sin stock.
+  3. Ofrécele inmediatamente 3 alternativas deliciosas del menú regular que SÍ están disponibles (por ejemplo: ${topAlternatives || 'nuestras hamburguesas clásicas, dobles o smash'}) y recuérdale que puede escribir MENU o CARTA para ver la carta completa.
+
 ${context.menuMode === 'catalog' ? `1. Si el cliente saluda (hola, buenas noches, etc.), dale la bienvenida cordial en nombre de "${storeName}" y compártele el enlace a nuestra Carta Digital (${context.catalogUrl || 'https://comandafast.online'}/#catalog) para que pueda ver las fotos y armar su pedido en un click.
 2. Si el cliente pregunta por promociones o la carta, invítalo a verlas con fotos y precios actualizados en la Carta Digital (${context.catalogUrl || 'https://comandafast.online'}/#catalog).
 3. Si el cliente pregunta qué comer, qué le recomendás o qué opciones hay, recomendale 2 o 3 opciones tentadoras con su precio y descripción real, y déjale el link al catálogo.
@@ -386,7 +412,7 @@ ${context.menuMode === 'catalog' ? `1. Si el cliente saluda (hola, buenas noches
 5. Si el cliente quiere hacer un pedido o ver fotos, envíale el enlace a la Carta Digital (${context.catalogUrl || 'https://comandafast.online'}/#catalog).
 6. Respuestas concisas y atractivas (máximo 2 a 3 párrafos cortos). No des discursos largos ni menús numerados en texto.
 7. TERMINOLOGÍA OBLIGATORIA: Usa SIEMPRE la palabra "pedido" o "pedidos". Está TERMINANTEMENTE PROHIBIDO usar la palabra "comanda" con el cliente. Habla siempre de "tu pedido", "armar tu pedido", "confirmar tu pedido".` : `1. Si el cliente saluda (hola, buenas noches, etc.), dale la bienvenida cordial en nombre de "${storeName}" y recuérdale que puede escribir *MENU* para ver la carta o *COMPRAR* para pedir.
-2. Si el cliente pregunta por promociones, ofertas o qué promos hay, detalle con entusiasmo las PROMOCIONES ACTIVAS mencionadas arriba con sus nombres, precios y agregados, y recuérdale que puede pedirlas respondiendo con el nombre de la promo o *COMPRAR*.
+2. Si el cliente pregunta por promociones, ofertas o qué promos hay, si hay activas detállalas con entusiasmo. Si están agotadas, aclara que se agotaron (hasta agotar stock) y ofrécele las 3 alternativas.
 3. Si el cliente pregunta qué comer, qué le recomendás o qué opciones hay, recomendale 2 o 3 opciones tentadoras con su precio y descripción real.
 4. Si pregunta por ingredientes, celíacos o vegetarianos, sé honesto y empático mencionando lo que tenemos.
 5. Si el cliente quiere hacer un pedido o ver fotos, recordale que puede escribir "COMPRAR", "MENU", "PROMOS" o "FOTO [número]".

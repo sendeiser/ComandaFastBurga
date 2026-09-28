@@ -926,8 +926,14 @@ function detectCategoryQuery(text, prodsList) {
 }
 
 function buildCategoryCatalogMessage(categoryName, prodsList, currentItems = [], currentTotal = 0) {
-  const categoryProds = prodsList.filter(p => (p.category || '').toLowerCase() === categoryName.toLowerCase());
-  if (categoryProds.length === 0) return null;
+  const isPromoCat = (categoryName || '').toLowerCase() === 'promos' || (categoryName || '').toLowerCase() === 'promo';
+  const categoryProds = prodsList.filter(p => isProductAvailable(p) && (p.category || '').toLowerCase() === categoryName.toLowerCase());
+  if (categoryProds.length === 0) {
+    if (isPromoCat) {
+      return buildPromosMessage(prodsList);
+    }
+    return null;
+  }
 
   const emojiMap = {
     hamburguesas: '🍔',
@@ -1074,12 +1080,28 @@ function parseCatalogOrder(text) {
 }
 
 function buildPromosMessage(prods) {
-  const promoProds = prods.filter(p => (p.category || '').toLowerCase() === 'promos');
+  const promoProds = prods.filter(p => isProductAvailable(p) && ((p.category || '').toLowerCase() === 'promos' || Boolean(p.discountBadge)));
   const biz = getBusinessContext();
   const storeName = biz.nombre_local || "Burga's Chamical";
 
   if (promoProds.length === 0) {
-    return `🏷️ *PROMOCIONES DE ${storeName.toUpperCase()}* 🔥\n\nEn este momento no hay promociones activas cargadas en el sistema.\n👉 Escribí *4* o *MENU* para ver toda nuestra carta de hamburguesas.`;
+    const regularAvailable = prods
+      .filter(p => isProductAvailable(p) && (p.category || '').toLowerCase() !== 'promos')
+      .slice(0, 3);
+
+    let altsText = '';
+    if (regularAvailable.length > 0) {
+      altsText = `\n👉 *Pero tenemos toda nuestra carta disponible con opciones increíbles recién hechas a la plancha:*\n` +
+        regularAvailable.map((p) => {
+          const globalIdx = prods.indexOf(p) + 1;
+          return `  • *${formatItemNumber(globalIdx)} ${p.name}* — $${Number(p.price).toLocaleString('es-AR')}${p.description ? ` (${p.description})` : ''}`;
+        }).join('\n') + `\n`;
+    }
+
+    return `🏷️ *PROMOCIONES DE ${storeName.toUpperCase()}* 🍔\n\n` +
+      `⚠️ *¡Por el momento las promociones se encuentran AGOTADAS (válido únicamente hasta agotar stock)!* 😔💨\n` +
+      altsText +
+      `\n_Escribí *CARTA* o *MENU* para ver todas las opciones disponibles._`;
   }
 
   const list = promoProds.map((p) => {
@@ -3270,6 +3292,12 @@ class WhatsAppBotServer {
             }
 
             if (selectedProd) {
+              if (!isProductAvailable(selectedProd)) {
+                const outOfStockReply = `⚠️ *¡Lo sentimos mucho!* El producto *${selectedProd.name}* se encuentra *agotado por hoy (hasta agotar stock)* 😔🍔\n\n¿Te gustaría elegir otra de nuestras opciones disponibles? Enviá *MENU* para ver la carta.`;
+                await this.safeSendMessage(remoteJid, { text: outOfStockReply }, msg.key);
+                continue;
+              }
+
               const existingIdx = session.items.findIndex(it => it.id === selectedProd.id);
               if (existingIdx !== -1) {
                 session.items[existingIdx].qty = (session.items[existingIdx].qty || 1) + parsedQty;
@@ -3363,7 +3391,19 @@ class WhatsAppBotServer {
           // DETECCIÓN Y CONSULTA DIRECTA CON IA (PREGUNTAS, INGREDIENTES, DUDAS, RECOMENDACIONES)
           // Se activa prioritariamente cuando el cliente hace una pregunta gastronómica o del local
           // -------------------------------------------------------------
+          const cleanNormText = normalizeSearchText(lower);
+
           if (isCustomerInquiry(text)) {
+            // Si la consulta es directamente sobre si quedan promos o si hay promos disponibles, y todas están agotadas:
+            const isPromoStockCheck = /\b(promos?|promocion(es)?|ofertas?|combos?)\b/i.test(cleanNormText) &&
+                                      /\b(quedan|quedaron|quedo|hay|tienen|tenes|disponible|disponibles|alguna|algun)\b/i.test(cleanNormText);
+            const activePromos = prods.filter(p => isProductAvailable(p) && ((p.category || '').toLowerCase() === 'promos' || Boolean(p.discountBadge)));
+            if (isPromoStockCheck && activePromos.length === 0) {
+              const promoReply = buildPromosMessage(prods);
+              await this.safeSendMessage(remoteJid, { text: promoReply }, msg.key);
+              continue;
+            }
+
             try {
               const biz = getBusinessContext();
               const aiReply = await geminiBotService.generateReply(text, {
@@ -3388,14 +3428,15 @@ class WhatsAppBotServer {
           // -------------------------------------------------------------
           // COMANDO: CONSULTA DIRECTA DE PROMOS ("promos", "ver promos", "ofertas")
           // -------------------------------------------------------------
-          const cleanNormText = normalizeSearchText(lower);
           const isGeneralPromoInquiry = (
             ['promo', 'promos', 'ver promo', 'ver promos', 'promocion', 'promociones', 'oferta', 'ofertas', 'descuento', 'descuentos', 'combo', 'combos', '0'].includes(cleanNormText) ||
             /^(ver\s+)?(las\s+)?(promos?|promocion(es)?|ofertas?|combos?)$/i.test(cleanNormText) ||
             (/\b(promos?|promocion(es)?|ofertas?|combos?|descuentos?)\b/i.test(cleanNormText) && (
               cleanNormText.includes('que') || cleanNormText.includes('hay') || cleanNormText.includes('tienen') ||
               cleanNormText.includes('tenes') || cleanNormText.includes('cuales') || cleanNormText.includes('ver') ||
-              cleanNormText.includes('mostrar') || cleanNormText.includes('quiero') || cleanNormText.includes('disponible')
+              cleanNormText.includes('mostrar') || cleanNormText.includes('quiero') || cleanNormText.includes('disponible') ||
+              cleanNormText.includes('quedan') || cleanNormText.includes('quedaron') || cleanNormText.includes('quedo') ||
+              cleanNormText.includes('alguna') || cleanNormText.includes('algun')
             ))
           );
 
