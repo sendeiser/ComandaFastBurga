@@ -159,9 +159,16 @@ function ProductCard({ product, onOpen }) {
   const isPromo = Boolean(product.discountBadge) || (product.category || '').toLowerCase().includes('promo');
   const hasDiscount = Boolean(product.originalPrice && Number(product.originalPrice) > Number(product.price));
   const discountPercent = hasDiscount ? Math.round(((Number(product.originalPrice) - Number(product.price)) / Number(product.originalPrice)) * 100) : 0;
+  const isSoldOut = product.available === false || product.is_active === false || (product.stock !== null && product.stock !== undefined && Number(product.stock) <= 0);
 
   return (
-    <div className="cat-product-card" onClick={() => onOpen(product)}>
+    <div 
+      className={`cat-product-card ${isSoldOut ? 'sold-out' : ''}`} 
+      onClick={() => {
+        if (!isSoldOut) onOpen(product);
+      }}
+      style={isSoldOut ? { opacity: 0.65, cursor: 'not-allowed' } : {}}
+    >
       <div className="cat-product-card-info">
         <div className="cat-product-card-name">{product.name.toUpperCase()}</div>
         {product.description && (
@@ -175,12 +182,16 @@ function ProductCard({ product, onOpen }) {
           {hasDiscount && discountPercent > 0 && (
             <span className="cat-product-card-discount-tag">-{discountPercent}%</span>
           )}
-          {isPromo && (
+          {isSoldOut ? (
+            <span className="cat-product-card-badge" style={{ background: '#ef4444', color: '#fff', fontWeight: 800 }}>
+              🔴 AGOTADO
+            </span>
+          ) : isPromo ? (
             <span className="cat-product-card-badge promo-badge">
               {product.discountBadge || '🔥 PROMO'}
             </span>
-          )}
-          {product.freeShipping && (
+          ) : null}
+          {product.freeShipping && !isSoldOut && (
             <span className="cat-product-card-badge free-shipping">
               Envío gratis
             </span>
@@ -200,14 +211,30 @@ function ProductCard({ product, onOpen }) {
         ) : (
           <div className="cat-product-card-emoji">{product.emoji || '🍔'}</div>
         )}
-        <button
-          type="button"
-          className="cat-add-btn"
-          onClick={(e) => { e.stopPropagation(); onOpen(product); }}
-          aria-label={`Agregar ${product.name}`}
-        >
-          <Plus size={16} />
-        </button>
+        {!isSoldOut ? (
+          <button
+            type="button"
+            className="cat-add-btn"
+            onClick={(e) => { e.stopPropagation(); onOpen(product); }}
+            aria-label={`Agregar ${product.name}`}
+          >
+            <Plus size={16} />
+          </button>
+        ) : (
+          <div style={{
+            position: 'absolute',
+            bottom: '6px',
+            right: '6px',
+            background: 'rgba(239, 68, 68, 0.9)',
+            color: '#fff',
+            fontSize: '0.65rem',
+            fontWeight: 800,
+            padding: '3px 6px',
+            borderRadius: '12px'
+          }}>
+            AGOTADO
+          </div>
+        )}
       </div>
     </div>
   );
@@ -215,6 +242,8 @@ function ProductCard({ product, onOpen }) {
 
 function UpsellCard({ product, onAdd }) {
   const [imgError, setImgError] = useState(false);
+  const isSoldOut = product.available === false || product.is_active === false || (product.stock !== null && product.stock !== undefined && Number(product.stock) <= 0);
+  if (isSoldOut) return null;
   return (
     <div className="cat-upsell-card" onClick={() => onAdd(product)}>
       <div className="cat-upsell-card-image">

@@ -677,6 +677,15 @@ export default function App() {
     setProducts(newProducts);
     // Upsert completo a Supabase Cloud (fuente de verdad de productos)
     await supabaseSync.pushProducts(newProducts);
+
+    // Sincronizar en tiempo real con el servidor local del bot de WhatsApp
+    try {
+      fetch('http://localhost:3002/sync-products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ products: newProducts })
+      }).catch(() => {});
+    } catch (_) {}
   };
 
   const handleSaveSettings = (newSettings) => {

@@ -838,6 +838,10 @@ export const chatbotService = {
       }
 
       if (selectedProd) {
+        if (selectedProd.available === false || selectedProd.is_active === false || (selectedProd.stock !== null && selectedProd.stock !== undefined && selectedProd.stock <= 0)) {
+          reply = `⚠️ *¡Lo sentimos!* El producto *${selectedProd.name}* se encuentra *agotado por hoy (hasta agotar stock)* 😔🍔\n\n¿Te gustaría pedir otra de nuestras deliciosas opciones?`;
+          return { reply, newState };
+        }
         const itemPrice = selectedProd.price;
         newState.items.push({
           id: selectedProd.id,
@@ -1037,7 +1041,9 @@ export const chatbotService = {
       ? availableProducts
       : storageService.getProducts();
 
-    const promoProducts = prodsList.filter(p => 
+    const availableProds = prodsList.filter(p => p.available !== false && p.is_active !== false && (p.stock === null || p.stock === undefined || p.stock > 0));
+
+    const promoProducts = availableProds.filter(p => 
       (p.category || '').toLowerCase().includes('promo') ||
       Boolean(p.discountBadge) ||
       Boolean(p.originalPrice && Number(p.originalPrice) > Number(p.price))
@@ -1046,7 +1052,7 @@ export const chatbotService = {
     let promosAlerta = '';
     if (promoProducts.length > 0) {
       const promoNames = promoProducts.slice(0, 3).map(p => `• *${p.name}* ($${Number(p.price).toLocaleString('es-AR')})`).join('\n');
-      promosAlerta = `🏷️💥 *¡HOY TENEMOS PROMOS Y COMBOS ESPECIALES!* 🛵🍔\n${promoNames}\n\n`;
+      promosAlerta = `🏷️💥 *¡HOY TENEMOS PROMOS Y COMBOS ESPECIALES!* 🛵🍔\n⚠️ _(Válido únicamente hasta agotar stock)_\n${promoNames}\n\n`;
     }
 
     if (currentMenuMode === 'catalog') {
@@ -1067,7 +1073,7 @@ export const chatbotService = {
     newState.catalogPage = 1;
     if (!Array.isArray(newState.items)) newState.items = [];
 
-    const catalogList = (prodsList.slice(0, 8).map((p, i) => {
+    const catalogList = (availableProds.slice(0, 8).map((p, i) => {
       const numBadge = formatItemNumber(i + 1);
       const photoBadge = p.image ? ' 📸' : '';
       let priceStr = `$${Number(p.price).toLocaleString('es-AR')}`;
@@ -1076,7 +1082,7 @@ export const chatbotService = {
       }
       const desc = p.description ? `\n   _${p.description}_` : '';
       return `${numBadge} *${p.name}* — ${priceStr}${photoBadge}${desc}`;
-    }).join('\n\n')) + (prodsList.length > 8 ? `\n\n⏩ _Mostrando las primeras 8 opciones de ${prodsList.length}. Escribí *SIGUIENTE* para ver más._` : '');
+    }).join('\n\n')) + (availableProds.length > 8 ? `\n\n⏩ _Mostrando las primeras 8 opciones de ${availableProds.length}. Escribí *SIGUIENTE* para ver más._` : '');
 
     let rawTemplate = settings.template_menu || DEFAULT_TEMPLATES.template_menu;
     if (!rawTemplate || rawTemplate.includes('Consultar estado') || rawTemplate.includes('1️⃣ 📋') || rawTemplate.includes('5️⃣ 👤')) {

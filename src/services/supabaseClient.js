@@ -57,7 +57,9 @@ function mapProductFromDB(p) {
     description: p.description || '',
     modifiers: Array.isArray(p.modifiers) ? p.modifiers : [],
     image: p.image || '',
-    is_active: p.is_active !== false
+    is_active: p.is_active !== false,
+    available: p.available !== undefined ? p.available !== false : p.is_active !== false,
+    stock: p.stock !== undefined && p.stock !== null && !isNaN(Number(p.stock)) ? Number(p.stock) : null
   };
 }
 
@@ -140,7 +142,9 @@ function mapProductToDB(p) {
     emoji: p.emoji || '🍔',
     description: p.description || '',
     modifiers: p.modifiers || [],
-    is_active: p.is_active !== false,
+    is_active: p.is_active !== false && p.available !== false,
+    available: p.available !== false && p.is_active !== false,
+    stock: p.stock !== undefined && p.stock !== null && !isNaN(Number(p.stock)) ? Number(p.stock) : null,
     updated_at: new Date().toISOString()
   };
 }

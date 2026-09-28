@@ -1290,7 +1290,8 @@ function buildMainMenuMessage(customerName = '') {
   const catalogUrl = (biz.catalogo_url || biz.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
 
   const prods = getStoredProducts();
-  const promoProducts = prods.filter(p => 
+  const availableProds = prods.filter(isProductAvailable);
+  const promoProducts = availableProds.filter(p => 
     (p.category || '').toLowerCase().includes('promo') ||
     Boolean(p.discountBadge) ||
     Boolean(p.originalPrice && Number(p.originalPrice) > Number(p.price))
@@ -1299,7 +1300,7 @@ function buildMainMenuMessage(customerName = '') {
   let promosAlerta = '';
   if (promoProducts.length > 0) {
     const promoNames = promoProducts.slice(0, 3).map(p => `• *${p.name}* ($${Number(p.price).toLocaleString('es-AR')})`).join('\n');
-    promosAlerta = `🏷️💥 *¡HOY TENEMOS PROMOS Y COMBOS ESPECIALES!* 🛵🍔\n${promoNames}\n\n`;
+    promosAlerta = `🏷️💥 *¡HOY TENEMOS PROMOS Y COMBOS ESPECIALES!* 🛵🍔\n⚠️ _(Válido únicamente hasta agotar stock)_\n${promoNames}\n\n`;
   }
 
   if (menuMode === 'catalog') {
@@ -1313,7 +1314,7 @@ function buildMainMenuMessage(customerName = '') {
   }
 
   // MODO PLANTILLAS CLÁSICO: directo al grano para pedir sin menú burocrático
-  const catalogList = formatCatalogListForTemplate(prods, 8);
+  const catalogList = formatCatalogListForTemplate(availableProds, 8);
   let rawMenu = tpls.template_menu || DEFAULT_SERVER_TEMPLATES.template_menu;
   if (!rawMenu || rawMenu.includes('Consultar estado') || rawMenu.includes('1️⃣ 📋') || rawMenu.includes('5️⃣ 👤')) {
     rawMenu = DEFAULT_SERVER_TEMPLATES.template_menu;
@@ -1336,6 +1337,15 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
+// Comprueba si un producto está disponible para venta y con stock > 0
+function isProductAvailable(p) {
+  if (!p) return false;
+  if (p.available === false) return false;
+  if (p.is_active === false) return false;
+  if (p.stock !== null && p.stock !== undefined && !isNaN(Number(p.stock)) && Number(p.stock) <= 0) return false;
+  return true;
+}
+
 // Cargar productos de la base de datos local (priorizando Promos al frente)
 function getStoredProducts() {
   try {
@@ -1355,6 +1365,80 @@ function getStoredProducts() {
     console.error('[WHATSAPP BOT] Error al leer products.json:', e);
   }
   return [];
+}
+
+// Guardar productos en archivo local
+function saveStoredProducts(products) {
+  try {
+    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), 'utf-8');
+    return true;
+  } catch (e) {
+    console.error('[WHATSAPP BOT] Error al guardar products.json:', e);
+    return false;
+  }
+}
+
+// Sincronizar actualización de stock y disponibilidad en Supabase Cloud
+async function pushProductUpdateToSupabase(productId, updates) {
+  try {
+    const body = { updated_at: new Date().toISOString() };
+    if (updates.available !== undefined) body.is_active = updates.available;
+    if (updates.is_active !== undefined) body.is_active = updates.is_active;
+    if (updates.stock !== undefined) body.stock = updates.stock;
+
+    await fetch(`${SUPABASE_URL}/rest/v1/products?id=eq.${productId}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+  } catch (err) {
+    console.warn(`[SUPABASE] Error actualizando stock para ${productId}:`, err.message);
+  }
+}
+
+// Alternativa 3: Descuento automático de stock al confirmar pedidos
+function deductStockForOrder(order) {
+  if (!order || !Array.isArray(order.items) || order.items.length === 0) return;
+  try {
+    const products = getStoredProducts();
+    let modified = false;
+
+    for (const item of order.items) {
+      const qty = Number(item.qty || item.quantity || 1);
+      if (qty <= 0) continue;
+
+      const normItemName = (item.name || '').trim().toLowerCase();
+      const prod = products.find(p => 
+        (item.id && p.id === item.id) || 
+        (p.name && p.name.trim().toLowerCase() === normItemName)
+      );
+
+      if (prod && prod.stock !== null && prod.stock !== undefined && !isNaN(Number(prod.stock))) {
+        const currentStock = Number(prod.stock);
+        const newStock = Math.max(0, currentStock - qty);
+        prod.stock = newStock;
+        if (newStock <= 0) {
+          prod.available = false;
+          prod.is_active = false;
+          console.log(`🚨 [STOCK BOT]: El producto '${prod.name}' llegó a 0 stock y se marcó automáticamente como AGOTADO.`);
+        } else {
+          console.log(`📉 [STOCK BOT]: Descontadas ${qty}u de '${prod.name}'. Stock restante: ${newStock}u.`);
+        }
+        modified = true;
+        pushProductUpdateToSupabase(prod.id, { available: prod.available, is_active: prod.is_active, stock: prod.stock }).catch(() => {});
+      }
+    }
+
+    if (modified) {
+      saveStoredProducts(products);
+    }
+  } catch (e) {
+    console.error('[STOCK DEDUCT ERROR]:', e);
+  }
 }
 
 // Almacenar pedidos generados por WhatsApp
@@ -2250,8 +2334,8 @@ class WhatsAppBotServer {
           if (isUpdateCmd) {
             const isFromMe = Boolean(msg.key?.fromMe);
             const senderDigits = extractCleanDigits(remoteJid);
-            const vars = getStoredVariables();
-            const contactPhone = vars.find(v => v.key === 'telefono_contacto')?.value || '';
+            const vars = getBotVariablesMap();
+            const contactPhone = vars.telefono_contacto || '';
             const contactDigits = extractCleanDigits(contactPhone);
             const isAuthorized = isFromMe || (contactDigits && senderDigits.endsWith(contactDigits.slice(-8)));
 
@@ -2291,6 +2375,152 @@ class WhatsAppBotServer {
               }, msg.key);
             }
             continue;
+          }
+
+          // -------------------------------------------------------------
+          // COMANDOS DE ADMINISTRACIÓN DE STOCK Y PRODUCTOS AGOTADOS
+          // (#agotados, #agotado [prod], #pausar [prod], #activar [prod], #stock [prod] [cant])
+          // -------------------------------------------------------------
+          const isStockAdminCmd = lower.startsWith('#agotado') || 
+                                  lower.startsWith('#pausar') || 
+                                  lower.startsWith('#activar') || 
+                                  lower.startsWith('#disponible') || 
+                                  lower.startsWith('#stock');
+
+          if (isStockAdminCmd) {
+            const isFromMe = Boolean(msg.key?.fromMe);
+            const isTester = remoteJid.includes('sim_') || remoteJid.includes('test_');
+            const senderDigits = extractCleanDigits(remoteJid);
+            const vars = getBotVariablesMap();
+            const contactPhone = vars.telefono_contacto || '';
+            const contactDigits = extractCleanDigits(contactPhone);
+            const isAuthorized = isFromMe || isTester || !contactDigits || senderDigits.endsWith(contactDigits.slice(-8));
+
+            if (!isAuthorized) {
+              console.warn(`⛔ [ACCESO DENEGADO COMANDO STOCK]: ${remoteJid}`);
+              await this.safeSendMessage(remoteJid, { 
+                text: '🔒 *Acceso denegado:* Los comandos de stock son exclusivos para el personal y administración del local.' 
+              }, msg.key);
+              continue;
+            }
+
+            const allProds = getStoredProducts();
+
+            // CASO A: #agotados o #stock sin parámetros -> Listar estado
+            if (lower === '#agotados' || lower === '#stock') {
+              const outOfStockProds = allProds.filter(p => !isProductAvailable(p));
+              const limitedStockProds = allProds.filter(p => isProductAvailable(p) && p.stock !== null && p.stock !== undefined && !isNaN(p.stock));
+
+              let statusText = `📦 *ESTADO DE STOCK Y DISPONIBILIDAD* 🍔\n\n`;
+              if (outOfStockProds.length > 0) {
+                statusText += `🔴 *PRODUCTOS AGOTADOS / PAUSADOS:*\n` + 
+                  outOfStockProds.map(p => `  • *${p.name}*`).join('\n') + `\n\n`;
+              } else {
+                statusText += `🔴 *PRODUCTOS AGOTADOS:* Ninguno (todos en stock)\n\n`;
+              }
+
+              if (limitedStockProds.length > 0) {
+                statusText += `🟡 *CON STOCK DIARIO LIMITADO:*\n` + 
+                  limitedStockProds.map(p => `  • *${p.name}:* ${p.stock} unidades restantes`).join('\n') + `\n\n`;
+              }
+
+              statusText += `🟢 *RESTO DEL MENÚ:* En stock (ilimitado)\n\n` +
+                `───────────────────\n` +
+                `💡 *Comandos disponibles:*\n` +
+                `• *#agotado [nombre o número]* (pausa un producto)\n` +
+                `• *#activar [nombre o número]* (lo reactiva en stock)\n` +
+                `• *#stock [nombre o número] [cant]* (fija cantidad que se descuenta sola)`;
+
+              await this.safeSendMessage(remoteJid, { text: statusText }, msg.key);
+              continue;
+            }
+
+            // Helper para buscar producto por texto o número
+            const findTargetProduct = (query) => {
+              const cleanQuery = query.trim().toLowerCase();
+              const num = parseInt(cleanQuery, 10);
+              if (!isNaN(num) && num >= 1 && num <= allProds.length && /^\d+$/.test(cleanQuery)) {
+                return allProds[num - 1];
+              }
+              return allProds.find(p => p.name.toLowerCase() === cleanQuery) ||
+                     allProds.find(p => p.name.toLowerCase().includes(cleanQuery)) ||
+                     findProductByText(cleanQuery, allProds);
+            };
+
+            // CASO B: #stock [producto] [cantidad]
+            const stockSetMatch = text.match(/^#stock\s+(.+?)\s+(\d+)$/i);
+            if (stockSetMatch) {
+              const query = stockSetMatch[1];
+              const qty = parseInt(stockSetMatch[2], 10);
+              const target = findTargetProduct(query);
+
+              if (!target) {
+                await this.safeSendMessage(remoteJid, { 
+                  text: `⚠️ No se encontró ningún producto con "${query}". Enviá *#agotados* para ver la lista.` 
+                }, msg.key);
+                continue;
+              }
+
+              target.stock = qty;
+              target.available = qty > 0;
+              target.is_active = qty > 0;
+              saveStoredProducts(allProds);
+              pushProductUpdateToSupabase(target.id, { available: target.available, is_active: target.is_active, stock: target.stock }).catch(() => {});
+
+              const reply = `📦 *STOCK ACTUALIZADO:* El producto *${target.name}* ahora cuenta con *${qty} unidades* disponibles. Se irán descontando automáticamente con cada pedido confirmado.`;
+              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
+              continue;
+            }
+
+            // CASO C: #agotado [producto] o #pausar [producto]
+            const agotadoMatch = text.match(/^#(?:agotado|pausar)\s+(.+)$/i);
+            if (agotadoMatch) {
+              const query = agotadoMatch[1];
+              const target = findTargetProduct(query);
+
+              if (!target) {
+                await this.safeSendMessage(remoteJid, { 
+                  text: `⚠️ No se encontró ningún producto con "${query}". Enviá *#agotados* para ver la lista.` 
+                }, msg.key);
+                continue;
+              }
+
+              target.available = false;
+              target.is_active = false;
+              target.stock = 0;
+              saveStoredProducts(allProds);
+              pushProductUpdateToSupabase(target.id, { available: false, is_active: false, stock: 0 }).catch(() => {});
+
+              const reply = `🔴 *PRODUCTO PAUSADO:* *${target.name}* fue marcado como *AGOTADO*. Ya no aparecerá en las promos ni se podrá pedir hasta que sea reactivado.`;
+              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
+              continue;
+            }
+
+            // CASO D: #activar [producto] o #disponible [producto]
+            const activarMatch = text.match(/^#(?:activar|disponible)\s+(.+)$/i);
+            if (activarMatch) {
+              const query = activarMatch[1];
+              const target = findTargetProduct(query);
+
+              if (!target) {
+                await this.safeSendMessage(remoteJid, { 
+                  text: `⚠️ No se encontró ningún producto con "${query}". Enviá *#agotados* para ver la lista.` 
+                }, msg.key);
+                continue;
+              }
+
+              target.available = true;
+              target.is_active = true;
+              if (target.stock !== null && target.stock !== undefined && target.stock <= 0) {
+                target.stock = null; // Vuelve a stock ilimitado
+              }
+              saveStoredProducts(allProds);
+              pushProductUpdateToSupabase(target.id, { available: true, is_active: true, stock: target.stock }).catch(() => {});
+
+              const reply = `🟢 *PRODUCTO REACTIVADO:* *${target.name}* vuelve a estar *DISPONIBLE* en el menú y promos (stock ilimitado).`;
+              await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
+              continue;
+            }
           }
 
           // Ignorar mensajes con más de 90 segundos de antigüedad (historial masivo al conectar)
@@ -2473,6 +2703,7 @@ class WhatsAppBotServer {
 
             // Inyectar en almacenamiento y cola para el POS / KDS / Cocina
             saveStoredOrder(newOrder);
+            deductStockForOrder(newOrder);
             await pushOrderToSupabase(newOrder);
             pendingOrdersForPos.push(newOrder);
             console.log(`🛎️ [PEDIDO CATÁLOGO WEB]: Pedido #${displayCode} de ${newOrder.customer.name} ($${newOrder.total}) inyectado a cocina y POS. Método: ${chosenMethod}`);
@@ -2726,6 +2957,7 @@ class WhatsAppBotServer {
 
               // Guardar pedido localmente y en cola para el POS / Cocina
               saveStoredOrder(newOrder);
+              deductStockForOrder(newOrder);
               await pushOrderToSupabase(newOrder);
               pendingOrdersForPos.push(newOrder);
               console.log(`🔔 [NUEVO PEDIDO WHATSAPP]: Pedido #${displayCode} (${uniqueOrderId}) de ${newOrder.customer.name} ($${newOrder.total}) inyectado.`);
@@ -3378,6 +3610,13 @@ class WhatsAppBotServer {
           }
 
           if (matchedProd) {
+            // Comprobar si el producto está pausado o sin stock
+            if (!isProductAvailable(matchedProd)) {
+              const outOfStockReply = `⚠️ *¡Lo sentimos mucho!* El producto *${matchedProd.name}* se encuentra *agotado por hoy (hasta agotar stock)* 😔🍔\n\n¿Te gustaría elegir otra de nuestras opciones disponibles? Enviá *MENU* para ver la carta.`;
+              await this.safeSendMessage(remoteJid, { text: outOfStockReply }, msg.key);
+              continue;
+            }
+
             const tplsDirect = getBotTemplates();
             const menuModeDirect = tplsDirect.menu_mode || 'templates';
             if (menuModeDirect === 'catalog') {
@@ -4106,11 +4345,11 @@ app.post('/logout', async (req, res) => {
 
 // Endpoint para sincronizar productos y fotos desde la base de datos / frontend
 app.post('/sync-products', (req, res) => {
-  const { products } = req.body;
+  const products = Array.isArray(req.body) ? req.body : req.body?.products;
   if (Array.isArray(products)) {
     try {
-      fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), 'utf-8');
-      console.log(`📦 [WHATSAPP BOT] Sincronizados ${products.length} productos con fotos para el chatbot.`);
+      saveStoredProducts(products);
+      console.log(`📦 [WHATSAPP BOT] Sincronizados ${products.length} productos con fotos y stock para el chatbot.`);
       return res.json({ success: true, count: products.length });
     } catch (err) {
       console.error('[WHATSAPP BOT] Error al guardar products.json:', err);
@@ -4171,6 +4410,7 @@ app.post('/api/orders', async (req, res) => {
 
   // Guardar en orders.json
   saveStoredOrder(normalizedOrder);
+  deductStockForOrder(normalizedOrder);
   pushOrderToSupabase(normalizedOrder).catch(() => {});
 
   // Inyectar en la cola de pedidos pendientes para que cocina web, KDS y POS lo reciban

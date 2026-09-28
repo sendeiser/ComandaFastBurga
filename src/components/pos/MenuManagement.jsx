@@ -27,6 +27,8 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
   const [description, setDescription] = useState('');
   const [modifiersStr, setModifiersStr] = useState('');
   const [compressing, setCompressing] = useState(false);
+  const [available, setAvailable] = useState(true);
+  const [stock, setStock] = useState('');
 
   // Estados de filtrado y categorías
   const [availableCategories, setAvailableCategories] = useState(() => storageService.getCategories());
@@ -55,6 +57,8 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
     setImage('');
     setDescription('');
     setModifiersStr('');
+    setAvailable(true);
+    setStock('');
     setImageMode('upload');
   };
 
@@ -70,6 +74,8 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
     setImage(p.image || '');
     setDescription(p.description || '');
     setModifiersStr((p.modifiers || []).join(', '));
+    setAvailable(p.available !== false && p.is_active !== false);
+    setStock(p.stock !== undefined && p.stock !== null ? p.stock.toString() : '');
     setImageMode(p.image && p.image.startsWith('data:') ? 'upload' : 'upload');
   };
 
@@ -155,7 +161,10 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
       emoji: emoji || '🍔',
       image: image.trim(),
       description: description.trim(),
-      modifiers: modsArray
+      modifiers: modsArray,
+      available: Boolean(available),
+      is_active: Boolean(available),
+      stock: stock.trim() !== '' && !isNaN(parseInt(stock, 10)) ? parseInt(stock, 10) : null
     };
 
     if (editingProduct.id) {
@@ -164,6 +173,25 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
       onSaveProducts([...products, itemData]);
     }
     setEditingProduct(null);
+  };
+
+  const handleToggleStock = (e, prod) => {
+    e.stopPropagation();
+    const isCurrentlyAvail = prod.available !== false && prod.is_active !== false && (prod.stock === null || prod.stock === undefined || prod.stock > 0);
+    const updated = products.map(p => {
+      if (p.id !== prod.id) return p;
+      if (isCurrentlyAvail) {
+        return { ...p, available: false, is_active: false, stock: 0 };
+      } else {
+        return { 
+          ...p, 
+          available: true, 
+          is_active: true, 
+          stock: (p.stock !== null && p.stock !== undefined && p.stock <= 0) ? null : p.stock 
+        };
+      }
+    });
+    onSaveProducts(updated);
   };
 
   const handleDelete = (prod) => {
@@ -307,8 +335,14 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
             </div>
           ) : (
             <div className="menu-products-grid">
-              {filteredProducts.map(prod => (
-                <div key={prod.id} className="menu-product-card">
+              {filteredProducts.map(prod => {
+                const isAvailable = prod.available !== false && prod.is_active !== false && (prod.stock === null || prod.stock === undefined || prod.stock > 0);
+                return (
+                <div 
+                  key={prod.id} 
+                  className="menu-product-card"
+                  style={!isAvailable ? { opacity: 0.72, border: '1px dashed #ef4444' } : {}}
+                >
                   <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
                     {/* Thumbnail del Producto (Foto o Emoji) */}
                     <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -346,12 +380,24 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
                       <div className="menu-card-cat">
                         {prod.category}
                       </div>
-                      {(prod.freeShipping || prod.discountBadge) && (
+                      {(prod.freeShipping || prod.discountBadge || !isAvailable) && (
                         <div className="product-card-promo-tags">
-                          {prod.freeShipping && (
+                          {!isAvailable && (
+                            <span style={{
+                              background: '#ef4444',
+                              color: '#fff',
+                              padding: '2px 7px',
+                              borderRadius: '4px',
+                              fontSize: '0.68rem',
+                              fontWeight: 800
+                            }}>
+                              🔴 AGOTADO
+                            </span>
+                          )}
+                          {prod.freeShipping && isAvailable && (
                             <span className="badge-promo-free-shipping">🛵 Envío Gratis</span>
                           )}
-                          {prod.discountBadge && (
+                          {prod.discountBadge && isAvailable && (
                             <span className="badge-promo-tag">🏷️ {prod.discountBadge}</span>
                           )}
                         </div>
@@ -379,7 +425,35 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
                         ${Number(prod.price || 0).toLocaleString('es-AR')}
                       </span>
                     </div>
-                    <div style={{ display: 'flex', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {/* Alternativa 1: Botón rápido de 1 click para pausar o activar stock */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleStock(e, prod)}
+                        title={isAvailable ? 'Click para marcar como AGOTADO' : 'Click para reactivar en stock'}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '3px 8px',
+                          borderRadius: '12px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          border: isAvailable ? '1px solid rgba(16, 185, 129, 0.5)' : '1px solid rgba(239, 68, 68, 0.6)',
+                          background: isAvailable ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.15)',
+                          color: isAvailable ? '#10b981' : '#ef4444',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <span style={{ fontSize: '0.65rem' }}>{isAvailable ? '🟢' : '🔴'}</span>
+                        <span>
+                          {isAvailable 
+                            ? (prod.stock !== null && prod.stock !== undefined ? `Stock: ${prod.stock}` : 'En Stock') 
+                            : 'Agotado'}
+                        </span>
+                      </button>
+
                       <button
                         type="button"
                         className="btn-edit-item"
@@ -399,7 +473,8 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
                     </div>
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           )}
         </div>
@@ -703,6 +778,60 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
                   />
                   <span>🛵 <strong>Incluye Envío Gratis</strong> (Bonifica el delivery a $0 en POS y WhatsApp)</span>
                 </label>
+              </div>
+
+              {/* SECCIÓN DISPONIBILIDAD Y CONTROL DE STOCK */}
+              <div style={{
+                background: available ? 'rgba(16, 185, 129, 0.05)' : 'rgba(239, 68, 68, 0.05)',
+                border: available ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: 'var(--radius-md)',
+                padding: '0.75rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.65rem'
+              }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 800, color: available ? '#10b981' : '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>📦 Disponibilidad & Control de Stock</span>
+                  <span style={{ fontSize: '0.7rem', padding: '2px 7px', borderRadius: '10px', background: available ? '#10b981' : '#ef4444', color: '#fff' }}>
+                    {available ? '🟢 Activo en Menú' : '🔴 Agotado / Pausado'}
+                  </span>
+                </div>
+
+                <label style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px', 
+                  cursor: 'pointer',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  color: 'var(--text-primary)'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={available}
+                    onChange={e => setAvailable(e.target.checked)}
+                    style={{ width: '16px', height: '16px', accentColor: '#10b981', cursor: 'pointer' }}
+                  />
+                  <span><strong>Producto Disponible para la Venta</strong> (Si lo desmarcas, se muestra como Agotado en WhatsApp y Carta Digital)</span>
+                </label>
+
+                <div>
+                  <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+                    Stock límite (Opcional - dejar vacío para ilimitado):
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="custom-input-sm"
+                    placeholder="Ej: 15 (se descuenta automáticamente al confirmar pedidos)"
+                    value={stock}
+                    onChange={e => setStock(e.target.value)}
+                    disabled={!available}
+                  />
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginTop: '3px' }}>
+                    💡 Cuando el stock llega a 0, el producto se marca como Agotado y desaparece de las alertas de promos.
+                  </span>
+                </div>
               </div>
 
               <div>
