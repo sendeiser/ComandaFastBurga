@@ -28,6 +28,8 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
   const [description, setDescription] = useState('');
   const [modifiersStr, setModifiersStr] = useState('');
   const [compressing, setCompressing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
   const [available, setAvailable] = useState(true);
   const [stock, setStock] = useState('');
 
@@ -139,41 +141,51 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
     reader.readAsDataURL(file);
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     if (!name.trim() || !price) {
       alert('Por favor completa el nombre y el precio.');
       return;
     }
 
-    const modsArray = modifiersStr
-      .split(',')
-      .map(m => m.trim())
-      .filter(Boolean);
+    setIsSaving(true);
+    try {
+      const modsArray = modifiersStr
+        .split(',')
+        .map(m => m.trim())
+        .filter(Boolean);
 
-    const itemData = {
-      id: editingProduct.id || 'prod-' + Date.now(),
-      name: name.trim(),
-      category,
-      price: parseFloat(price) || 0,
-      originalPrice: originalPrice ? parseFloat(originalPrice) : null,
-      discountBadge: discountBadge.trim() || null,
-      freeShipping: Boolean(freeShipping),
-      emoji: emoji || '🍔',
-      image: image.trim(),
-      description: description.trim(),
-      modifiers: modsArray,
-      available: Boolean(available),
-      is_active: Boolean(available),
-      stock: stock.trim() !== '' && !isNaN(parseInt(stock, 10)) ? parseInt(stock, 10) : null
-    };
+      const itemData = {
+        id: editingProduct.id || 'prod-' + Date.now(),
+        name: name.trim(),
+        category,
+        price: parseFloat(price) || 0,
+        originalPrice: originalPrice ? parseFloat(originalPrice) : null,
+        discountBadge: discountBadge.trim() || null,
+        freeShipping: Boolean(freeShipping),
+        emoji: emoji || '🍔',
+        image: image.trim(),
+        description: description.trim(),
+        modifiers: modsArray,
+        available: Boolean(available),
+        is_active: Boolean(available),
+        stock: stock.trim() !== '' && !isNaN(parseInt(stock, 10)) ? parseInt(stock, 10) : null
+      };
 
-    if (editingProduct.id) {
-      onSaveProducts(products.map(p => p.id === editingProduct.id ? itemData : p));
-    } else {
-      onSaveProducts([...products, itemData]);
+      if (editingProduct.id) {
+        await onSaveProducts(products.map(p => p.id === editingProduct.id ? itemData : p));
+      } else {
+        await onSaveProducts([...products, itemData]);
+      }
+      setEditingProduct(null);
+      setSaveSuccessMsg('¡Producto guardado y sincronizado en la nube con éxito!');
+      setTimeout(() => setSaveSuccessMsg(''), 4000);
+    } catch (err) {
+      console.error('Error al guardar producto:', err);
+      alert('Hubo un error al guardar el producto. Por favor intenta de nuevo.');
+    } finally {
+      setIsSaving(false);
     }
-    setEditingProduct(null);
   };
 
   const handleToggleStock = (e, prod) => {
@@ -212,6 +224,29 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
 
   return (
     <div className="menu-container">
+      {saveSuccessMsg && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 9999,
+          background: '#10b981',
+          color: '#ffffff',
+          fontWeight: 800,
+          fontSize: '0.88rem',
+          padding: '10px 22px',
+          borderRadius: '30px',
+          boxShadow: '0 6px 20px rgba(16, 185, 129, 0.45)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <span>✅</span>
+          <span>{saveSuccessMsg}</span>
+        </div>
+      )}
+
       {/* BARRA SUPERIOR CON SUB-PESTAÑAS */}
       <div className="menu-header-bar">
         <div className="menu-header-info">
@@ -787,10 +822,10 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
               </button>
               <button
                 type="submit"
-                disabled={compressing}
+                disabled={compressing || isSaving}
                 className="btn-confirm-order btn-save-product-submit"
               >
-                {compressing ? 'Procesando foto...' : (editingProduct.id ? '💾 Guardar Cambios' : '➕ Crear Producto')}
+                {compressing ? 'Procesando foto...' : (isSaving ? '⏳ Guardando en la nube...' : (editingProduct.id ? '💾 Guardar Cambios' : '➕ Crear Producto'))}
               </button>
             </div>
           </form>

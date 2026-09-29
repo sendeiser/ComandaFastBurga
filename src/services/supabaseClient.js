@@ -46,20 +46,26 @@ function mapOrderFromDB(o) {
   };
 }
 
-function mapProductFromDB(p) {
+function mapProductFromDB(p, metadata = {}) {
   if (!p) return null;
+  const meta = metadata[p.id] || {};
+  const isAvailable = meta.available !== undefined ? meta.available : (p.is_active !== false);
+  const stockVal = meta.stock !== undefined && meta.stock !== null && !isNaN(Number(meta.stock)) ? Number(meta.stock) : null;
   return {
     id: p.id,
     name: p.name,
-    category: p.category,
-    price: Number(p.price),
+    category: p.category || 'Hamburguesas',
+    price: Number(p.price) || 0,
+    originalPrice: meta.originalPrice !== undefined && meta.originalPrice !== null ? Number(meta.originalPrice) : null,
+    discountBadge: meta.discountBadge || null,
+    freeShipping: Boolean(meta.freeShipping),
     emoji: p.emoji || '🍔',
     description: p.description || '',
     modifiers: Array.isArray(p.modifiers) ? p.modifiers : [],
     image: p.image || '',
     is_active: p.is_active !== false,
-    available: p.available !== undefined ? p.available !== false : p.is_active !== false,
-    stock: p.stock !== undefined && p.stock !== null && !isNaN(Number(p.stock)) ? Number(p.stock) : null
+    available: isAvailable,
+    stock: stockVal
   };
 }
 
@@ -134,17 +140,16 @@ function mapOrderToDB(order) {
 }
 
 function mapProductToDB(p) {
+  const isAvail = p.available !== false && p.is_active !== false && (p.stock === null || p.stock === undefined || p.stock > 0);
   return {
     id: p.id,
     name: p.name,
-    category: p.category,
+    category: p.category || 'Hamburguesas',
     price: Number(p.price) || 0,
     emoji: p.emoji || '🍔',
     description: p.description || '',
-    modifiers: p.modifiers || [],
-    is_active: p.is_active !== false && p.available !== false,
-    available: p.available !== false && p.is_active !== false,
-    stock: p.stock !== undefined && p.stock !== null && !isNaN(Number(p.stock)) ? Number(p.stock) : null,
+    modifiers: Array.isArray(p.modifiers) ? p.modifiers : [],
+    is_active: Boolean(isAvail),
     updated_at: new Date().toISOString()
   };
 }
@@ -528,19 +533,57 @@ export const supabaseSync = {
     }
   },
 
+  async fetchProductMetadata() {
+    if (!this.isConfigured()) return {};
+    try {
+      const res = await fetch(this._url('system_settings', 'id=eq.product_metadata&select=data'), {
+        headers: this._headers()
+      });
+      if (res.ok) {
+        const rows = await res.json();
+        if (Array.isArray(rows) && rows.length > 0 && rows[0].data) {
+          return rows[0].data;
+        }
+      }
+    } catch (e) {
+      console.warn('[Supabase] fetchProductMetadata error:', e);
+    }
+    return {};
+  },
+
+  async saveProductMetadata(metaMap) {
+    if (!this.isConfigured() || !metaMap || typeof metaMap !== 'object') return false;
+    try {
+      const res = await fetch(this._url('system_settings'), {
+        method: 'POST',
+        headers: this._headers({ 'Prefer': 'resolution=merge-duplicates' }),
+        body: JSON.stringify({
+          id: 'product_metadata',
+          data: metaMap,
+          updated_at: new Date().toISOString()
+        })
+      });
+      return res.ok;
+    } catch (e) {
+      console.warn('[Supabase] saveProductMetadata error:', e);
+      return false;
+    }
+  },
+
   async fetchProducts() {
     if (!this.isConfigured()) return null;
     try {
-      const [res, imagesMap] = await Promise.all([
+      const [res, imagesMap, metaMap] = await Promise.all([
         fetch(this._url('products', 'order=name.asc'), { headers: this._headers() }),
-        this.fetchProductImages()
+        this.fetchProductImages(),
+        this.fetchProductMetadata()
       ]);
 
       if (res.ok) {
         const rows = await res.json();
         if (Array.isArray(rows) && rows.length > 0) {
           return rows.map(r => {
-            const mapped = mapProductFromDB(r);
+            const mapped = mapProductFromDB(r, metaMap);
             if (imagesMap && imagesMap[mapped.id]) {
               mapped.image = imagesMap[mapped.id];
             }
@@ -567,6 +610,19 @@ export const supabaseSync = {
       if (product.image) {
         promises.push(this.saveSingleProductImage(product.id, product.image));
       }
+      this.fetchProductMetadata().then(meta => {
+        const updated = {
+          ...meta,
+          [product.id]: {
+            originalPrice: product.originalPrice !== undefined && product.originalPrice !== null && product.originalPrice !== '' ? Number(product.originalPrice) : null,
+            discountBadge: product.discountBadge ? String(product.discountBadge).trim() : null,
+            freeShipping: Boolean(product.freeShipping),
+            stock: product.stock !== undefined && product.stock !== null && product.stock !== '' && !isNaN(Number(product.stock)) ? Number(product.stock) : null,
+            available: product.available !== false && product.is_active !== false
+          }
+        };
+        return this.saveProductMetadata(updated);
+      }).catch(() => {});
       await Promise.allSettled(promises);
     } catch (e) {
       console.warn('[Supabase] createProduct error:', e);
@@ -597,6 +653,22 @@ export const supabaseSync = {
         promises.push(this.saveSingleProductImage(id, patchData.image));
       }
 
+      this.fetchProductMetadata().then(meta => {
+        const existing = meta[id] || {};
+        const updated = {
+          ...meta,
+          [id]: {
+            ...existing,
+            ...(patchData.originalPrice !== undefined ? { originalPrice: patchData.originalPrice ? Number(patchData.originalPrice) : null } : {}),
+            ...(patchData.discountBadge !== undefined ? { discountBadge: patchData.discountBadge ? String(patchData.discountBadge).trim() : null } : {}),
+            ...(patchData.freeShipping !== undefined ? { freeShipping: Boolean(patchData.freeShipping) } : {}),
+            ...(patchData.stock !== undefined ? { stock: patchData.stock !== null && patchData.stock !== '' && !isNaN(Number(patchData.stock)) ? Number(patchData.stock) : null } : {}),
+            ...(patchData.available !== undefined ? { available: Boolean(patchData.available) } : {})
+          }
+        };
+        return this.saveProductMetadata(updated);
+      }).catch(() => {});
+
       await Promise.allSettled(promises);
     } catch (e) {
       console.warn('[Supabase] updateProduct error:', e);
@@ -610,14 +682,20 @@ export const supabaseSync = {
         fetch(this._url('products', `id=eq.${id}`), {
           method: 'DELETE',
           headers: this._headers()
-        })
+        }),
+        this.fetchProductImages().then(imgs => {
+          if (imgs && imgs[id]) {
+            delete imgs[id];
+            return this.saveProductImages(imgs);
+          }
+        }).catch(() => {}),
+        this.fetchProductMetadata().then(meta => {
+          if (meta && meta[id]) {
+            delete meta[id];
+            return this.saveProductMetadata(meta);
+          }
+        }).catch(() => {})
       ];
-      this.fetchProductImages().then(imgs => {
-        if (imgs && imgs[id]) {
-          delete imgs[id];
-          this.saveProductImages(imgs);
-        }
-      }).catch(() => {});
       await Promise.allSettled(promises);
     } catch (e) {
       console.warn('[Supabase] deleteProduct error:', e);
@@ -629,12 +707,31 @@ export const supabaseSync = {
     try {
       const rows = products.map(mapProductToDB);
 
+      const metaMap = {};
+      const imgMapUpdates = {};
+
+      products.forEach(p => {
+        if (p && p.id) {
+          metaMap[p.id] = {
+            originalPrice: p.originalPrice !== undefined && p.originalPrice !== null && p.originalPrice !== '' ? Number(p.originalPrice) : null,
+            discountBadge: p.discountBadge ? String(p.discountBadge).trim() : null,
+            freeShipping: Boolean(p.freeShipping),
+            stock: p.stock !== undefined && p.stock !== null && p.stock !== '' && !isNaN(Number(p.stock)) ? Number(p.stock) : null,
+            available: p.available !== false && p.is_active !== false
+          };
+          if (p.image && p.image.trim()) {
+            imgMapUpdates[p.id] = p.image.trim();
+          }
+        }
+      });
+
       const promises = [
         fetch(this._url('products'), {
           method: 'POST',
           headers: this._headers({ 'Prefer': 'resolution=merge-duplicates' }),
           body: JSON.stringify(rows)
         }),
+        this.saveProductMetadata(metaMap),
         this.fetchProductImages().then(existing => {
           const merged = { ...existing };
           products.forEach(p => {
@@ -650,7 +747,12 @@ export const supabaseSync = {
         })
       ];
 
-      await Promise.allSettled(promises);
+      const results = await Promise.allSettled(promises);
+      results.forEach((r, idx) => {
+        if (r.status === 'rejected') {
+          console.warn(`[Supabase] pushProducts promise ${idx} rejected:`, r.reason);
+        }
+      });
     } catch (e) {
       console.warn('[Supabase] pushProducts error:', e);
     }

@@ -638,7 +638,7 @@ export default function CatalogPage({ initialCashShift }) {
           return;
         }
 
-        const [prodsRes, settingsRes, imagesRes] = await Promise.all([
+        const [prodsRes, settingsRes, imagesRes, metaRes] = await Promise.all([
           fetch(`${SUPABASE_URL}/rest/v1/products?select=*&order=category.asc,name.asc`, {
             headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
           }),
@@ -648,6 +648,9 @@ export default function CatalogPage({ initialCashShift }) {
           fetch(`${SUPABASE_URL}/rest/v1/system_settings?id=eq.product_images&select=data`, {
             headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
           }),
+          fetch(`${SUPABASE_URL}/rest/v1/system_settings?id=eq.product_metadata&select=data`, {
+            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+          })
         ]);
 
         let imagesMap = {};
@@ -656,28 +659,39 @@ export default function CatalogPage({ initialCashShift }) {
           if (Array.isArray(imgRows) && imgRows.length > 0) imagesMap = imgRows[0].data || {};
         }
 
+        let metaMap = {};
+        if (metaRes && metaRes.ok) {
+          const metaRows = await metaRes.json();
+          if (Array.isArray(metaRows) && metaRows.length > 0) metaMap = metaRows[0].data || {};
+        }
+
         if (prodsRes.ok) {
           const raw = await prodsRes.json();
           // Keep ALL products including sold-out so they show with AGOTADO badge
           const prods = (Array.isArray(raw) ? raw : [])
             .filter(p => p)
-            .map(p => ({
-              id: p.id,
-              name: p.name,
-              category: p.category || 'Hamburguesas',
-              price: Number(p.price) || 0,
-              originalPrice: p.original_price ? Number(p.original_price) : null,
-              discountBadge: p.discount_badge || null,
-              freeShipping: Boolean(p.free_shipping),
-              emoji: p.emoji || '🍔',
-              description: p.description || '',
-              modifiers: Array.isArray(p.modifiers) ? p.modifiers : [],
-              image: p.image || imagesMap[p.id] || '',
-              // Preserve availability fields so AGOTADO badge works
-              is_active: p.is_active !== false,
-              available: p.available !== undefined ? p.available !== false : p.is_active !== false,
-              stock: (p.stock !== undefined && p.stock !== null && !isNaN(Number(p.stock))) ? Number(p.stock) : null,
-            }));
+            .map(p => {
+              const meta = metaMap[p.id] || {};
+              const isAvailable = meta.available !== undefined ? meta.available : (p.is_active !== false);
+              const stockVal = meta.stock !== undefined && meta.stock !== null && !isNaN(Number(meta.stock)) ? Number(meta.stock) : null;
+              return {
+                id: p.id,
+                name: p.name,
+                category: p.category || 'Hamburguesas',
+                price: Number(p.price) || 0,
+                originalPrice: meta.originalPrice ? Number(meta.originalPrice) : (p.original_price ? Number(p.original_price) : null),
+                discountBadge: meta.discountBadge || p.discount_badge || null,
+                freeShipping: meta.freeShipping !== undefined ? Boolean(meta.freeShipping) : Boolean(p.free_shipping),
+                emoji: p.emoji || '🍔',
+                description: p.description || '',
+                modifiers: Array.isArray(p.modifiers) ? p.modifiers : [],
+                image: p.image || imagesMap[p.id] || '',
+                // Preserve availability fields so AGOTADO badge works
+                is_active: p.is_active !== false,
+                available: isAvailable,
+                stock: stockVal,
+              };
+            });
           if (prods.length > 0) {
             setProducts(prods);
             try { storageService.saveProducts(prods); } catch (_) {}
