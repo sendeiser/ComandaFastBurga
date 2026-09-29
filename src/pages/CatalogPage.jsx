@@ -420,10 +420,8 @@ export default function CatalogPage({ initialCashShift }) {
   const [products, setProducts] = useState(() => {
     try {
       const local = storageService.getProducts();
-      if (Array.isArray(local) && local.length > 0) {
-        const active = local.filter(p => p.is_active !== false);
-        if (active.length > 0) return active;
-      }
+      // Keep ALL products including sold-out (is_active: false) so they render with AGOTADO badge
+      if (Array.isArray(local) && local.length > 0) return local;
       return DEMO_PRODUCTS;
     } catch (_) {
       return DEMO_PRODUCTS;
@@ -566,8 +564,9 @@ export default function CatalogPage({ initialCashShift }) {
 
         if (prodsRes.ok) {
           const raw = await prodsRes.json();
+          // Keep ALL products including sold-out so they show with AGOTADO badge
           const prods = (Array.isArray(raw) ? raw : [])
-            .filter(p => p && p.is_active !== false)
+            .filter(p => p)
             .map(p => ({
               id: p.id,
               name: p.name,
@@ -580,6 +579,10 @@ export default function CatalogPage({ initialCashShift }) {
               description: p.description || '',
               modifiers: Array.isArray(p.modifiers) ? p.modifiers : [],
               image: p.image || imagesMap[p.id] || '',
+              // Preserve availability fields so AGOTADO badge works
+              is_active: p.is_active !== false,
+              available: p.available !== undefined ? p.available !== false : p.is_active !== false,
+              stock: (p.stock !== undefined && p.stock !== null && !isNaN(Number(p.stock))) ? Number(p.stock) : null,
             }));
           if (prods.length > 0) {
             setProducts(prods);
@@ -628,6 +631,16 @@ export default function CatalogPage({ initialCashShift }) {
     Boolean(p.discountBadge) ||
     Boolean(p.originalPrice && Number(p.originalPrice) > Number(p.price))
   );
+
+  // Helper to check if a product is sold out (consistent logic)
+  const isProductSoldOut = (p) => p && (
+    p.available === false ||
+    p.is_active === false ||
+    (p.stock !== null && p.stock !== undefined && Number(p.stock) <= 0)
+  );
+
+  const allPromosSoldOut = promoProducts.length > 0 && promoProducts.every(p => isProductSoldOut(p));
+  const activePromosCount = promoProducts.filter(p => !isProductSoldOut(p)).length;
 
   useEffect(() => {
     if (categories.length > 0 && !activeCategory) {
@@ -1033,15 +1046,19 @@ export default function CatalogPage({ initialCashShift }) {
       {/* 3.1 CARTELITO / BANNER DE PROMOS DEL DÍA */}
       {promoProducts.length > 0 && (
         <div className="cat-promos-banner-wrap">
-          <div className="cat-promos-banner">
+          <div className="cat-promos-banner" style={allPromosSoldOut ? { opacity: 0.85, borderColor: 'rgba(239,68,68,0.4)' } : {}}>
             <div className="cat-promos-banner-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <div className="cat-promos-badge">
-                  <Flame size={14} className="cat-flame-icon" />
+                <div className="cat-promos-badge" style={allPromosSoldOut ? { background: 'rgba(239,68,68,0.15)', borderColor: 'rgba(239,68,68,0.4)' } : {}}>
+                  {allPromosSoldOut ? (
+                    <span style={{ fontSize: '0.75rem' }}>⚠️</span>
+                  ) : (
+                    <Flame size={14} className="cat-flame-icon" />
+                  )}
                   <span>PROMOS DEL DÍA</span>
                 </div>
-                <span className="cat-promos-badge-sub">
-                  ¡Imperdibles de hoy! 🔥
+                <span className="cat-promos-badge-sub" style={allPromosSoldOut ? { color: '#ef4444' } : {}}>
+                  {allPromosSoldOut ? '🔴 AGOTADAS (válido hasta agotar stock)' : '¡Imperdibles de hoy! 🔥'}
                 </span>
               </div>
               <button 
@@ -1058,19 +1075,31 @@ export default function CatalogPage({ initialCashShift }) {
             <div className="cat-promos-items-scroll">
               {promoProducts.map(p => {
                 const hasDiscount = Boolean(p.originalPrice && Number(p.originalPrice) > Number(p.price));
+                const chipSoldOut = isProductSoldOut(p);
                 return (
                   <div 
                     key={p.id} 
                     className="cat-promo-chip"
-                    onClick={() => setSelectedProduct(p)}
+                    onClick={() => { if (!chipSoldOut) setSelectedProduct(p); }}
                     role="button"
                     tabIndex={0}
+                    style={chipSoldOut ? { opacity: 0.6, cursor: 'not-allowed', filter: 'grayscale(0.4)' } : {}}
                   >
-                    <div className="cat-promo-chip-media">
+                    <div className="cat-promo-chip-media" style={{ position: 'relative' }}>
                       {p.image ? (
                         <img src={p.image} alt={p.name} className="cat-promo-chip-img" loading="lazy" />
                       ) : (
                         <span className="cat-promo-chip-emoji">{p.emoji || '🍔'}</span>
+                      )}
+                      {chipSoldOut && (
+                        <div style={{
+                          position: 'absolute', inset: 0,
+                          background: 'rgba(0,0,0,0.45)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          borderRadius: 'inherit'
+                        }}>
+                          <span style={{ fontSize: '0.6rem', fontWeight: 900, color: '#fff', background: 'rgba(239,68,68,0.9)', padding: '2px 5px', borderRadius: 8 }}>AGOTADA</span>
+                        </div>
                       )}
                     </div>
                     <div className="cat-promo-chip-info">
@@ -1082,16 +1111,33 @@ export default function CatalogPage({ initialCashShift }) {
                         )}
                       </div>
                     </div>
-                    <button 
-                      type="button" 
-                      className="cat-promo-chip-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedProduct(p);
-                      }}
-                    >
-                      Pedir
-                    </button>
+                    {chipSoldOut ? (
+                      <div
+                        style={{
+                          padding: '5px 10px',
+                          borderRadius: 20,
+                          fontSize: '0.7rem',
+                          fontWeight: 800,
+                          background: 'rgba(239,68,68,0.15)',
+                          color: '#ef4444',
+                          border: '1px solid rgba(239,68,68,0.4)',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        🔴 Agotada
+                      </div>
+                    ) : (
+                      <button 
+                        type="button" 
+                        className="cat-promo-chip-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedProduct(p);
+                        }}
+                      >
+                        Pedir
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -1201,12 +1247,21 @@ export default function CatalogPage({ initialCashShift }) {
                   )}
                 </div>
 
-                {isPromoCat && (
-                  <div className="cat-promos-section-callout">
-                    <Flame size={16} style={{ color: '#f97316', flexShrink: 0 }} />
-                    <span>🔥 ¡Promociones especiales del día! Calidad 100% smashada a precio promocional.</span>
-                  </div>
-                )}
+                {isPromoCat && (() => {
+                  const sectionPromos = prods;
+                  const allSectionSoldOut = sectionPromos.length > 0 && sectionPromos.every(p => isProductSoldOut(p));
+                  return allSectionSoldOut ? (
+                    <div className="cat-promos-section-callout" style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.25)' }}>
+                      <span style={{ flexShrink: 0 }}>⚠️</span>
+                      <span style={{ color: '#ef4444' }}>¡Promociones agotadas por el momento (válido únicamente hasta agotar stock)! Disfrutá del resto de nuestra carta recién salida de la plancha. 🔥</span>
+                    </div>
+                  ) : (
+                    <div className="cat-promos-section-callout">
+                      <Flame size={16} style={{ color: '#f97316', flexShrink: 0 }} />
+                      <span>🔥 ¡Promociones especiales del día! Calidad 100% smashada a precio promocional.</span>
+                    </div>
+                  );
+                })()}
 
                 <div className="cat-product-grid">
                   {prods.map(p => (

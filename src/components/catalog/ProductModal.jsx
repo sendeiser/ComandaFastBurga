@@ -17,6 +17,10 @@ export default function ProductModal({ product, onClose, onAddToCart }) {
   const [notes, setNotes] = useState('');
   const [imageError, setImageError] = useState(false);
 
+  // Sold-out check
+  const isSoldOut = product.available === false || product.is_active === false ||
+    (product.stock !== null && product.stock !== undefined && Number(product.stock) <= 0);
+
   // Grupos de modificadores del producto
   const modifierGroups = Array.isArray(product.modifiers) ? product.modifiers : [];
 
@@ -216,29 +220,56 @@ export default function ProductModal({ product, onClose, onAddToCart }) {
 
         {/* Footer: cantidad + agregar */}
         <div className="cat-modal-footer">
-          <div className="cat-modal-qty-selector cat-qty-control">
+          {isSoldOut ? (
             <button
               type="button"
-              className="cat-modal-qty-btn cat-qty-btn"
-              onClick={() => setQty(q => Math.max(1, q - 1))}
-              aria-label="Disminuir cantidad"
+              disabled
+              style={{
+                flex: 1,
+                padding: '14px 20px',
+                borderRadius: 12,
+                fontSize: '0.95rem',
+                fontWeight: 800,
+                background: 'rgba(239,68,68,0.12)',
+                color: '#ef4444',
+                border: '2px solid rgba(239,68,68,0.4)',
+                cursor: 'not-allowed',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
             >
-              <Minus size={18} />
+              🔴 Producto Agotado
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, opacity: 0.8 }}>(hasta agotar stock)</span>
             </button>
-            <span className="cat-modal-qty-val cat-qty-value">{qty}</span>
-            <button
-              type="button"
-              className="cat-modal-qty-btn cat-qty-btn"
-              onClick={() => setQty(q => q + 1)}
-              aria-label="Aumentar cantidad"
-            >
-              <Plus size={18} />
-            </button>
-          </div>
-          <button type="button" className="cat-modal-add-btn cat-add-to-cart-btn" onClick={handleAdd}>
-            <span>Agregar</span>
-            <span className="cat-modal-add-price">{formatPrice(totalPrice)}</span>
-          </button>
+          ) : (
+            <>
+              <div className="cat-modal-qty-selector cat-qty-control">
+                <button
+                  type="button"
+                  className="cat-modal-qty-btn cat-qty-btn"
+                  onClick={() => setQty(q => Math.max(1, q - 1))}
+                  aria-label="Disminuir cantidad"
+                >
+                  <Minus size={18} />
+                </button>
+                <span className="cat-modal-qty-val cat-qty-value">{qty}</span>
+                <button
+                  type="button"
+                  className="cat-modal-qty-btn cat-qty-btn"
+                  onClick={() => setQty(q => q + 1)}
+                  aria-label="Aumentar cantidad"
+                >
+                  <Plus size={18} />
+                </button>
+              </div>
+              <button type="button" className="cat-modal-add-btn cat-add-to-cart-btn" onClick={handleAdd}>
+                <span>Agregar</span>
+                <span className="cat-modal-add-price">{formatPrice(totalPrice)}</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
