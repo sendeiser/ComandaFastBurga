@@ -62,7 +62,7 @@ export default function WhatsAppToastAlert({ onOpenChat, currentTab }) {
   if (!activeAlert || currentTab === 'whatsapp') return null;
 
   return (
-    <div style={{
+    <div className="desktop-only-action whatsapp-toast-container" style={{
       position: 'fixed',
       bottom: '24px',
       right: '24px',

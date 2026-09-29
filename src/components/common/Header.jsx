@@ -296,22 +296,6 @@ export default function Header({
         </div>
         <span className="mobile-nav-label">Menú</span>
       </button>
-
-      <button 
-        type="button"
-        className={`mobile-nav-item ${currentTab === 'whatsapp' ? 'active' : ''}`}
-        onClick={() => setCurrentTab('whatsapp')}
-      >
-        <div className="mobile-nav-icon-box">
-          <MessageSquare size={19} style={{ color: currentTab === 'whatsapp' ? '#25D366' : 'inherit' }} />
-          {activeWhatsAppCount > 0 && (
-            <span className="mobile-nav-badge" style={{ background: '#25D366', color: '#052e16' }}>
-              {activeWhatsAppCount}
-            </span>
-          )}
-        </div>
-        <span className="mobile-nav-label">WhatsApp</span>
-      </button>
     </nav>
     </>
   );

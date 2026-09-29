@@ -2230,7 +2230,7 @@ h1, h2, h3, h4, .brand-title {
   /* Modern Glassmorphic Bottom Navigation Bar */
   .mobile-bottom-nav {
     display: grid !important;
-    grid-template-columns: repeat(5, 1fr) !important;
+    grid-template-columns: repeat(4, 1fr) !important;
     position: fixed !important;
     bottom: 0 !important;
     left: 0 !important;
