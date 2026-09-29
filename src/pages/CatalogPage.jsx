@@ -85,7 +85,7 @@ function generateWhatsAppMessage(items, subtotal, serviceType, customerName, cus
     `💳 *Forma de pago:* ${paymentLabel}\n` +
     (customerName ? `👤 *Nombre:* ${customerName}\n` : '') +
     (serviceType === 'delivery' && customerAddress ? `📍 *Dirección:* ${customerAddress}\n` : '') +
-    (customerPhone ? `📞 *Teléfono:* ${customerPhone}\n` : '') +
+    (serviceType !== 'dine_in' && customerPhone ? `📞 *Teléfono:* ${customerPhone}\n` : '') +
     (notes ? `\n📝 *Aclaraciones:* ${notes}\n` : '');
 }
 
@@ -511,6 +511,7 @@ export default function CatalogPage({ initialCashShift }) {
   const [view, setView] = useState('catalog'); // 'catalog' | 'cart' | 'checkout'
   const initialMesa = getMesaFromUrl();
   const [tableNumber, setTableNumber] = useState(initialMesa);
+  const [isQrTable, setIsQrTable] = useState(Boolean(initialMesa));
   const [serviceType, setServiceType] = useState(initialMesa ? 'dine_in' : null); // 'dine_in' | 'takeaway' | 'delivery'
   const [toast, setToast] = useState('');
   const [logoError, setLogoError] = useState(false);
@@ -521,9 +522,11 @@ export default function CatalogPage({ initialCashShift }) {
       const uMesa = getMesaFromUrl();
       if (uMesa) {
         setTableNumber(uMesa);
+        setIsQrTable(true);
         setServiceType('dine_in');
       }
     };
+    handleUrlMesa();
     window.addEventListener('hashchange', handleUrlMesa);
     window.addEventListener('popstate', handleUrlMesa);
     return () => {
@@ -927,24 +930,56 @@ export default function CatalogPage({ initialCashShift }) {
           {/* Form */}
           {serviceType === 'dine_in' && (
             <div className="cat-form-group">
-              <label className="cat-form-label">Número de Mesa o Ubicación en el Local *</label>
-              <input 
-                className="cat-form-input" 
-                placeholder="Ej: Mesa 4, Barra, Patio 2..." 
-                value={tableNumber} 
-                onChange={e => setTableNumber(e.target.value)} 
-                autoFocus={!tableNumber}
-              />
+              <label className="cat-form-label">Ubicación asignada en el local</label>
+              {isQrTable ? (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1.5px solid rgba(239, 68, 68, 0.35)',
+                  borderRadius: 10,
+                  padding: '12px 14px',
+                  color: 'var(--cat-text)',
+                  fontWeight: 800,
+                  fontSize: '0.95rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: '1.2rem' }}>🍽️</span>
+                    <span>{tableNumber.toLowerCase().startsWith('mesa') ? tableNumber : `Mesa ${tableNumber}`}</span>
+                  </div>
+                  <span style={{
+                    fontSize: '0.7rem',
+                    background: '#dc2626',
+                    color: '#ffffff',
+                    padding: '2px 8px',
+                    borderRadius: 6,
+                    fontWeight: 700
+                  }}>
+                    Asignada por QR
+                  </span>
+                </div>
+              ) : (
+                <input 
+                  className="cat-form-input" 
+                  placeholder="Ej: Mesa 4, Barra, Patio 2..." 
+                  value={tableNumber} 
+                  onChange={e => setTableNumber(e.target.value)} 
+                  autoFocus={!tableNumber}
+                />
+              )}
             </div>
           )}
           <div className="cat-form-group">
             <label className="cat-form-label">Nombre y Apellido *</label>
             <input className="cat-form-input" placeholder="Tu nombre" value={customerName} onChange={e => setCustomerName(e.target.value)} />
           </div>
-          <div className="cat-form-group">
-            <label className="cat-form-label">Teléfono de contacto</label>
-            <input className="cat-form-input" placeholder="Ej: 3826..." value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} type="tel" />
-          </div>
+          {serviceType !== 'dine_in' && (
+            <div className="cat-form-group">
+              <label className="cat-form-label">Teléfono de contacto</label>
+              <input className="cat-form-input" placeholder="Ej: 3826..." value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} type="tel" />
+            </div>
+          )}
           {serviceType === 'delivery' && (
             <div className="cat-form-group">
               <label className="cat-form-label">Dirección exacta de entrega *</label>
@@ -1049,39 +1084,95 @@ export default function CatalogPage({ initialCashShift }) {
                 </div>
               )}
 
-              {/* Service selector */}
-              <div className="cat-service-selector">
-                <div className="cat-service-label">Seleccioná cómo recibirás tu pedido:</div>
-                <div className="cat-service-btns">
+              {/* Service selector or Direct Continue if QR table */}
+              {isQrTable ? (
+                <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1.5px solid rgba(239, 68, 68, 0.35)',
+                    borderRadius: 12,
+                    padding: '12px 16px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: '1.5rem' }}>🍽️</span>
+                      <div>
+                        <div style={{ fontWeight: 800, color: 'var(--cat-text)', fontSize: '0.92rem' }}>
+                          Consumo en {tableNumber.toLowerCase().startsWith('mesa') ? tableNumber : `Mesa ${tableNumber}`}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--cat-text-muted)' }}>
+                          Pedido directo a la mesa
+                        </div>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', background: '#dc2626', color: '#fff', padding: '3px 8px', borderRadius: 8, fontWeight: 700 }}>
+                      QR Activo
+                    </span>
+                  </div>
+
                   <button
                     type="button"
-                    className={`cat-service-btn ${serviceType === 'dine_in' ? 'active' : ''}`}
-                    onClick={() => { setServiceType('dine_in'); setView('checkout'); }}
+                    style={{
+                      width: '100%',
+                      padding: '14px 20px',
+                      background: '#dc2626',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: 12,
+                      fontWeight: 800,
+                      fontSize: '1rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      boxShadow: '0 4px 14px rgba(220, 38, 38, 0.35)'
+                    }}
+                    onClick={() => {
+                      setServiceType('dine_in');
+                      setView('checkout');
+                    }}
                   >
-                    <span className="cat-service-btn-icon">🍽️</span>
-                    En el local
-                    <span className="cat-service-btn-sub">Mesa o salón</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`cat-service-btn ${serviceType === 'takeaway' ? 'active' : ''}`}
-                    onClick={() => { setServiceType('takeaway'); setView('checkout'); }}
-                  >
-                    <span className="cat-service-btn-icon">🏃</span>
-                    Para llevar
-                    <span className="cat-service-btn-sub">Retirar en el local</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`cat-service-btn ${serviceType === 'delivery' ? 'active' : ''}`}
-                    onClick={() => { setServiceType('delivery'); setView('checkout'); }}
-                  >
-                    <span className="cat-service-btn-icon">🛵</span>
-                    A domicilio
-                    <span className="cat-service-btn-sub">Envío con cadete</span>
+                    <span>Continuar con el pedido</span>
+                    <ChevronRight size={18} />
                   </button>
                 </div>
-              </div>
+              ) : (
+                <div className="cat-service-selector">
+                  <div className="cat-service-label">Seleccioná cómo recibirás tu pedido:</div>
+                  <div className="cat-service-btns">
+                    <button
+                      type="button"
+                      className={`cat-service-btn ${serviceType === 'dine_in' ? 'active' : ''}`}
+                      onClick={() => { setServiceType('dine_in'); setView('checkout'); }}
+                    >
+                      <span className="cat-service-btn-icon">🍽️</span>
+                      En el local
+                      <span className="cat-service-btn-sub">Mesa o salón</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`cat-service-btn ${serviceType === 'takeaway' ? 'active' : ''}`}
+                      onClick={() => { setServiceType('takeaway'); setView('checkout'); }}
+                    >
+                      <span className="cat-service-btn-icon">🏃</span>
+                      Para llevar
+                      <span className="cat-service-btn-sub">Retirar en el local</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`cat-service-btn ${serviceType === 'delivery' ? 'active' : ''}`}
+                      onClick={() => { setServiceType('delivery'); setView('checkout'); }}
+                    >
+                      <span className="cat-service-btn-icon">🛵</span>
+                      A domicilio
+                      <span className="cat-service-btn-sub">Envío con cadete</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -1161,29 +1252,31 @@ export default function CatalogPage({ initialCashShift }) {
               }}
             >
               <span>🍽️ {tableNumber.toLowerCase().startsWith('mesa') ? tableNumber : `Mesa ${tableNumber}`}</span>
-              <button
-                type="button"
-                onClick={() => {
-                  const newMesa = window.prompt('Modificar tu número de mesa o barra:', tableNumber);
-                  if (newMesa !== null) {
-                    setTableNumber(newMesa.trim());
-                    if (newMesa.trim()) setServiceType('dine_in');
-                  }
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#71717a',
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  textDecoration: 'underline',
-                  padding: 0
-                }}
-                title="Modificar mesa"
-              >
-                Cambiar
-              </button>
+              {!isQrTable && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newMesa = window.prompt('Modificar tu número de mesa o barra:', tableNumber);
+                    if (newMesa !== null) {
+                      setTableNumber(newMesa.trim());
+                      if (newMesa.trim()) setServiceType('dine_in');
+                    }
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#71717a',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    textDecoration: 'underline',
+                    padding: 0
+                  }}
+                  title="Modificar mesa"
+                >
+                  Cambiar
+                </button>
+              )}
             </div>
           ) : (
             <button
