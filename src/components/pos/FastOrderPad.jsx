@@ -359,19 +359,19 @@ export default function FastOrderPad({
             <div className="search-filter-actions">
               <button 
                 type="button" 
-                className={`cat-pill-btn ${showPhotos ? 'active' : ''}`}
+                className={`cat-pill-btn btn-toggle-photos ${showPhotos ? 'active' : ''}`}
                 onClick={toggleShowPhotos}
                 title={showPhotos ? 'Ocultar fotos (modo compacto)' : 'Mostrar fotos de productos'}
-                style={{ gap: '6px' }}
               >
-                <ImageIcon size={16} />
-                <span>{showPhotos ? 'Fotos' : 'Sin fotos'}</span>
+                <ImageIcon size={15} />
+                <span className="btn-photos-full">{showPhotos ? 'Fotos' : 'Sin fotos'}</span>
+                <span className="btn-photos-short">{showPhotos ? 'Fotos' : 'Sin'}</span>
               </button>
 
               <button 
                 type="button" 
-                className="cat-pill-btn"
-                style={{ background: 'linear-gradient(135deg, #15803d, #16a34a)', color: '#fff', border: 'none', gap: '6px' }}
+                className="cat-pill-btn btn-paste-whatsapp"
+                style={{ background: 'linear-gradient(135deg, #15803d, #16a34a)', color: '#fff', border: 'none' }}
                 onClick={() => {
                   if (!isCashOpen) {
                     onOpenCashModal?.();
@@ -381,8 +381,9 @@ export default function FastOrderPad({
                 }}
                 title="Pegar y parsear texto de WhatsApp"
               >
-                <Sparkles size={16} />
-                <span>Pegar WhatsApp</span>
+                <Sparkles size={15} />
+                <span className="btn-wa-full-text">Pegar WhatsApp</span>
+                <span className="btn-wa-short-text">WhatsApp</span>
               </button>
             </div>
           </div>

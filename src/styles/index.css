@@ -821,6 +821,19 @@ h1, h2, h3, h4, .brand-title {
   border-color: transparent;
 }
 
+.btn-photos-full {
+  display: inline;
+}
+.btn-photos-short {
+  display: none;
+}
+.btn-wa-full-text {
+  display: inline;
+}
+.btn-wa-short-text {
+  display: none;
+}
+
 /* Product Cards Grid */
 .product-grid {
   display: grid;
@@ -2321,17 +2334,17 @@ h1, h2, h3, h4, .brand-title {
     display: flex;
     flex-direction: column;
     height: 100%;
-    gap: 0.4rem;
+    gap: 0.25rem !important;
   }
 
   .pos-mobile-tabs {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 0.4rem;
-    margin-bottom: 0.35rem;
+    gap: 0.25rem !important;
+    margin-bottom: 0.2rem !important;
     background: var(--bg-card);
-    padding: 3px;
-    border-radius: var(--radius-md);
+    padding: 2px !important;
+    border-radius: var(--radius-sm) !important;
     border: 1px solid var(--border-subtle);
   }
 
@@ -2339,16 +2352,16 @@ h1, h2, h3, h4, .brand-title {
     background: transparent;
     border: none;
     color: var(--text-secondary);
-    font-size: 0.88rem;
+    font-size: 0.8rem !important;
     font-weight: 700;
-    padding: 0.55rem 0.4rem;
-    border-radius: var(--radius-sm);
+    padding: 0.35rem 0.35rem !important;
+    border-radius: 6px !important;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.4rem;
-    min-height: 42px;
+    gap: 0.3rem !important;
+    min-height: 34px !important;
   }
 
   .pos-mobile-tab-btn.active {
@@ -2359,7 +2372,7 @@ h1, h2, h3, h4, .brand-title {
 
   .pos-catalog-panel {
     display: none !important;
-    padding-bottom: 95px; /* Safe space for floating cart bar and bottom nav */
+    padding-bottom: 75px; /* Safe space for floating cart bar and bottom nav */
   }
   .pos-catalog-panel.mobile-active {
     display: flex !important;
@@ -2375,28 +2388,78 @@ h1, h2, h3, h4, .brand-title {
     display: flex !important;
   }
 
-  /* POS Mobile Search Filter Bar */
+  /* Catalog sticky header - tight & compact */
+  .catalog-sticky-header {
+    padding: 0.1rem 0 0.3rem 0 !important;
+    gap: 0.3rem !important;
+  }
+
+  /* POS Mobile Search Filter Bar - 1 Single Unified Row */
   .search-filter-bar {
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 0.45rem !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 0.3rem !important;
+    width: 100% !important;
   }
 
   .search-input-wrapper {
-    width: 100% !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+    width: auto !important;
+  }
+
+  .search-input-wrapper input {
+    height: 36px !important;
+    font-size: 0.82rem !important;
+    padding: 0 0.5rem 0 2rem !important;
+    border-radius: var(--radius-sm) !important;
+  }
+
+  .search-icon-inside {
+    left: 8px !important;
+    width: 15px !important;
+    height: 15px !important;
   }
 
   .search-filter-actions {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 0.45rem !important;
-    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.25rem !important;
+    width: auto !important;
+    flex-shrink: 0 !important;
   }
 
   .search-filter-actions .cat-pill-btn {
-    width: 100% !important;
-    justify-content: center !important;
-    height: 38px !important;
+    width: auto !important;
+    height: 36px !important;
+    padding: 0 0.55rem !important;
+    font-size: 0.74rem !important;
+    gap: 4px !important;
+    border-radius: var(--radius-sm) !important;
+  }
+
+  .btn-photos-full,
+  .btn-wa-full-text {
+    display: none !important;
+  }
+
+  .btn-photos-short,
+  .btn-wa-short-text {
+    display: inline !important;
+  }
+
+  .category-scroll-pills {
+    gap: 0.3rem !important;
+    padding-bottom: 2px !important;
+  }
+
+  /* Category pill buttons */
+  .cat-pill-btn {
+    height: 28px !important;
+    padding: 0 0.65rem !important;
+    font-size: 0.74rem !important;
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
   }
 
   /* Floating cart bar on mobile (floating above mobile bottom nav) */
@@ -2410,13 +2473,13 @@ h1, h2, h3, h4, .brand-title {
     border: 2px solid var(--accent-amber) !important;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
     border-radius: var(--radius-full) !important;
-    padding: 0.65rem 1.15rem !important;
+    padding: 0.5rem 1rem !important;
     align-items: center !important;
     justify-content: space-between !important;
     z-index: 99 !important;
     cursor: pointer !important;
-    min-height: 48px !important;
-    font-size: 0.88rem !important;
+    min-height: 44px !important;
+    font-size: 0.86rem !important;
   }
 
   .mobile-back-btn {
@@ -2424,48 +2487,50 @@ h1, h2, h3, h4, .brand-title {
     align-items: center;
     justify-content: center;
     width: 100%;
-    padding: 0.65rem;
+    padding: 0.55rem;
     background: var(--bg-main);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
     color: var(--accent-amber);
     font-size: 0.85rem;
     font-weight: 800;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.4rem;
     cursor: pointer;
-    min-height: 42px;
+    min-height: 38px;
   }
 
-  /* Products Grid in Mobile */
+  /* Products Grid in Mobile - 2 tight columns, max product visibility */
   .product-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 0.55rem !important;
-    padding-bottom: 95px !important;
+    gap: 0.45rem !important;
+    padding-bottom: 85px !important;
+    padding-top: 0.25rem !important;
   }
 
   .product-card {
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
-    padding: 0.55rem !important;
+    padding: 0.4rem 0.45rem !important;
     min-height: auto !important;
-    border-radius: var(--radius-md) !important;
+    border-radius: 10px !important;
     background: var(--bg-card) !important;
     border: 1px solid var(--border-subtle) !important;
+    gap: 0.2rem !important;
   }
 
   .product-card.compact {
     min-height: auto !important;
-    padding: 0.45rem !important;
+    padding: 0.35rem 0.4rem !important;
   }
 
   .product-card-media {
-    height: 95px !important;
+    height: 80px !important;
     width: 100% !important;
-    border-radius: var(--radius-sm) !important;
+    border-radius: 7px !important;
     overflow: hidden !important;
     position: relative !important;
-    margin-bottom: 0.35rem !important;
+    margin-bottom: 0.2rem !important;
     background: var(--bg-main) !important;
   }
 
@@ -2476,28 +2541,41 @@ h1, h2, h3, h4, .brand-title {
   }
 
   .product-card-emoji-badge {
-    bottom: 4px !important;
-    right: 4px !important;
-    font-size: 0.95rem !important;
-    padding: 2px 4px !important;
+    bottom: 3px !important;
+    right: 3px !important;
+    font-size: 0.8rem !important;
+    padding: 1px 3px !important;
+    border-radius: 4px !important;
   }
 
   .product-emoji-icon {
-    font-size: 2.2rem !important;
-    margin-bottom: 0.35rem !important;
+    font-size: 1.8rem !important;
+    margin-bottom: 0.2rem !important;
+  }
+
+  .product-card-promo-tags {
+    margin-bottom: 2px !important;
+    padding: 0 !important;
+  }
+
+  .badge-promo-free-shipping,
+  .badge-promo-tag {
+    font-size: 0.62rem !important;
+    padding: 1px 4px !important;
   }
 
   .product-name {
-    font-size: 0.88rem !important;
+    font-size: 0.82rem !important;
     font-weight: 800 !important;
     white-space: normal !important;
     display: -webkit-box !important;
     -webkit-line-clamp: 2 !important;
     -webkit-box-orient: vertical !important;
     overflow: hidden !important;
-    line-height: 1.25 !important;
-    min-height: 2.2rem !important;
+    line-height: 1.15 !important;
+    min-height: auto !important;
     color: var(--text-primary) !important;
+    margin-bottom: 1px !important;
   }
 
   .product-desc {
@@ -2505,34 +2583,34 @@ h1, h2, h3, h4, .brand-title {
     -webkit-line-clamp: 1 !important;
     -webkit-box-orient: vertical !important;
     overflow: hidden !important;
-    font-size: 0.72rem !important;
+    font-size: 0.68rem !important;
     color: var(--text-muted) !important;
-    line-height: 1.2 !important;
-    margin-bottom: 0.25rem !important;
+    line-height: 1.15 !important;
+    margin-bottom: 0.15rem !important;
   }
 
   .product-footer {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    margin-top: 0.35rem !important;
-    padding-top: 0.35rem !important;
+    margin-top: 0.2rem !important;
+    padding-top: 0.2rem !important;
     border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
   }
 
   .product-price {
-    font-size: 1.05rem !important;
+    font-size: 0.95rem !important;
     font-weight: 900 !important;
     color: var(--accent-amber) !important;
     font-variant-numeric: tabular-nums;
   }
 
   .product-add-badge {
-    width: 34px !important;
-    height: 34px !important;
-    min-width: 34px !important;
-    min-height: 34px !important;
-    border-radius: var(--radius-sm) !important;
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+    border-radius: 6px !important;
     background: var(--amber-gradient) !important;
     color: #0b0f19 !important;
     display: flex !important;
@@ -2540,12 +2618,9 @@ h1, h2, h3, h4, .brand-title {
     justify-content: center !important;
   }
 
-  .cat-pill-btn {
-    height: 36px !important;
-    padding: 0.35rem 0.85rem !important;
-    font-size: 0.8rem !important;
-    flex-shrink: 0 !important;
-    white-space: nowrap !important;
+  .product-add-badge svg {
+    width: 15px !important;
+    height: 15px !important;
   }
 
   /* Admin Owner Portal Mobile Layout */
