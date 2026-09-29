@@ -424,6 +424,41 @@
   }
 }
 
+@media (max-width: 600px) {
+  .cat-product-grid {
+    gap: 10px;
+  }
+  .cat-product-card {
+    gap: 12px;
+    padding-bottom: 12px;
+    contain-intrinsic-size: 85px;
+  }
+  .cat-product-card-image-box {
+    width: 88px;
+    height: 88px;
+    border-radius: 10px;
+  }
+  .cat-product-card-name {
+    font-size: 0.95rem;
+    margin-bottom: 3px;
+  }
+  .cat-product-card-desc {
+    font-size: 0.72rem;
+    line-height: 1.25;
+    margin-bottom: 6px;
+  }
+  .cat-product-card-price {
+    font-size: 1.05rem;
+  }
+  .cat-section {
+    margin-bottom: 18px;
+  }
+  .cat-section-title {
+    font-size: 1.25rem;
+    margin: 12px 0 8px;
+  }
+}
+
 /* ============================================================
    6. PRODUCT CARD (EXACT TRIPP AMERICAN BURGER ROW LAYOUT)
    ============================================================ */

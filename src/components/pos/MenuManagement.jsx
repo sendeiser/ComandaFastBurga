@@ -254,29 +254,16 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
         </div>
 
         {/* ACCIONES: QR CARTA DIGITAL & NUEVO PRODUCTO */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="menu-header-actions">
           <button
             type="button"
-            className="cat-pill-btn"
-            style={{
-              height: '38px',
-              padding: '0 14px',
-              fontSize: '0.82rem',
-              fontWeight: 800,
-              background: 'rgba(245, 158, 11, 0.12)',
-              border: '1.5px solid rgba(245, 158, 11, 0.4)',
-              color: 'var(--accent-amber)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              borderRadius: '8px'
-            }}
+            className="cat-pill-btn btn-menu-qr"
             onClick={onOpenCatalogQR}
             title="Generar código QR y flyer imprimible en PDF de la carta digital"
           >
-            <QrCode size={16} />
-            <span>QR Carta Digital</span>
+            <QrCode size={15} />
+            <span className="menu-btn-text-full">QR Carta Digital</span>
+            <span className="menu-btn-text-short">QR</span>
           </button>
 
           {/* BOTÓN NUEVO PRODUCTO */}
@@ -286,8 +273,9 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
               className="btn-confirm-order btn-new-product"
               onClick={openNew}
             >
-              <Plus size={17} />
-              <span>Nuevo Producto</span>
+              <Plus size={16} />
+              <span className="menu-btn-text-full">Nuevo Producto</span>
+              <span className="menu-btn-text-short">Nuevo</span>
             </button>
           )}
         </div>
@@ -371,9 +359,9 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
                   className="menu-product-card"
                   style={!isAvailable ? { opacity: 0.72, border: '1px dashed #ef4444' } : {}}
                 >
-                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                  <div className="menu-card-top">
                     {/* Thumbnail del Producto (Foto o Emoji) */}
-                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <div className="menu-card-thumb-wrap">
                       {prod.image ? (
                         <img
                           src={prod.image}
@@ -386,22 +374,13 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
                         </div>
                       )}
                       {prod.image && (
-                        <span style={{
-                          position: 'absolute',
-                          bottom: '-4px',
-                          right: '-4px',
-                          background: 'var(--bg-card)',
-                          borderRadius: '50%',
-                          padding: '2px',
-                          fontSize: '0.7rem',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                        }}>
+                        <span className="menu-card-emoji-badge">
                           {prod.emoji}
                         </span>
                       )}
                     </div>
 
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="menu-card-info-wrap">
                       <div className="menu-card-title">
                         {prod.name}
                       </div>
@@ -443,9 +422,9 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
                   )}
 
                   <div className="menu-card-footer">
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                    <div className="menu-card-price-wrap">
                       {prod.originalPrice && Number(prod.originalPrice) > Number(prod.price) && (
-                        <span style={{ textDecoration: 'line-through', opacity: 0.55, fontSize: '0.85rem' }}>
+                        <span className="menu-card-orig-price">
                           ${Number(prod.originalPrice).toLocaleString('es-AR')}
                         </span>
                       )}
@@ -453,32 +432,27 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
                         ${Number(prod.price || 0).toLocaleString('es-AR')}
                       </span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div className="menu-card-actions">
                       {/* Alternativa 1: Botón rápido de 1 click para pausar o activar stock */}
                       <button
                         type="button"
+                        className="btn-quick-stock"
                         onClick={(e) => handleToggleStock(e, prod)}
                         title={isAvailable ? 'Click para marcar como AGOTADO' : 'Click para reactivar en stock'}
                         style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          padding: '3px 8px',
-                          borderRadius: '12px',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
                           border: isAvailable ? '1px solid rgba(16, 185, 129, 0.5)' : '1px solid rgba(239, 68, 68, 0.6)',
                           background: isAvailable ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.15)',
-                          color: isAvailable ? '#10b981' : '#ef4444',
-                          transition: 'all 0.15s ease'
+                          color: isAvailable ? '#10b981' : '#ef4444'
                         }}
                       >
-                        <span style={{ fontSize: '0.65rem' }}>{isAvailable ? '🟢' : '🔴'}</span>
-                        <span>
+                        <span className="stock-dot">{isAvailable ? '🟢' : '🔴'}</span>
+                        <span className="stock-text-full">
                           {isAvailable 
                             ? (prod.stock !== null && prod.stock !== undefined ? `Stock: ${prod.stock}` : 'En Stock') 
                             : 'Agotado'}
+                        </span>
+                        <span className="stock-text-short">
+                          {isAvailable ? 'Stock' : 'Sin'}
                         </span>
                       </button>
 
@@ -488,7 +462,7 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
                         onClick={() => openEdit(prod)}
                         title="Editar Producto & Foto"
                       >
-                        <Edit2 size={14} />
+                        <Edit2 size={13} />
                       </button>
                       <button
                         type="button"
@@ -496,7 +470,7 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
                         onClick={() => handleDelete(prod)}
                         title="Eliminar Producto"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={13} />
                       </button>
                     </div>
                   </div>
