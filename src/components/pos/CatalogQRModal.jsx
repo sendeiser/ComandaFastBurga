@@ -21,8 +21,32 @@ export default function CatalogQRModal({ settings, onClose }) {
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [template, setTemplate] = useState('dark'); // 'dark' | 'red' | 'white' | 'green'
   const [format, setFormat] = useState('a4'); // 'a4' | 'a5' | 'sticker'
-  const [zoom, setZoom] = useState(60); // Preview zoom percentage
+  const [zoom, setZoom] = useState(() => {
+    if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+      return 38;
+    }
+    return 60;
+  }); // Preview zoom percentage
   const [copyDone, setCopyDone] = useState(false);
+  const [mobileTab, setMobileTab] = useState('config'); // 'config' | 'preview'
+
+  const handleFormatSelect = (fmtId) => {
+    setFormat(fmtId);
+    if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+      if (fmtId === 'a4') setZoom(38);
+      else if (fmtId === 'a5') setZoom(50);
+      else setZoom(60);
+    }
+  };
+
+  const handleAdjustZoom = () => {
+    const isMob = typeof window !== 'undefined' && window.innerWidth <= 768;
+    if (isMob) {
+      setZoom(format === 'a4' ? 38 : format === 'a5' ? 50 : 60);
+    } else {
+      setZoom(format === 'a4' ? 55 : format === 'a5' ? 70 : 85);
+    }
+  };
 
   // Calcula la URL efectiva con el parámetro ?mesa= si se especificó
   const getEffectiveUrl = () => {
@@ -315,152 +339,79 @@ export default function CatalogQRModal({ settings, onClose }) {
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 9999,
-        background: 'rgba(0, 0, 0, 0.85)',
-        backdropFilter: 'blur(8px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '16px',
-        animation: 'fadeIn 0.2s ease-out',
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 24,
-          width: '100%',
-          maxWidth: 1220,
-          height: '92vh',
-          maxHeight: 880,
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 30px 90px rgba(0,0,0,0.7)',
-          overflow: 'hidden',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="qr-modal-overlay" onClick={onClose}>
+      <div className="qr-modal-window" onClick={(e) => e.stopPropagation()}>
         {/* MODAL HEADER */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '16px 24px',
-            borderBottom: '1px solid var(--border-subtle)',
-            background: 'var(--bg-main)',
-            flexShrink: 0,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 12,
-                background: 'rgba(245, 158, 11, 0.15)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '1.5px solid rgba(245, 158, 11, 0.35)',
-                color: 'var(--accent-amber)',
-              }}
-            >
-              <QrCode size={24} />
+        <div className="qr-modal-header">
+          <div className="qr-modal-header-left">
+            <div className="qr-modal-icon-box">
+              <QrCode size={22} />
             </div>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontWeight: 900, fontSize: '1.15rem', color: 'var(--text-primary)' }}>
-                  Generador de QR & Flyers — Carta Digital
+              <div className="qr-modal-title-row">
+                <span className="qr-modal-title">
+                  Generador de QR & Flyers
                 </span>
-                <span
-                  style={{
-                    background: 'rgba(245, 158, 11, 0.15)',
-                    color: 'var(--accent-amber)',
-                    padding: '2px 8px',
-                    borderRadius: 6,
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                  }}
-                >
+                <span className="qr-modal-badge">
                   PDF & PRINT
                 </span>
               </div>
-              <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: 2 }}>
+              <div className="qr-modal-subtitle">
                 Personalizá e imprimí afiches A4, carteles de mesa A5 o stickers para packaging de delivery
               </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="qr-modal-header-actions">
             <button
               onClick={handlePrintPdf}
-              style={{
-                background: 'var(--accent-amber)',
-                color: '#000000',
-                border: 'none',
-                borderRadius: 10,
-                padding: '9px 18px',
-                fontWeight: 800,
-                fontSize: '0.88rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                boxShadow: '0 4px 14px rgba(245, 158, 11, 0.3)',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseOver={(e) => (e.currentTarget.style.transform = 'translateY(-1px)')}
-              onMouseOut={(e) => (e.currentTarget.style.transform = 'none')}
+              className="btn-qr-print-action"
+              title="Imprimir o guardar en PDF"
             >
-              <Printer size={17} />
-              <span>Imprimir / Guardar en PDF</span>
+              <Printer size={16} />
+              <span className="qr-print-text-full">Imprimir / Guardar en PDF</span>
+              <span className="qr-print-text-short">Imprimir / PDF</span>
             </button>
 
             <button
               onClick={onClose}
-              style={{
-                background: 'var(--bg-main)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 10,
-                width: 38,
-                height: 38,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                color: 'var(--text-muted)',
-              }}
+              className="btn-qr-close-action"
               title="Cerrar (Esc)"
             >
-              <X size={20} />
+              <X size={19} />
             </button>
           </div>
         </div>
 
-        {/* MODAL BODY: Split Panel */}
-        <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-          
-          {/* PANEL IZQUIERDO: Configuración y Edición */}
-          <div
-            style={{
-              width: 440,
-              flexShrink: 0,
-              borderRight: '1px solid var(--border-subtle)',
-              background: 'var(--bg-card)',
-              overflowY: 'auto',
-              padding: '20px 22px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 20,
+        {/* MOBILE NAVIGATION TABS (Segmented Control) */}
+        <div className="qr-mobile-tab-bar">
+          <button
+            type="button"
+            className={`qr-mobile-tab-btn ${mobileTab === 'config' ? 'active' : ''}`}
+            onClick={() => setMobileTab('config')}
+          >
+            <Sliders size={15} />
+            <span>1. Personalizar</span>
+          </button>
+          <button
+            type="button"
+            className={`qr-mobile-tab-btn ${mobileTab === 'preview' ? 'active' : ''}`}
+            onClick={() => {
+              setMobileTab('preview');
+              if (zoom > 45 && typeof window !== 'undefined' && window.innerWidth <= 768) {
+                setZoom(format === 'a4' ? 38 : format === 'a5' ? 50 : 60);
+              }
             }}
           >
+            <QrCode size={15} />
+            <span>2. Ver Flyer & QR</span>
+          </button>
+        </div>
+
+        {/* MODAL BODY: Split Panel en Desktop / Tabs en Mobile */}
+        <div className="qr-modal-body">
+          {/* PANEL IZQUIERDO: Configuración y Edición */}
+          <div className={`qr-modal-panel-config ${mobileTab === 'config' ? 'mobile-active' : ''}`}>
             {/* 1. Selector de Formato */}
             <div>
               <div
@@ -483,7 +434,7 @@ export default function CatalogQRModal({ settings, onClose }) {
                 {Object.values(FORMATS).map((fmt) => (
                   <button
                     key={fmt.id}
-                    onClick={() => setFormat(fmt.id)}
+                    onClick={() => handleFormatSelect(fmt.id)}
                     style={{
                       background: format === fmt.id ? 'rgba(245, 158, 11, 0.12)' : 'var(--bg-main)',
                       border: `1.5px solid ${format === fmt.id ? 'var(--accent-amber)' : 'var(--border-subtle)'}`,
@@ -1033,45 +984,41 @@ export default function CatalogQRModal({ settings, onClose }) {
                 <li>Configurá márgenes en <strong>"Ninguno"</strong> o "Por defecto".</li>
               </ul>
             </div>
+
+            {/* Botón destacado en mobile para ver la vista previa */}
+            <div className="qr-mobile-next-step-wrap">
+              <button
+                type="button"
+                className="btn-qr-next-step"
+                onClick={() => {
+                  setMobileTab('preview');
+                  if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+                    setZoom(format === 'a4' ? 38 : format === 'a5' ? 50 : 60);
+                  }
+                }}
+              >
+                <span>Ver Flyer & Código QR</span>
+                <Sparkles size={16} />
+              </button>
+            </div>
           </div>
 
           {/* PANEL DERECHO: Live Preview del Flyer */}
-          <div
-            style={{
-              flex: 1,
-              background: '#22232a',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-              position: 'relative',
-            }}
-          >
+          <div className={`qr-modal-panel-preview ${mobileTab === 'preview' ? 'mobile-active' : ''}`}>
             {/* Top Toolbar de la vista previa */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '10px 18px',
-                background: '#18191f',
-                borderBottom: '1px solid rgba(255,255,255,0.08)',
-                flexShrink: 0,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 1 }}>
-                  Vista Previa en Vivo
-                </span>
-                <span
-                  style={{
-                    background: 'rgba(255,255,255,0.1)',
-                    color: '#ffffff',
-                    padding: '2px 8px',
-                    borderRadius: 6,
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                  }}
+            <div className="qr-preview-toolbar">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn-qr-back-to-config"
+                  onClick={() => setMobileTab('config')}
                 >
+                  ← Editar
+                </button>
+                <span className="qr-preview-title">
+                  Vista Previa
+                </span>
+                <span className="qr-preview-format-badge">
                   {f.name}
                 </span>
               </div>
@@ -1079,7 +1026,7 @@ export default function CatalogQRModal({ settings, onClose }) {
               {/* Controles de Zoom */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <button
-                  onClick={() => setZoom((z) => Math.max(35, z - 10))}
+                  onClick={() => setZoom((z) => Math.max(25, z - 8))}
                   style={{
                     background: 'rgba(255,255,255,0.08)',
                     border: 'none',
@@ -1096,11 +1043,11 @@ export default function CatalogQRModal({ settings, onClose }) {
                 >
                   <ZoomOut size={14} />
                 </button>
-                <span style={{ color: '#d1d5db', fontSize: '0.75rem', fontWeight: 700, minWidth: 44, textAlign: 'center' }}>
+                <span style={{ color: '#d1d5db', fontSize: '0.75rem', fontWeight: 700, minWidth: 40, textAlign: 'center' }}>
                   {zoom}%
                 </span>
                 <button
-                  onClick={() => setZoom((z) => Math.min(100, z + 10))}
+                  onClick={() => setZoom((z) => Math.min(100, z + 8))}
                   style={{
                     background: 'rgba(255,255,255,0.08)',
                     border: 'none',
@@ -1118,7 +1065,7 @@ export default function CatalogQRModal({ settings, onClose }) {
                   <ZoomIn size={14} />
                 </button>
                 <button
-                  onClick={() => setZoom(format === 'a4' ? 55 : format === 'a5' ? 70 : 85)}
+                  onClick={handleAdjustZoom}
                   style={{
                     background: 'rgba(255,255,255,0.08)',
                     border: 'none',
@@ -1472,6 +1419,26 @@ export default function CatalogQRModal({ settings, onClose }) {
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Mobile Bottom Action Bar */}
+            <div className="qr-mobile-preview-footer">
+              <button
+                type="button"
+                className="btn-qr-mobile-print"
+                onClick={handlePrintPdf}
+              >
+                <Printer size={16} />
+                <span>Imprimir / PDF</span>
+              </button>
+              <button
+                type="button"
+                className="btn-qr-mobile-dl"
+                onClick={handleDownloadQrPng}
+              >
+                <Download size={16} />
+                <span>Descargar PNG</span>
+              </button>
             </div>
           </div>
         </div>
