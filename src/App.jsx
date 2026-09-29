@@ -284,7 +284,9 @@ export default function App() {
     // 1. Escuchar pedidos inyectados internamente desde el Chatbot Lab
     const handleInternalOrder = () => {
       setOrders(storageService.getOrders());
-      audioService.playOrderChime();
+      if (!checkIsCatalogRoute()) {
+        audioService.playOrderChime();
+      }
     };
     window.addEventListener('comandafast:new-order', handleInternalOrder);
 
@@ -436,7 +438,9 @@ export default function App() {
                 hasChanges = true;
 
                 if (ord.status === 'listo' && existing.status !== 'listo') {
-                  audioService.playReadyBell();
+                  if (!checkIsCatalogRoute()) {
+                    audioService.playReadyBell();
+                  }
                 }
 
                 // Cross-sync del cambio de estado
@@ -494,10 +498,12 @@ export default function App() {
           }
 
           if (hasNewPending) {
-            audioService.playOrderChime();
-            try {
-              confetti({ particleCount: 60, spread: 70, origin: { y: 0.7 } });
-            } catch (_) {}
+            if (!checkIsCatalogRoute()) {
+              audioService.playOrderChime();
+              try {
+                confetti({ particleCount: 60, spread: 70, origin: { y: 0.7 } });
+              } catch (_) {}
+            }
           }
         }
 
@@ -627,17 +633,17 @@ export default function App() {
       } catch (_) {}
     }
 
-    // Audio feedback
-    audioService.playOrderChime();
-
-    // Celebration confetti
-    try {
-      confetti({
-        particleCount: 50,
-        spread: 60,
-        origin: { y: 0.8 }
-      });
-    } catch (e) {}
+    // Audio feedback (solo para POS / Cajero)
+    if (!checkIsCatalogRoute()) {
+      audioService.playOrderChime();
+      try {
+        confetti({
+          particleCount: 50,
+          spread: 60,
+          origin: { y: 0.8 }
+        });
+      } catch (e) {}
+    }
 
     // Auto open cash drawer if cash sale
     if (orderData.paymentMethod === 'efectivo') {
@@ -675,7 +681,9 @@ export default function App() {
     }
 
     if (newStatus === 'listo') {
-      audioService.playReadyBell();
+      if (!checkIsCatalogRoute()) {
+        audioService.playReadyBell();
+      }
     }
   };
 

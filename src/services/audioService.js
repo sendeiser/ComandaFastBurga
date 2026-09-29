@@ -2,6 +2,31 @@
 // AUDIO SERVICE — SYNTHESIZED SOUNDS (NO EXTERNAL ASSETS)
 // =========================================================
 
+function isCatalogUrl() {
+  if (typeof window === 'undefined') return false;
+  try {
+    const hash = (window.location.hash || '').toLowerCase();
+    const search = (window.location.search || '').toLowerCase();
+    const pathname = (window.location.pathname || '').toLowerCase();
+    return (
+      pathname === '/catalog' ||
+      pathname === '/carta' ||
+      pathname === '/menu' ||
+      hash.startsWith('#catalog') ||
+      hash.startsWith('#carta') ||
+      hash.startsWith('#menu') ||
+      hash.startsWith('#mesa') ||
+      hash.includes('mesa=') ||
+      hash.includes('catalog') ||
+      search.includes('catalog') ||
+      search.includes('mesa=') ||
+      search.includes('table=')
+    );
+  } catch (_) {
+    return false;
+  }
+}
+
 class AudioService {
   constructor() {
     this.ctx = null;
@@ -17,6 +42,7 @@ class AudioService {
   }
 
   playOrderChime() {
+    if (isCatalogUrl()) return;
     try {
       this.init();
       if (!this.ctx) return;
@@ -44,6 +70,7 @@ class AudioService {
   }
 
   playReadyBell() {
+    if (isCatalogUrl()) return;
     try {
       this.init();
       if (!this.ctx) return;
@@ -69,6 +96,7 @@ class AudioService {
   }
 
   playWhatsAppNotification() {
+    if (isCatalogUrl()) return;
     try {
       this.init();
       if (!this.ctx) return;
