@@ -17,11 +17,24 @@ export default function CatalogQRModal({ settings, onClose }) {
   const initialUrl = (settings?.store_website_url || defaultOrigin).replace(/\/$/, '') + '/#catalog';
 
   const [catalogUrl, setCatalogUrl] = useState(initialUrl);
+  const [tableNumber, setTableNumber] = useState(''); // E.g. '', '1', '2', 'Barra'
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [template, setTemplate] = useState('dark'); // 'dark' | 'red' | 'white' | 'green'
   const [format, setFormat] = useState('a4'); // 'a4' | 'a5' | 'sticker'
   const [zoom, setZoom] = useState(60); // Preview zoom percentage
   const [copyDone, setCopyDone] = useState(false);
+
+  // Calcula la URL efectiva con el parámetro ?mesa= si se especificó
+  const getEffectiveUrl = () => {
+    const base = catalogUrl.trim() || initialUrl;
+    if (!tableNumber.trim()) return base;
+    const cleanMesa = encodeURIComponent(tableNumber.trim().replace(/^mesa\s*/i, ''));
+    if (base.includes('mesa=')) {
+      return base.replace(/([?&])mesa=[^&#]*/, `$1mesa=${cleanMesa}`);
+    }
+    const separator = base.includes('?') ? '&' : '?';
+    return `${base}${separator}mesa=${cleanMesa}`;
+  };
 
   // Textos editables del flyer
   const [brandName, setBrandName] = useState(
@@ -49,7 +62,7 @@ export default function CatalogQRModal({ settings, onClose }) {
     let isMounted = true;
     const generateQr = async () => {
       try {
-        const urlToEncode = catalogUrl.trim() || initialUrl;
+        const urlToEncode = getEffectiveUrl();
         const dataUrl = await QRCode.toDataURL(urlToEncode, {
           width: 800, // Alta resolución para que en impresión no se pixele
           margin: 1,
@@ -71,12 +84,13 @@ export default function CatalogQRModal({ settings, onClose }) {
     return () => {
       isMounted = false;
     };
-  }, [catalogUrl, template, initialUrl]);
+  }, [catalogUrl, tableNumber, template, initialUrl]);
 
   // Copiar URL al portapapeles
   const handleCopyUrl = () => {
-    if (!catalogUrl) return;
-    navigator.clipboard.writeText(catalogUrl).then(() => {
+    const url = getEffectiveUrl();
+    if (!url) return;
+    navigator.clipboard.writeText(url).then(() => {
       setCopyDone(true);
       setTimeout(() => setCopyDone(false), 2000);
     });
@@ -84,7 +98,7 @@ export default function CatalogQRModal({ settings, onClose }) {
 
   // Abrir catálogo en nueva pestaña
   const handleOpenCatalog = () => {
-    window.open(catalogUrl, '_blank');
+    window.open(getEffectiveUrl(), '_blank');
   };
 
   // Descargar imagen QR individual en alta definición (PNG)
@@ -92,7 +106,8 @@ export default function CatalogQRModal({ settings, onClose }) {
     if (!qrDataUrl) return;
     const link = document.createElement('a');
     const safeBrand = (brandName || 'comandafast').toLowerCase().replace(/[^a-z0-9]/g, '_');
-    link.download = `qr_carta_digital_${safeBrand}.png`;
+    const mesaSuffix = tableNumber.trim() ? `_mesa_${tableNumber.trim().replace(/[^a-z0-9]/gi, '_')}` : '';
+    link.download = `qr_carta_digital_${safeBrand}${mesaSuffix}.png`;
     link.href = qrDataUrl;
     link.click();
   };
@@ -561,7 +576,138 @@ export default function CatalogQRModal({ settings, onClose }) {
               </div>
             </div>
 
-            {/* 3. URL del Catálogo & Accesos Directos */}
+            {/* 3. Selector de Mesa / Ubicación */}
+            <div>
+              <div
+                style={{
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  color: 'var(--text-muted)',
+                  textTransform: 'uppercase',
+                  letterSpacing: 1,
+                  marginBottom: 8,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Store size={14} style={{ color: 'var(--accent-amber)' }} />
+                  <span>3. Mesa / Salón (Opcional)</span>
+                </div>
+                {tableNumber && (
+                  <button
+                    onClick={() => {
+                      setTableNumber('');
+                      handlePresetCta('carta');
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--accent-amber)',
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Quitar mesa
+                  </button>
+                )}
+              </div>
+
+              <div
+                style={{
+                  background: 'var(--bg-main)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 12,
+                  padding: '10px 12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                }}
+              >
+                <input
+                  type="text"
+                  value={tableNumber}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setTableNumber(val);
+                    if (val.trim()) {
+                      handlePresetCta('mesa');
+                    }
+                  }}
+                  placeholder="Ej: 1, 4, Barra... (vacío = carta general)"
+                  className="custom-input-sm"
+                  style={{ width: '100%', fontSize: '0.82rem' }}
+                />
+
+                {/* Chips rápidos de mesas */}
+                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTableNumber('');
+                      handlePresetCta('carta');
+                    }}
+                    style={{
+                      background: !tableNumber ? 'rgba(245, 158, 11, 0.15)' : 'var(--bg-card)',
+                      border: `1px solid ${!tableNumber ? 'var(--accent-amber)' : 'var(--border-subtle)'}`,
+                      borderRadius: 6,
+                      padding: '3px 8px',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      color: !tableNumber ? 'var(--accent-amber)' : 'var(--text-muted)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    General
+                  </button>
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => {
+                        setTableNumber(String(n));
+                        handlePresetCta('mesa');
+                      }}
+                      style={{
+                        background: tableNumber === String(n) ? 'rgba(245, 158, 11, 0.15)' : 'var(--bg-card)',
+                        border: `1px solid ${tableNumber === String(n) ? 'var(--accent-amber)' : 'var(--border-subtle)'}`,
+                        borderRadius: 6,
+                        padding: '3px 8px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        color: tableNumber === String(n) ? 'var(--accent-amber)' : 'var(--text-muted)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Mesa {n}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTableNumber('Barra');
+                      handlePresetCta('mesa');
+                    }}
+                    style={{
+                      background: tableNumber.toLowerCase() === 'barra' ? 'rgba(245, 158, 11, 0.15)' : 'var(--bg-card)',
+                      border: `1px solid ${tableNumber.toLowerCase() === 'barra' ? 'var(--accent-amber)' : 'var(--border-subtle)'}`,
+                      borderRadius: 6,
+                      padding: '3px 8px',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      color: tableNumber.toLowerCase() === 'barra' ? 'var(--accent-amber)' : 'var(--text-muted)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Barra
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 4. URL del Catálogo & Accesos Directos */}
             <div>
               <div
                 style={{
@@ -578,7 +724,7 @@ export default function CatalogQRModal({ settings, onClose }) {
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Smartphone size={14} style={{ color: 'var(--accent-amber)' }} />
-                  <span>3. Destino del Código QR</span>
+                  <span>4. Destino del Código QR</span>
                 </div>
                 {catalogUrl !== initialUrl && (
                   <button
@@ -694,7 +840,7 @@ export default function CatalogQRModal({ settings, onClose }) {
               </div>
             </div>
 
-            {/* 4. Textos Personalizables del Flyer */}
+            {/* 5. Textos Personalizables del Flyer */}
             <div>
               <div
                 style={{
@@ -710,7 +856,7 @@ export default function CatalogQRModal({ settings, onClose }) {
                 }}
               >
                 <Sliders size={14} style={{ color: 'var(--accent-amber)' }} />
-                <span>4. Textos del Flyer</span>
+                <span>5. Textos del Flyer</span>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1148,6 +1294,34 @@ export default function CatalogQRModal({ settings, onClose }) {
                     )}
                   </div>
 
+                  {/* Table Badge on flyer if set */}
+                  {tableNumber.trim() && (
+                    <div
+                      style={{
+                        background: t.accent,
+                        color: t.id === 'white' ? '#ffffff' : '#000000',
+                        padding: format === 'sticker' ? '4px 16px' : '6px 24px',
+                        borderRadius: 50,
+                        fontSize: format === 'sticker' ? 14 : 20,
+                        fontWeight: 900,
+                        letterSpacing: 1.5,
+                        textTransform: 'uppercase',
+                        marginBottom: 14,
+                        boxShadow: `0 8px 24px ${t.accentSoft}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                      }}
+                    >
+                      <span>🪑</span>
+                      <span>
+                        {tableNumber.trim().toUpperCase().startsWith('MESA') 
+                          ? tableNumber.trim().toUpperCase() 
+                          : `MESA ${tableNumber.trim().toUpperCase()}`}
+                      </span>
+                    </div>
+                  )}
+
                   {/* QR CODE CARD */}
                   <div
                     style={{
@@ -1245,7 +1419,7 @@ export default function CatalogQRModal({ settings, onClose }) {
                         fontFamily: 'monospace',
                       }}
                     >
-                      {catalogUrl}
+                      {getEffectiveUrl()}
                     </div>
                   </div>
 

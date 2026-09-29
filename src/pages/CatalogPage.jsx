@@ -23,7 +23,25 @@ function formatPrice(n) {
   return '$ ' + Number(n).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function generateWhatsAppMessage(items, subtotal, serviceType, customerName, customerAddress, customerPhone, deliveryFee, notes, paymentMethod = 'efectivo') {
+function getMesaFromUrl() {
+  if (typeof window === 'undefined') return '';
+  try {
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.has('mesa')) return searchParams.get('mesa').trim();
+
+    const hash = window.location.hash || '';
+    const qIndex = hash.indexOf('?');
+    if (qIndex !== -1) {
+      const hashParams = new URLSearchParams(hash.substring(qIndex));
+      if (hashParams.has('mesa')) return hashParams.get('mesa').trim();
+    }
+    const mMatch = hash.match(/mesa[=_](\w+)/i);
+    if (mMatch) return mMatch[1].trim();
+  } catch (_) {}
+  return '';
+}
+
+function generateWhatsAppMessage(items, subtotal, serviceType, customerName, customerAddress, customerPhone, deliveryFee, notes, paymentMethod = 'efectivo', tableNumber = '') {
   const lines = items.map(item => {
     const mods = [...(item.selectedMods || []).map(m => `  + ${m.name}`),
                   ...(item.selectedOptions || []).map(o => `  → ${o.name}`),
@@ -34,11 +52,19 @@ function generateWhatsAppMessage(items, subtotal, serviceType, customerName, cus
   const total = subtotal + (deliveryFee || 0);
   const paymentLabel = paymentMethod === 'transferencia' ? 'Transferencia Bancaria / MP 🏦' : 'Efectivo 💵';
 
+  let deliveryTypeLabel = 'Para llevar / Mostrador 🏃';
+  if (serviceType === 'delivery') {
+    deliveryTypeLabel = 'Delivery con cadete 🛵';
+  } else if (serviceType === 'dine_in') {
+    deliveryTypeLabel = 'Comer en el Local / En Mesa 🍽️';
+  }
+
   return `🍔 *Mi Pedido — ComandaFast*\n\n${lines.join('\n')}\n\n` +
     `💵 *Subtotal:* ${formatPrice(subtotal)}\n` +
     (deliveryFee ? `🛵 *Delivery:* ${formatPrice(deliveryFee)}\n` : '') +
     `💰 *TOTAL:* ${formatPrice(total)}\n\n` +
-    `🚀 *Tipo de entrega:* ${serviceType === 'delivery' ? 'Delivery 🛵' : 'Para llevar 🏃'}\n` +
+    `🚀 *Tipo de entrega:* ${deliveryTypeLabel}\n` +
+    (serviceType === 'dine_in' && tableNumber ? `🪑 *Mesa:* Mesa ${tableNumber.replace(/^mesa\s*/i, '')}\n` : '') +
     `💳 *Forma de pago:* ${paymentLabel}\n` +
     (customerName ? `👤 *Nombre:* ${customerName}\n` : '') +
     (serviceType === 'delivery' && customerAddress ? `📍 *Dirección:* ${customerAddress}\n` : '') +
@@ -466,9 +492,28 @@ export default function CatalogPage({ initialCashShift }) {
   const [showCategoriesDrawer, setShowCategoriesDrawer] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [view, setView] = useState('catalog'); // 'catalog' | 'cart' | 'checkout'
-  const [serviceType, setServiceType] = useState(null); // 'takeaway' | 'delivery'
+  const initialMesa = getMesaFromUrl();
+  const [tableNumber, setTableNumber] = useState(initialMesa);
+  const [serviceType, setServiceType] = useState(initialMesa ? 'dine_in' : null); // 'dine_in' | 'takeaway' | 'delivery'
   const [toast, setToast] = useState('');
   const [logoError, setLogoError] = useState(false);
+
+  // Escuchar cambios de URL por si se entra con ?mesa=X
+  useEffect(() => {
+    const handleUrlMesa = () => {
+      const uMesa = getMesaFromUrl();
+      if (uMesa) {
+        setTableNumber(uMesa);
+        setServiceType('dine_in');
+      }
+    };
+    window.addEventListener('hashchange', handleUrlMesa);
+    window.addEventListener('popstate', handleUrlMesa);
+    return () => {
+      window.removeEventListener('hashchange', handleUrlMesa);
+      window.removeEventListener('popstate', handleUrlMesa);
+    };
+  }, []);
 
   // Checkout form
   const [customerName, setCustomerName] = useState('');
@@ -754,6 +799,10 @@ export default function CatalogPage({ initialCashShift }) {
       showToast('⚠️ Ingresá tu nombre');
       return;
     }
+    if (serviceType === 'dine_in' && !tableNumber.trim()) {
+      showToast('⚠️ Ingresá tu número de mesa');
+      return;
+    }
     if (serviceType === 'delivery' && !customerAddress.trim()) {
       showToast('⚠️ Ingresá tu dirección');
       return;
@@ -771,7 +820,8 @@ export default function CatalogPage({ initialCashShift }) {
       customerPhone,
       deliveryFee,
       orderNotes,
-      paymentMethod
+      paymentMethod,
+      tableNumber
     );
 
     const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(message)}`;
@@ -784,7 +834,14 @@ export default function CatalogPage({ initialCashShift }) {
     setCustomerAddress('');
     setOrderNotes('');
     setPaymentMethod('efectivo');
-    setServiceType(null);
+    // Si la mesa vino por URL se conserva, sino se limpia
+    const urlMesa = getMesaFromUrl();
+    if (!urlMesa) {
+      setTableNumber('');
+      setServiceType(null);
+    } else {
+      setServiceType('dine_in');
+    }
     showToast('🎉 Pedido enviado por WhatsApp');
   };
 
@@ -822,7 +879,11 @@ export default function CatalogPage({ initialCashShift }) {
             <span className="cat-cart-total-top">{formatPrice(cart.subtotal + deliveryFee)}</span>
           </div>
           <h2 className="cat-checkout-title">
-            {serviceType === 'delivery' ? '🛵 Entrega por Delivery' : '🏃 Retiro en el Local'}
+            {serviceType === 'delivery' 
+              ? '🛵 Entrega por Delivery' 
+              : serviceType === 'dine_in' 
+                ? '🍽️ Consumo en el Local / En Mesa' 
+                : '🏃 Retiro en el Local (Mostrador)'}
           </h2>
 
           {/* Summary */}
@@ -847,6 +908,18 @@ export default function CatalogPage({ initialCashShift }) {
           </div>
 
           {/* Form */}
+          {serviceType === 'dine_in' && (
+            <div className="cat-form-group">
+              <label className="cat-form-label">Número de Mesa o Ubicación en el Local *</label>
+              <input 
+                className="cat-form-input" 
+                placeholder="Ej: Mesa 4, Barra, Patio 2..." 
+                value={tableNumber} 
+                onChange={e => setTableNumber(e.target.value)} 
+                autoFocus={!tableNumber}
+              />
+            </div>
+          )}
           <div className="cat-form-group">
             <label className="cat-form-label">Nombre y Apellido *</label>
             <input className="cat-form-input" placeholder="Tu nombre" value={customerName} onChange={e => setCustomerName(e.target.value)} />
@@ -873,7 +946,7 @@ export default function CatalogPage({ initialCashShift }) {
                 <span className="cat-payment-icon">💵</span>
                 <div className="cat-payment-text">
                   <strong>Efectivo</strong>
-                  <small>{serviceType === 'delivery' ? 'Abonás al recibir' : 'Abonás al retirar'}</small>
+                  <small>{serviceType === 'delivery' ? 'Abonás al recibir' : serviceType === 'dine_in' ? 'Abonás en mesa o en caja' : 'Abonás al retirar'}</small>
                 </div>
                 {paymentMethod === 'efectivo' && <Check size={16} className="cat-payment-check" />}
               </button>
@@ -964,7 +1037,17 @@ export default function CatalogPage({ initialCashShift }) {
                 <div className="cat-service-label">Seleccioná cómo recibirás tu pedido:</div>
                 <div className="cat-service-btns">
                   <button
-                    className="cat-service-btn"
+                    type="button"
+                    className={`cat-service-btn ${serviceType === 'dine_in' ? 'active' : ''}`}
+                    onClick={() => { setServiceType('dine_in'); setView('checkout'); }}
+                  >
+                    <span className="cat-service-btn-icon">🍽️</span>
+                    En el local
+                    <span className="cat-service-btn-sub">Mesa o salón</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`cat-service-btn ${serviceType === 'takeaway' ? 'active' : ''}`}
                     onClick={() => { setServiceType('takeaway'); setView('checkout'); }}
                   >
                     <span className="cat-service-btn-icon">🏃</span>
@@ -972,7 +1055,8 @@ export default function CatalogPage({ initialCashShift }) {
                     <span className="cat-service-btn-sub">Retirar en el local</span>
                   </button>
                   <button
-                    className="cat-service-btn"
+                    type="button"
+                    className={`cat-service-btn ${serviceType === 'delivery' ? 'active' : ''}`}
                     onClick={() => { setServiceType('delivery'); setView('checkout'); }}
                   >
                     <span className="cat-service-btn-icon">🛵</span>
@@ -1033,14 +1117,86 @@ export default function CatalogPage({ initialCashShift }) {
           <MapPin size={15} style={{ flexShrink: 0 }} />
           <span>{settings.direccion || 'Av. Perón 145 (frente al super x día)'}</span>
         </div>
-        <button 
-          type="button"
-          className="cat-store-info-btn"
-          onClick={() => setShowInfoModal(true)}
-        >
-          <Info size={17} />
-          <span>Información</span>
-        </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+          <button 
+            type="button"
+            className="cat-store-info-btn"
+            onClick={() => setShowInfoModal(true)}
+          >
+            <Info size={17} />
+            <span>Información</span>
+          </button>
+
+          {tableNumber ? (
+            <div 
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                background: 'rgba(239, 68, 68, 0.12)',
+                border: '1.5px solid rgba(239, 68, 68, 0.4)',
+                borderRadius: 20,
+                padding: '4px 12px',
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                color: '#b91c1c'
+              }}
+            >
+              <span>🍽️ {tableNumber.toLowerCase().startsWith('mesa') ? tableNumber : `Mesa ${tableNumber}`}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const newMesa = window.prompt('Modificar tu número de mesa o barra:', tableNumber);
+                  if (newMesa !== null) {
+                    setTableNumber(newMesa.trim());
+                    if (newMesa.trim()) setServiceType('dine_in');
+                  }
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#71717a',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  textDecoration: 'underline',
+                  padding: 0
+                }}
+                title="Modificar mesa"
+              >
+                Cambiar
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                const chosen = window.prompt('¿En qué mesa o ubicación estás sentado? (Ej: 1, 4, Barra)');
+                if (chosen && chosen.trim()) {
+                  setTableNumber(chosen.trim());
+                  setServiceType('dine_in');
+                  showToast(`🍽️ Asignada ${chosen.trim().toLowerCase().startsWith('mesa') ? chosen.trim() : `Mesa ${chosen.trim()}`}`);
+                }
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                background: 'var(--cat-surface)',
+                border: '1px solid var(--cat-border-strong)',
+                borderRadius: 20,
+                padding: '5px 12px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                color: 'var(--cat-text-muted)',
+                cursor: 'pointer'
+              }}
+            >
+              <span>🍽️ ¿Estás en el local?</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 3.1 CARTELITO / BANNER DE PROMOS DEL DÍA */}

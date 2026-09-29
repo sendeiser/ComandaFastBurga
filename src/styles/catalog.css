@@ -1504,15 +1504,16 @@
 
 .cat-service-btns {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
 }
 
 .cat-service-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 16px;
+  justify-content: center;
+  padding: 14px 8px;
   background: var(--cat-surface);
   border: 1px solid var(--cat-border-strong);
   border-radius: 12px;
@@ -1520,12 +1521,20 @@
   cursor: pointer;
   transition: all 0.15s ease;
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
+  text-align: center;
 }
 
 .cat-service-btn:hover {
   border-color: var(--cat-red);
   background: var(--cat-surface-2);
+}
+
+.cat-service-btn.active {
+  border-color: var(--cat-red);
+  background: rgba(239, 68, 68, 0.1);
+  box-shadow: 0 0 0 1.5px var(--cat-red);
+  color: var(--cat-red);
 }
 
 .cat-service-btn-icon {

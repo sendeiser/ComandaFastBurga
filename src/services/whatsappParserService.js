@@ -21,8 +21,23 @@ export const whatsappParserService = {
     let transferConfirmed = false;
     let transferProof = '';
     let detectedItems = [];
+    let detectedChannel = 'whatsapp';
+    let detectedTableNumber = '';
 
-    // 1. Detectar datos de entrega y cliente
+    // 1. Detectar canal (mesa, mostrador, delivery) y número de mesa
+    const mesaMatch = raw.match(/(?:🪑\s*)?(?:mesa|ubicaci[oó]n|barra)\s*:?\s*(?:mesa\s*)?([A-Za-z0-9\-]+)/i);
+    if (mesaMatch) {
+      detectedChannel = 'mesa';
+      detectedTableNumber = mesaMatch[1].trim();
+    } else if (/(?:comer\s*en\s*el\s*local|en\s*mesa|consumo\s*en\s*el\s*local)/i.test(raw)) {
+      detectedChannel = 'mesa';
+    } else if (/(?:para\s*llevar|retiro\s*en\s*el\s*local|mostrador)/i.test(raw)) {
+      detectedChannel = 'mostrador';
+    } else if (/(?:delivery|env[ií]o|cadete|domicilio)/i.test(raw)) {
+      detectedChannel = 'whatsapp';
+    }
+
+    // 2. Detectar datos de entrega y cliente
     const addressMatch = raw.match(/(?:direcci[oó]n|env[ií]o|calle|domicilio|a|para)\s*:?\s*([A-Za-z0-9\s\.,°º]+?)(?:\n|$|,|pago|telefono|cel)/i);
     if (addressMatch) {
       detectedCustomer.address = addressMatch[1].trim();
@@ -38,7 +53,7 @@ export const whatsappParserService = {
       detectedCustomer.name = nameMatch[1].trim();
     }
 
-    // 2. Detectar Medio de Pago
+    // 3. Detectar Medio de Pago
     if (/transferencia|alias|mp|mercado\s*pago|cbu|cvu|deposito/i.test(raw)) {
       detectedPayment = 'transferencia';
       if (/comprobante|acreditad[ao]|adjunto|ya\s*te\s*transfer[ií]|pagado/i.test(raw)) {
@@ -95,6 +110,8 @@ export const whatsappParserService = {
       transferConfirmed,
       transferProof,
       items: detectedItems,
+      channel: detectedChannel,
+      tableNumber: detectedTableNumber,
       rawText: raw
     };
   }

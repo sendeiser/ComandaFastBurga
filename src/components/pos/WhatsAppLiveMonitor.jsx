@@ -3,7 +3,8 @@ import {
   MessageSquare, Send, RefreshCw, User, Phone, MapPin, 
   ShoppingBag, CheckCircle2, AlertCircle, Clock, Trash2, 
   Play, Pause, ExternalLink, Search, Check, CheckCheck, 
-  ArrowRight, Image as ImageIcon, Zap, X, ShieldAlert, Sparkles
+  ArrowRight, Image as ImageIcon, Zap, X, ShieldAlert, Sparkles,
+  ChevronDown
 } from 'lucide-react';
 import { liveChatService } from '../../services/liveChatService';
 import { audioService } from '../../services/audioService';
@@ -36,7 +37,35 @@ export default function WhatsAppLiveMonitor({
   const [zoomedImage, setZoomedImage] = useState(null);
 
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const chatInputRef = useRef(null);
+  const isNearBottomRef = useRef(true);
+  const [userHasScrolledUp, setUserHasScrolledUp] = useState(false);
+
+  // Helper para hacer scroll al fondo
+  const scrollToBottom = useCallback((behavior = 'smooth') => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior
+      });
+    } else if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior });
+    }
+    isNearBottomRef.current = true;
+    setUserHasScrolledUp(false);
+  }, []);
+
+  // Detector de posición de scroll del usuario
+  const handleScroll = useCallback(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    // Si está a menos de 75px del fondo, se considera que está al final
+    const nearBottom = distanceFromBottom < 75;
+    isNearBottomRef.current = nearBottom;
+    setUserHasScrolledUp(!nearBottom);
+  }, []);
 
   // 1. Cargar lista de chats
   const fetchChats = useCallback(async (silent = false) => {
@@ -66,7 +95,18 @@ export default function WhatsAppLiveMonitor({
     try {
       const res = await liveChatService.getChatMessages(jid);
       if (res && res.success) {
-        setMessages(res.messages || []);
+        const incoming = res.messages || [];
+        setMessages(prev => {
+          // Si el tamaño y el último mensaje son idénticos, conservamos la referencia para no causar re-render ni layout shifts
+          if (prev && prev.length === incoming.length && prev.length > 0) {
+            const pLast = prev[prev.length - 1];
+            const iLast = incoming[incoming.length - 1];
+            if (pLast?.id === iLast?.id && pLast?.timestamp === iLast?.timestamp && pLast?.text === iLast?.text) {
+              return prev;
+            }
+          }
+          return incoming;
+        });
         setCurrentSession(res.session || null);
       }
     } catch (_) {
@@ -87,21 +127,31 @@ export default function WhatsAppLiveMonitor({
     return () => clearInterval(interval);
   }, [fetchChats, fetchMessages, selectedJid]);
 
-  // Al cambiar chat seleccionado
+  // Al cambiar chat seleccionado: resetear scroll al fondo y dar foco al input
   useEffect(() => {
     if (selectedJid) {
+      isNearBottomRef.current = true;
+      setUserHasScrolledUp(false);
       fetchMessages(selectedJid);
-      // Foco en el input
       setTimeout(() => {
         chatInputRef.current?.focus();
-      }, 150);
+        scrollToBottom('auto');
+      }, 120);
     }
-  }, [selectedJid, fetchMessages]);
+  }, [selectedJid, fetchMessages, scrollToBottom]);
 
-  // Auto-scroll al final de mensajes
+  // Auto-scroll al final SOLO si el usuario no hizo scroll hacia arriba (respetar lectura de historial)
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (isNearBottomRef.current) {
+      const timer = setTimeout(() => {
+        if (isNearBottomRef.current && messagesContainerRef.current) {
+          messagesContainerRef.current.scrollTo({
+            top: messagesContainerRef.current.scrollHeight,
+            behavior: 'smooth'
+          });
+        }
+      }, 60);
+      return () => clearTimeout(timer);
     }
   }, [messages]);
 
@@ -115,6 +165,11 @@ export default function WhatsAppLiveMonitor({
       const res = await liveChatService.sendMessage(selectedJid, text);
       if (res && res.success) {
         setInputText('');
+        // Forzar scroll al fondo cuando el cajero envía un mensaje
+        isNearBottomRef.current = true;
+        setUserHasScrolledUp(false);
+        setTimeout(() => scrollToBottom('smooth'), 50);
+
         // Agregar optimistamente
         setMessages(prev => [
           ...prev,
@@ -174,11 +229,19 @@ export default function WhatsAppLiveMonitor({
     }
 
     const currentChat = chats.find(c => c.jid === selectedJid);
+    const isMesa = currentSession.shippingMethod === 'mesa' || Boolean(currentSession.tableNumber);
+    const channel = isMesa 
+      ? 'mesa' 
+      : (currentSession.shippingMethod === 'delivery' ? 'whatsapp' : 'mostrador');
+
     const parsedData = {
+      channel,
+      tableNumber: currentSession.tableNumber || '',
       customer: {
         name: currentSession.customerName || currentChat?.name || 'Cliente WhatsApp',
         phone: currentChat?.phone || '',
-        address: currentSession.shippingAddress || (currentSession.shippingMethod === 'delivery' ? 'Domicilio' : 'Retiro en Local')
+        address: currentSession.shippingAddress || (isMesa ? `Mesa ${currentSession.tableNumber || ''}` : currentSession.shippingMethod === 'delivery' ? 'Domicilio' : 'Retiro en Local'),
+        notes: currentSession.notes || ''
       },
       items: currentSession.items.map(it => {
         const prodMatch = products.find(p => p.id === it.id || p.name.toLowerCase() === it.name.toLowerCase());
@@ -206,14 +269,22 @@ export default function WhatsAppLiveMonitor({
     }
 
     const currentChat = chats.find(c => c.jid === selectedJid);
+    const isMesa = currentSession.shippingMethod === 'mesa' || Boolean(currentSession.tableNumber);
+    const channel = isMesa 
+      ? 'mesa' 
+      : (currentSession.shippingMethod === 'delivery' ? 'whatsapp' : 'mostrador');
+
     if (typeof onDirectInjectOrder === 'function') {
       onDirectInjectOrder({
+        channel,
+        tableNumber: currentSession.tableNumber || '',
         customer: {
           name: currentSession.customerName || currentChat?.name || 'Cliente WhatsApp',
           phone: currentChat?.phone || '',
-          address: currentSession.shippingAddress || (currentSession.shippingMethod === 'delivery' ? 'Domicilio' : 'Retiro en Local')
+          address: currentSession.shippingAddress || (isMesa ? `Mesa ${currentSession.tableNumber || ''}` : currentSession.shippingMethod === 'delivery' ? 'Domicilio' : 'Retiro en Local'),
+          notes: currentSession.notes || ''
         },
-        deliveryType: currentSession.shippingMethod || 'local',
+        deliveryType: currentSession.shippingMethod || (isMesa ? 'mesa' : 'local'),
         paymentMethod: currentSession.paymentMethod || 'efectivo',
         items: currentSession.items,
         total: currentSession.total || currentSession.subtotal || 0
@@ -488,7 +559,8 @@ export default function WhatsAppLiveMonitor({
         borderRadius: 'var(--radius-lg)',
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        position: 'relative'
       }}>
         {activeChat ? (
           <>
@@ -610,15 +682,19 @@ export default function WhatsAppLiveMonitor({
             )}
 
             {/* FEED DE MENSAJES SCROLLABLE */}
-            <div style={{
-              flex: 1,
-              overflowY: 'auto',
-              padding: '1rem',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.75rem',
-              background: 'var(--bg-main)'
-            }}>
+            <div 
+              ref={messagesContainerRef}
+              onScroll={handleScroll}
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '1rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem',
+                background: 'var(--bg-main)'
+              }}
+            >
               {messages.length === 0 ? (
                 <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                   No hay mensajes registrados en esta conversación.
@@ -709,6 +785,46 @@ export default function WhatsAppLiveMonitor({
               )}
               <div ref={messagesEndRef} />
             </div>
+
+            {/* BOTÓN FLOTANTE BAJAR AL FINAL (Cuando el usuario hizo scroll hacia arriba) */}
+            {userHasScrolledUp && (
+              <button
+                type="button"
+                onClick={() => scrollToBottom('smooth')}
+                style={{
+                  position: 'absolute',
+                  bottom: '120px',
+                  right: '24px',
+                  background: 'var(--bg-card)',
+                  color: 'var(--text-primary)',
+                  border: '1.5px solid var(--accent-emerald)',
+                  borderRadius: '50px',
+                  padding: '7px 14px',
+                  boxShadow: '0 6px 20px rgba(0,0,0,0.35)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  zIndex: 30,
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                  backdropFilter: 'blur(6px)'
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(37, 211, 102, 0.3)';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.transform = 'none';
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.35)';
+                }}
+                title="Bajar a los mensajes más recientes"
+              >
+                <ChevronDown size={15} style={{ color: 'var(--accent-emerald)' }} />
+                <span>Bajar al final</span>
+              </button>
+            )}
 
             {/* RESPUESTAS RÁPIDAS (CHIPS) */}
             <div style={{

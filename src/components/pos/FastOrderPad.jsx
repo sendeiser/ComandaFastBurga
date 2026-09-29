@@ -275,12 +275,22 @@ export default function FastOrderPad({
   };
 
   const handleApplyWhatsAppImport = (parsed) => {
-    setChannel('whatsapp');
+    if (parsed.channel === 'mesa' || parsed.tableNumber) {
+      setChannel('mesa');
+      if (parsed.tableNumber) {
+        setTableNumber(String(parsed.tableNumber).replace(/^mesa\s*/i, '').trim());
+      }
+    } else if (parsed.channel === 'mostrador') {
+      setChannel('mostrador');
+    } else {
+      setChannel('whatsapp');
+    }
+
     setCustomer({
       name: parsed.customer?.name || '',
       address: parsed.customer?.address || '',
       phone: parsed.customer?.phone || '',
-      notes: ''
+      notes: parsed.customer?.notes || ''
     });
     setCartItems(parsed.items.map(it => {
       const match = products.find(p => p.id === it.productId);
@@ -681,18 +691,21 @@ export default function FastOrderPad({
           )}
 
           {channel === 'mesa' && (
-            <div className="customer-fields-bar" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>Número de Mesa:</span>
-              <select 
+            <div className="customer-fields-bar" style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '0.4rem' }}>
+              <input 
+                type="text" 
                 className="custom-input-sm" 
-                style={{ width: '100px' }}
+                placeholder="Nº Mesa / Barra"
                 value={tableNumber}
                 onChange={e => setTableNumber(e.target.value)}
-              >
-                {[1,2,3,4,5,6,7,8,9,10,11,12,15,20].map(n => (
-                  <option key={n} value={n}>Mesa #{n}</option>
-                ))}
-              </select>
+              />
+              <input 
+                type="text" 
+                className="custom-input-sm" 
+                placeholder="Nombre del Cliente (opcional)"
+                value={customer.name}
+                onChange={e => setCustomer({ ...customer, name: e.target.value })}
+              />
             </div>
           )}
         </div>
