@@ -111,7 +111,8 @@ export default function Header({
           title="Monitoreo y Control de WhatsApp Bot en Vivo (F6)"
         >
           <MessageSquare size={17} style={{ color: currentTab === 'whatsapp' ? '#25D366' : 'inherit' }} />
-          <span>WhatsApp Live</span>
+          <span className="nav-tab-label-full">WhatsApp Live</span>
+          <span className="nav-tab-label-short">WhatsApp</span>
           {activeWhatsAppCount > 0 && (
             <span className="nav-badge-count" style={{ background: '#25D366', color: '#052e16' }}>
               {activeWhatsAppCount}
@@ -130,6 +131,9 @@ export default function Header({
             <User size={14} style={{ color: 'var(--accent-amber)', flexShrink: 0 }} />
             <span className="cashier-name-desktop">
               {currentCashier.name}
+            </span>
+            <span className="cashier-name-compact">
+              {cashierFirstName}
             </span>
             <span className="cashier-name-mobile">
               {cashierFirstName}
@@ -150,12 +154,14 @@ export default function Header({
           <div className="shift-status-pill open" onClick={onOpenCashModal} title="Click para ver control de caja">
             <span className="shift-status-dot open" />
             <span className="shift-status-full-text">Caja Abierta (${cashShift.initialCash.toLocaleString('es-AR')})</span>
+            <span className="shift-status-mid-text">Abierta (${cashShift.initialCash.toLocaleString('es-AR')})</span>
             <span className="shift-status-short-text">Abierta</span>
           </div>
         ) : (
           <div className="shift-status-pill closed" onClick={onOpenCashModal} title="Click para abrir turno de caja">
             <span className="shift-status-dot closed" />
             <span className="shift-status-full-text">Caja Cerrada</span>
+            <span className="shift-status-mid-text">Cerrada</span>
             <span className="shift-status-short-text">Cerrada</span>
           </div>
         )}
