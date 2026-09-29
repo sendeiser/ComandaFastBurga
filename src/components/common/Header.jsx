@@ -14,7 +14,8 @@ import {
   Cloud, 
   Sun, 
   Moon,
-  MessageSquare
+  MessageSquare,
+  QrCode
 } from 'lucide-react';
 import { supabaseSync } from '../../services/supabaseClient';
 
@@ -30,7 +31,8 @@ export default function Header({
   theme,
   onToggleTheme,
   onOpenCashModal, 
-  onOpenSettings 
+  onOpenSettings,
+  onOpenCatalogQR
 }) {
   const isCloudSynced = supabaseSync.isConfigured();
 
@@ -183,6 +185,17 @@ export default function Header({
           ) : (
             <Sun size={15} style={{ color: 'var(--accent-amber)' }} />
           )}
+        </button>
+
+        {/* QR Carta Digital & Flyer PDF */}
+        <button 
+          type="button"
+          className="header-icon-btn" 
+          onClick={onOpenCatalogQR}
+          title="Generar Código QR & Flyer de Carta Digital para imprimir en PDF"
+          style={{ color: 'var(--accent-amber)' }}
+        >
+          <QrCode size={15} />
         </button>
 
         {/* Settings Modal Button */}

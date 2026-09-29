@@ -5,10 +5,11 @@ import { storageService } from '../../services/storageService';
 import { 
   Plus, Edit2, Trash2, Check, UtensilsCrossed, 
   Upload, Image as ImageIcon, Link as LinkIcon, X, 
-  Sparkles, Camera, RefreshCw, Layers, Search, Filter
+  Sparkles, Camera, RefreshCw, Layers, Search, Filter,
+  QrCode
 } from 'lucide-react';
 
-export default function MenuManagement({ products = [], onSaveProducts }) {
+export default function MenuManagement({ products = [], onSaveProducts, onOpenCatalogQR }) {
   // Sub-pestaña activa dentro del módulo de Menú
   const [activeSubTab, setActiveSubTab] = useState('products'); // 'products' | 'categories'
 
@@ -252,17 +253,44 @@ export default function MenuManagement({ products = [], onSaveProducts }) {
           </button>
         </div>
 
-        {/* BOTÓN NUEVO PRODUCTO */}
-        {activeSubTab === 'products' && (
+        {/* ACCIONES: QR CARTA DIGITAL & NUEVO PRODUCTO */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
             type="button"
-            className="btn-confirm-order btn-new-product"
-            onClick={openNew}
+            className="cat-pill-btn"
+            style={{
+              height: '38px',
+              padding: '0 14px',
+              fontSize: '0.82rem',
+              fontWeight: 800,
+              background: 'rgba(245, 158, 11, 0.12)',
+              border: '1.5px solid rgba(245, 158, 11, 0.4)',
+              color: 'var(--accent-amber)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              borderRadius: '8px'
+            }}
+            onClick={onOpenCatalogQR}
+            title="Generar código QR y flyer imprimible en PDF de la carta digital"
           >
-            <Plus size={17} />
-            <span>Nuevo Producto</span>
+            <QrCode size={16} />
+            <span>QR Carta Digital</span>
           </button>
-        )}
+
+          {/* BOTÓN NUEVO PRODUCTO */}
+          {activeSubTab === 'products' && (
+            <button
+              type="button"
+              className="btn-confirm-order btn-new-product"
+              onClick={openNew}
+            >
+              <Plus size={17} />
+              <span>Nuevo Producto</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ========================================================= */}

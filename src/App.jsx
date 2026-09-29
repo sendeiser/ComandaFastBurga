@@ -18,6 +18,7 @@ import { audioService } from './services/audioService';
 import { printerService } from './services/printerService';
 import { supabaseSync } from './services/supabaseClient';
 import CatalogPage from './pages/CatalogPage';
+import CatalogQRModal from './components/pos/CatalogQRModal';
 import WhatsAppLiveMonitor from './components/pos/WhatsAppLiveMonitor';
 import WhatsAppToastAlert from './components/pos/WhatsAppToastAlert';
 import { liveChatService } from './services/liveChatService';
@@ -134,7 +135,14 @@ export default function App() {
   // Modals
   const [isCashModalOpen, setIsCashModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isCatalogQROpen, setIsCatalogQROpen] = useState(false);
   const [previewOrder, setPreviewOrder] = useState(null);
+
+  useEffect(() => {
+    const handleOpenQr = () => setIsCatalogQROpen(true);
+    window.addEventListener('comandafast:open_catalog_qr', handleOpenQr);
+    return () => window.removeEventListener('comandafast:open_catalog_qr', handleOpenQr);
+  }, []);
 
   // Theme state ('light' as primary default | 'dark')
   const [theme, setTheme] = useState(() => {
@@ -968,6 +976,7 @@ export default function App() {
         onToggleTheme={handleToggleTheme}
         onOpenCashModal={() => setIsCashModalOpen(true)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
+        onOpenCatalogQR={() => setIsCatalogQROpen(true)}
       />
 
       <main className="main-content">
@@ -1005,6 +1014,7 @@ export default function App() {
           <MenuManagement 
             products={products}
             onSaveProducts={handleSaveProducts}
+            onOpenCatalogQR={() => setIsCatalogQROpen(true)}
           />
         )}
 
@@ -1040,7 +1050,18 @@ export default function App() {
         <SettingsModal 
           settings={settings}
           onSaveSettings={handleSaveSettings}
+          onOpenCatalogQR={() => {
+            setIsSettingsModalOpen(false);
+            setIsCatalogQROpen(true);
+          }}
           onClose={() => setIsSettingsModalOpen(false)}
+        />
+      )}
+
+      {isCatalogQROpen && (
+        <CatalogQRModal 
+          settings={settings}
+          onClose={() => setIsCatalogQROpen(false)}
         />
       )}
 

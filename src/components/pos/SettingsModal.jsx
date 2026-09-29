@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { X, Settings, Download, Upload, Printer, DollarSign, Database, Bluetooth, Usb, CheckCircle, Palette, FileText, Check, Hash, RotateCcw } from 'lucide-react';
+import { X, Settings, Download, Upload, Printer, DollarSign, Database, Bluetooth, Usb, CheckCircle, Palette, FileText, Check, Hash, RotateCcw, QrCode } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 import { printerService } from '../../services/printerService';
 import { supabaseSync } from '../../services/supabaseClient';
 
-export default function SettingsModal({ settings, onSaveSettings, onClose }) {
+export default function SettingsModal({ settings, onSaveSettings, onOpenCatalogQR, onClose }) {
   const [form, setForm] = useState(settings);
   const [testingSupabase, setTestingSupabase] = useState(false);
   const [supabaseStatus, setSupabaseStatus] = useState(null);
@@ -404,6 +404,29 @@ export default function SettingsModal({ settings, onSaveSettings, onClose }) {
                 <RotateCcw size={14} />
                 <span>Reiniciar contador a 0 ahora</span>
               </button>
+            </div>
+          </div>
+
+          {/* CARTA DIGITAL / CATÁLOGO ONLINE & QR */}
+          <div style={{ background: 'var(--bg-main)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--accent-amber)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <QrCode size={18} />
+                <span>Carta Digital & Código QR</span>
+              </div>
+              {onOpenCatalogQR && (
+                <button
+                  type="button"
+                  className="qty-btn"
+                  style={{ width: 'auto', padding: '0.35rem 0.8rem', fontSize: '0.78rem', background: 'var(--accent-amber)', color: '#000', fontWeight: 800 }}
+                  onClick={onOpenCatalogQR}
+                >
+                  Generar QR & Flyer PDF
+                </button>
+              )}
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+              Crea e imprime carteles de pared A4, displays de mesa A5 o stickers para packaging con el código QR de tu menú digital.
             </div>
           </div>
 
