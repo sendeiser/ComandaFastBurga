@@ -954,7 +954,7 @@ export default function CatalogPage({ initialCashShift }) {
         try {
           await supabaseSync.createOrder(orderPayload);
         } catch (supaErr) {
-          console.warn('[CatalogPage] Error enviando comanda a Supabase:', supaErr);
+          console.warn('[CatalogPage] Error enviando pedido a Supabase:', supaErr);
         }
       }
 
@@ -1226,7 +1226,7 @@ export default function CatalogPage({ initialCashShift }) {
                       💳 <strong>Alias:</strong> <code style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: 4, fontWeight: 800, color: '#fff' }}>{settings.alias_banco || 'burga.chamical.nx'}</code> ({settings.banco || 'Mercado Pago'})
                     </div>
                     <div>
-                      📲 <strong>Importante:</strong> Al confirmar, tu comanda se enviará a cocina y se abrirá WhatsApp con el detalle de tu mesa para que puedas adjuntar tu comprobante de pago.
+                      📲 <strong>Importante:</strong> Al confirmar, tu pedido se enviará a cocina y se abrirá WhatsApp con el detalle de tu mesa para que puedas adjuntar tu comprobante de pago.
                     </div>
                   </div>
                 ) : (
@@ -1307,7 +1307,7 @@ export default function CatalogPage({ initialCashShift }) {
 
     // Step configuration
     const stepsConfig = [
-      { key: 'pendiente', label: 'Pedido recibido', desc: 'Comanda ingresada al sistema POS', icon: '📋' },
+      { key: 'pendiente', label: 'Pedido recibido', desc: 'Pedido ingresado al sistema', icon: '📋' },
       { key: 'cocina', label: 'En cocina', desc: 'Preparando y marchando tu pedido a la plancha', icon: '👨‍🍳' },
       { key: 'listo', label: 'Listo para servir', desc: 'Salió de cocina y va en camino a tu mesa', icon: '🍽️' },
       { key: 'entregado', label: 'Entregado en mesa', desc: '¡Servido! Que disfrutes tu comida', icon: '✅' },
@@ -1385,7 +1385,7 @@ export default function CatalogPage({ initialCashShift }) {
               <div className="cat-status-current-badge" style={{ borderColor: 'rgba(239, 68, 68, 0.4)', background: 'rgba(239, 68, 68, 0.08)' }}>
                 <span className="cat-status-current-icon">⏳</span>
                 <div>
-                  <div className="cat-status-current-title" style={{ color: '#f87171' }}>Comanda recibida en sistema</div>
+                  <div className="cat-status-current-title" style={{ color: '#f87171' }}>Pedido recibido en el sistema</div>
                   <div className="cat-status-current-desc">Tu pedido ya está en la pantalla del salón. En instantes comienza la preparación en cocina.</div>
                 </div>
               </div>
@@ -1393,14 +1393,14 @@ export default function CatalogPage({ initialCashShift }) {
 
             <div className="cat-status-meta-info">
               <span>👤 {activeTableOrder.customer?.name || cleanTable}</span>
-              <span>🕒 Hora de comanda: {orderTimeFormatted} hs</span>
+              <span>🕒 Hora del pedido: {orderTimeFormatted} hs</span>
             </div>
           </div>
 
           {/* Stepper Card */}
           {currentStatus !== 'cancelado' && (
             <div className="cat-status-stepper">
-              <div className="cat-status-stepper-title">Progreso de la comanda</div>
+              <div className="cat-status-stepper-title">Progreso de tu pedido</div>
               <div className="cat-step-list">
                 {stepsConfig.map((s, idx) => {
                   const isDone = currentStepIndex > idx;
@@ -1492,7 +1492,7 @@ export default function CatalogPage({ initialCashShift }) {
                     </button>
                   </div>
                   <div style={{ fontSize: '0.74rem', color: '#a1a1aa', marginTop: 4 }}>
-                    Adjuntá tu comprobante por WhatsApp para validar el pago de tu comanda en el salón.
+                    Adjuntá tu comprobante por WhatsApp para validar el pago de tu pedido en el salón.
                   </div>
                 </div>
               ) : (
@@ -2103,7 +2103,7 @@ export default function CatalogPage({ initialCashShift }) {
             <div className="cat-active-order-text">
               <strong>{activeTableOrder.tableNumber?.toLowerCase().startsWith('mesa') ? activeTableOrder.tableNumber : `Mesa ${activeTableOrder.tableNumber}`} • Pedido #{activeTableOrder.orderNumber}</strong>
               <small>
-                {activeTableOrder.status === 'pendiente' && '⏳ Comanda recibida en sistema'}
+                {activeTableOrder.status === 'pendiente' && '⏳ Pedido recibido en el sistema'}
                 {activeTableOrder.status === 'cocina' && '👨‍🍳 En preparación en cocina'}
                 {activeTableOrder.status === 'listo' && '🍽️ ¡Listo para servir en tu mesa!'}
                 {activeTableOrder.status === 'entregado' && '✅ Entregado a la mesa'}
