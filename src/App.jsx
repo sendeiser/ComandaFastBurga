@@ -49,12 +49,31 @@ export default function App() {
     return hash === '#admin' || hash === '#dueno' || hash === '#dueÃ±o' || hash === '#auditoria' || search.includes('portal=admin') || search.includes('portal=dueno');
   });
 
-  // Catalog route: accessible via #catalog or ?catalog=1
-  const [isCatalogRoute, setIsCatalogRoute] = useState(() => {
-    const hash = window.location.hash.toLowerCase();
-    const search = window.location.search.toLowerCase();
-    return hash === '#catalog' || hash === '#carta' || hash === '#menu' || search.includes('catalog=1');
-  });
+  // Helper para detectar si la URL corresponde a la carta digital / catálogo público
+  const checkIsCatalogRoute = () => {
+    if (typeof window === 'undefined') return false;
+    const hash = (window.location.hash || '').toLowerCase();
+    const search = (window.location.search || '').toLowerCase();
+    const pathname = (window.location.pathname || '').toLowerCase();
+
+    return (
+      pathname === '/catalog' ||
+      pathname === '/carta' ||
+      pathname === '/menu' ||
+      hash.startsWith('#catalog') ||
+      hash.startsWith('#carta') ||
+      hash.startsWith('#menu') ||
+      hash.startsWith('#mesa') ||
+      hash.includes('mesa=') ||
+      hash.includes('catalog') ||
+      search.includes('catalog') ||
+      search.includes('mesa=') ||
+      search.includes('table=')
+    );
+  };
+
+  // Catalog route: accessible via #catalog, ?mesa=X, #catalog?mesa=X, etc.
+  const [isCatalogRoute, setIsCatalogRoute] = useState(() => checkIsCatalogRoute());
 
   // Secret URL listener and secret keyboard shortcut (Ctrl + Shift + D)
   useEffect(() => {
@@ -63,8 +82,7 @@ export default function App() {
       const search = window.location.search.toLowerCase();
       const isMatch = hash === '#admin' || hash === '#dueno' || hash === '#dueÃ±o' || hash === '#auditoria' || search.includes('portal=admin') || search.includes('portal=dueno');
       setIsOwnerPortalRoute(isMatch);
-      const isCatalog = hash === '#catalog' || hash === '#carta' || hash === '#menu' || search.includes('catalog=1');
-      setIsCatalogRoute(isCatalog);
+      setIsCatalogRoute(checkIsCatalogRoute());
     };
     handleHash();
     window.addEventListener('hashchange', handleHash);

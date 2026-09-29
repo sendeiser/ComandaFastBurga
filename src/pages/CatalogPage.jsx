@@ -26,17 +26,34 @@ function formatPrice(n) {
 function getMesaFromUrl() {
   if (typeof window === 'undefined') return '';
   try {
+    // 1. Buscar en query string estándar (?mesa=X o ?table=X)
     const searchParams = new URLSearchParams(window.location.search);
-    if (searchParams.has('mesa')) return searchParams.get('mesa').trim();
+    if (searchParams.has('mesa') && searchParams.get('mesa')) {
+      return decodeURIComponent(searchParams.get('mesa')).trim();
+    }
+    if (searchParams.has('table') && searchParams.get('table')) {
+      return decodeURIComponent(searchParams.get('table')).trim();
+    }
 
+    // 2. Buscar en hash (#catalog?mesa=X o #mesa=X)
     const hash = window.location.hash || '';
     const qIndex = hash.indexOf('?');
     if (qIndex !== -1) {
       const hashParams = new URLSearchParams(hash.substring(qIndex));
-      if (hashParams.has('mesa')) return hashParams.get('mesa').trim();
+      if (hashParams.has('mesa') && hashParams.get('mesa')) {
+        return decodeURIComponent(hashParams.get('mesa')).trim();
+      }
+      if (hashParams.has('table') && hashParams.get('table')) {
+        return decodeURIComponent(hashParams.get('table')).trim();
+      }
     }
-    const mMatch = hash.match(/mesa[=_](\w+)/i);
-    if (mMatch) return mMatch[1].trim();
+
+    // 3. Fallback regex en toda la URL por si viene como #mesa=1, /mesa/1, etc.
+    const fullUrl = window.location.href;
+    const match = fullUrl.match(/[?&#]mesa=([^&#]+)/i) || fullUrl.match(/#mesa[=_]([^&#]+)/i);
+    if (match && match[1]) {
+      return decodeURIComponent(match[1]).trim();
+    }
   } catch (_) {}
   return '';
 }
