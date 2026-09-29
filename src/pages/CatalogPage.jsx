@@ -67,35 +67,38 @@ function generateWhatsAppMessage(items, subtotal, serviceType, customerName, cus
   });
 
   const total = subtotal + (deliveryFee || 0);
-  const paymentLabel = paymentMethod === 'transferencia' ? 'Transferencia Bancaria / MP 🏦' : 'Efectivo 💵';
   const cleanMesa = tableNumber ? (tableNumber.toLowerCase().startsWith('mesa') ? tableNumber : `Mesa ${tableNumber}`) : '';
-
-  let deliveryTypeLabel = 'Para llevar / Mostrador 🏃';
-  if (serviceType === 'delivery') {
-    deliveryTypeLabel = 'Delivery con cadete 🛵';
-  } else if (serviceType === 'dine_in') {
-    deliveryTypeLabel = `Comer en el Local (${cleanMesa || 'En Mesa'}) 🍽️`;
-  }
-
   const orderNumStr = orderNumber ? ` #${orderNumber}` : '';
 
-  let msg = `🍔 *Mi Pedido${orderNumStr} — ComandaFast*\n\n${lines.join('\n')}\n\n` +
+  // Mensaje corto y directo para pedidos en mesa / salón (adjuntar comprobante de pago)
+  if (serviceType === 'dine_in') {
+    const mesaLabel = cleanMesa || 'En Mesa';
+    const isGenericMesaName = customerName && mesaLabel && customerName.trim().toLowerCase() === mesaLabel.trim().toLowerCase();
+    const showCustomerName = customerName && !isGenericMesaName ? customerName.trim() : '';
+
+    return `🍔 *Pedido${orderNumStr} — ${mesaLabel}*\n\n` +
+      `${lines.join('\n')}\n\n` +
+      `💰 *TOTAL:* ${formatPrice(total)}\n` +
+      `🪑 *Mesa:* ${mesaLabel}\n` +
+      (showCustomerName ? `👤 *Nombre:* ${showCustomerName}\n` : '') +
+      (notes ? `📝 *Aclaraciones:* ${notes}\n` : '') +
+      `\n📎 *Adjunto comprobante:* 👇`;
+  }
+
+  // Mensaje completo para Delivery y Para Llevar
+  const paymentLabel = paymentMethod === 'transferencia' ? 'Transferencia Bancaria / MP 🏦' : 'Efectivo 💵';
+  const deliveryTypeLabel = serviceType === 'delivery' ? 'Delivery con cadete 🛵' : 'Para llevar / Mostrador 🏃';
+
+  return `🍔 *Mi Pedido${orderNumStr} — ComandaFast*\n\n${lines.join('\n')}\n\n` +
     `💵 *Subtotal:* ${formatPrice(subtotal)}\n` +
     (deliveryFee ? `🛵 *Delivery:* ${formatPrice(deliveryFee)}\n` : '') +
     `💰 *TOTAL:* ${formatPrice(total)}\n\n` +
     `🚀 *Tipo de entrega:* ${deliveryTypeLabel}\n` +
-    (serviceType === 'dine_in' && cleanMesa ? `🪑 *Ubicación:* ${cleanMesa}\n` : '') +
     `💳 *Forma de pago:* ${paymentLabel}\n` +
     (customerName ? `👤 *Nombre:* ${customerName}\n` : '') +
     (serviceType === 'delivery' && customerAddress ? `📍 *Dirección:* ${customerAddress}\n` : '') +
-    (serviceType !== 'dine_in' && customerPhone ? `📞 *Teléfono:* ${customerPhone}\n` : '') +
+    (customerPhone ? `📞 *Teléfono:* ${customerPhone}\n` : '') +
     (notes ? `\n📝 *Aclaraciones:* ${notes}\n` : '');
-
-  if (serviceType === 'dine_in' && paymentMethod === 'transferencia') {
-    msg += `\n📎 *Adjunto el comprobante de transferencia a continuación:* 👇`;
-  }
-
-  return msg;
 }
 
 // ---- Cart State (simple, no external lib) ----
