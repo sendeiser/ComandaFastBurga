@@ -58,7 +58,7 @@ function getMesaFromUrl() {
   return '';
 }
 
-function generateWhatsAppMessage(items, subtotal, serviceType, customerName, customerAddress, customerPhone, deliveryFee, notes, paymentMethod = 'efectivo', tableNumber = '') {
+function generateWhatsAppMessage(items, subtotal, serviceType, customerName, customerAddress, customerPhone, deliveryFee, notes, paymentMethod = 'efectivo', tableNumber = '', orderNumber = '') {
   const lines = items.map(item => {
     const mods = [...(item.selectedMods || []).map(m => `  + ${m.name}`),
                   ...(item.selectedOptions || []).map(o => `  → ${o.name}`),
@@ -68,25 +68,34 @@ function generateWhatsAppMessage(items, subtotal, serviceType, customerName, cus
 
   const total = subtotal + (deliveryFee || 0);
   const paymentLabel = paymentMethod === 'transferencia' ? 'Transferencia Bancaria / MP 🏦' : 'Efectivo 💵';
+  const cleanMesa = tableNumber ? (tableNumber.toLowerCase().startsWith('mesa') ? tableNumber : `Mesa ${tableNumber}`) : '';
 
   let deliveryTypeLabel = 'Para llevar / Mostrador 🏃';
   if (serviceType === 'delivery') {
     deliveryTypeLabel = 'Delivery con cadete 🛵';
   } else if (serviceType === 'dine_in') {
-    deliveryTypeLabel = 'Comer en el Local / En Mesa 🍽️';
+    deliveryTypeLabel = `Comer en el Local (${cleanMesa || 'En Mesa'}) 🍽️`;
   }
 
-  return `🍔 *Mi Pedido — ComandaFast*\n\n${lines.join('\n')}\n\n` +
+  const orderNumStr = orderNumber ? ` #${orderNumber}` : '';
+
+  let msg = `🍔 *Mi Pedido${orderNumStr} — ComandaFast*\n\n${lines.join('\n')}\n\n` +
     `💵 *Subtotal:* ${formatPrice(subtotal)}\n` +
     (deliveryFee ? `🛵 *Delivery:* ${formatPrice(deliveryFee)}\n` : '') +
     `💰 *TOTAL:* ${formatPrice(total)}\n\n` +
     `🚀 *Tipo de entrega:* ${deliveryTypeLabel}\n` +
-    (serviceType === 'dine_in' && tableNumber ? `🪑 *Mesa:* Mesa ${tableNumber.replace(/^mesa\s*/i, '')}\n` : '') +
+    (serviceType === 'dine_in' && cleanMesa ? `🪑 *Ubicación:* ${cleanMesa}\n` : '') +
     `💳 *Forma de pago:* ${paymentLabel}\n` +
     (customerName ? `👤 *Nombre:* ${customerName}\n` : '') +
     (serviceType === 'delivery' && customerAddress ? `📍 *Dirección:* ${customerAddress}\n` : '') +
     (serviceType !== 'dine_in' && customerPhone ? `📞 *Teléfono:* ${customerPhone}\n` : '') +
     (notes ? `\n📝 *Aclaraciones:* ${notes}\n` : '');
+
+  if (serviceType === 'dine_in' && paymentMethod === 'transferencia') {
+    msg += `\n📎 *Adjunto el comprobante de transferencia a continuación:* 👇`;
+  }
+
+  return msg;
 }
 
 // ---- Cart State (simple, no external lib) ----
@@ -967,11 +976,37 @@ export default function CatalogPage({ initialCashShift }) {
         localStorage.setItem('comandafast_active_table_order', JSON.stringify(orderPayload));
       } catch (_) {}
 
-      // 5. Limpiar carrito y mostrar pantalla de seguimiento
+      // 5. Si eligió transferencia, abrir WhatsApp automáticamente con los datos de la mesa y lo pedido para adjuntar el comprobante
+      if (paymentMethod === 'transferencia') {
+        const waPhone = formatWhatsAppPhone(settings.telefono_whatsapp || settings.telefono_contacto);
+        const waMsg = generateWhatsAppMessage(
+          cart.items,
+          cart.subtotal,
+          'dine_in',
+          resolvedCustomerName,
+          '',
+          customerPhone,
+          0,
+          orderNotes,
+          'transferencia',
+          cleanTable,
+          nextNum
+        );
+        const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(waMsg)}`;
+        try {
+          window.open(waUrl, '_blank');
+        } catch (_) {}
+      }
+
+      // 6. Limpiar carrito y mostrar pantalla de seguimiento
       cart.clearCart();
       setOrderNotes('');
       setView('order_status');
-      showToast('🚀 ¡Pedido enviado a cocina con éxito!');
+      if (paymentMethod === 'transferencia') {
+        showToast('🚀 ¡Pedido enviado! Se abrió WhatsApp para adjuntar comprobante');
+      } else {
+        showToast('🚀 ¡Pedido enviado a cocina con éxito!');
+      }
     } catch (err) {
       console.error('[CatalogPage] Error enviando pedido a cocina:', err);
       showToast('❌ Ocurrió un error al enviar el pedido. Intentá nuevamente.');
@@ -1185,9 +1220,18 @@ export default function CatalogPage({ initialCashShift }) {
             </div>
             {paymentMethod === 'transferencia' && (
               <div className="cat-payment-notice">
-                {serviceType === 'dine_in' 
-                  ? `ℹ️ Podés transferir con el Alias: ${settings.alias_banco || 'burga.chamical.nx'} (${settings.banco || 'Mercado Pago'}) o abonar en caja/mesa.`
-                  : 'ℹ️ Al enviar el pedido recibirás el Alias y CBU por WhatsApp para transferir y adjuntar el comprobante.'}
+                {serviceType === 'dine_in' ? (
+                  <div>
+                    <div style={{ marginBottom: 6 }}>
+                      💳 <strong>Alias:</strong> <code style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: 4, fontWeight: 800, color: '#fff' }}>{settings.alias_banco || 'burga.chamical.nx'}</code> ({settings.banco || 'Mercado Pago'})
+                    </div>
+                    <div>
+                      📲 <strong>Importante:</strong> Al confirmar, tu comanda se enviará a cocina y se abrirá WhatsApp con el detalle de tu mesa para que puedas adjuntar tu comprobante de pago.
+                    </div>
+                  </div>
+                ) : (
+                  'ℹ️ Al enviar el pedido recibirás el Alias y CBU por WhatsApp para transferir y adjuntar el comprobante.'
+                )}
               </div>
             )}
           </div>
@@ -1199,10 +1243,11 @@ export default function CatalogPage({ initialCashShift }) {
 
           {serviceType === 'dine_in' ? (
             <button 
-              type="button"
+              type="button" 
               className="cat-send-dinein-btn" 
               onClick={handleSendDineInOrder}
               disabled={isSubmittingOrder}
+              style={paymentMethod === 'transferencia' ? { background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)', boxShadow: '0 6px 24px rgba(22, 163, 74, 0.45)' } : {}}
             >
               {isSubmittingOrder ? (
                 <>
@@ -1211,8 +1256,8 @@ export default function CatalogPage({ initialCashShift }) {
                 </>
               ) : (
                 <>
-                  <span style={{ fontSize: '1.25rem' }}>🚀</span>
-                  <span>Confirmar y Enviar a Cocina</span>
+                  <span style={{ fontSize: '1.25rem' }}>{paymentMethod === 'transferencia' ? '📲' : '🚀'}</span>
+                  <span>{paymentMethod === 'transferencia' ? 'Confirmar y Enviar Comprobante por WhatsApp' : 'Confirmar y Enviar a Cocina'}</span>
                 </>
               )}
             </button>
@@ -1420,11 +1465,35 @@ export default function CatalogPage({ initialCashShift }) {
               <span>{formatPrice(activeTableOrder.total || activeTableOrder.subtotal || 0)}</span>
             </div>
 
-            <div style={{ marginTop: 14, fontSize: '0.8rem', color: 'var(--cat-text-muted)', background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: 8 }}>
+            <div style={{ marginTop: 14, fontSize: '0.8rem', color: 'var(--cat-text-muted)', background: 'rgba(255,255,255,0.03)', padding: '12px 14px', borderRadius: 10 }}>
               {activeTableOrder.paymentMethod === 'transferencia' ? (
                 <div>
-                  <strong>Forma de pago:</strong> Transferencia bancaria<br/>
-                  Alias: <span style={{ color: '#fff', fontWeight: 700 }}>{settings.alias_banco || 'burga.chamical.nx'}</span> ({settings.banco || 'Mercado Pago'})
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <strong>Forma de pago:</strong>
+                    <span style={{ color: '#4ade80', fontWeight: 800, fontSize: '0.78rem' }}>🏦 Transferencia</span>
+                  </div>
+                  <div className="cat-alias-box">
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: '#a1a1aa' }}>Alias: </span>
+                      <strong style={{ color: '#fff', fontSize: '0.88rem' }}>{settings.alias_banco || 'burga.chamical.nx'}</strong>
+                      <span style={{ fontSize: '0.72rem', color: '#a1a1aa', marginLeft: 4 }}>({settings.banco || 'Mercado Pago'})</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="cat-alias-copy-btn"
+                      onClick={() => {
+                        try {
+                          navigator.clipboard.writeText(settings.alias_banco || 'burga.chamical.nx');
+                          showToast('📋 Alias copiado al portapapeles');
+                        } catch (_) {}
+                      }}
+                    >
+                      Copiar
+                    </button>
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: '#a1a1aa', marginTop: 4 }}>
+                    Adjuntá tu comprobante por WhatsApp para validar el pago de tu comanda en el salón.
+                  </div>
                 </div>
               ) : (
                 <div>
@@ -1437,6 +1506,34 @@ export default function CatalogPage({ initialCashShift }) {
 
           {/* Action Buttons */}
           <div className="cat-status-actions">
+            {activeTableOrder.paymentMethod === 'transferencia' && (
+              <button
+                type="button"
+                className="cat-send-proof-btn"
+                onClick={() => {
+                  const waPhone = formatWhatsAppPhone(settings.telefono_whatsapp || settings.telefono_contacto);
+                  const cleanTable = activeTableOrder.tableNumber ? (activeTableOrder.tableNumber.toLowerCase().startsWith('mesa') ? activeTableOrder.tableNumber : `Mesa ${activeTableOrder.tableNumber}`) : '';
+                  const waMsg = generateWhatsAppMessage(
+                    activeTableOrder.items || [],
+                    activeTableOrder.subtotal || activeTableOrder.total || 0,
+                    'dine_in',
+                    activeTableOrder.customer?.name || cleanTable,
+                    '',
+                    activeTableOrder.customer?.phone || '',
+                    0,
+                    activeTableOrder.customer?.notes || '',
+                    'transferencia',
+                    cleanTable,
+                    activeTableOrder.orderNumber || ''
+                  );
+                  window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(waMsg)}`, '_blank');
+                }}
+              >
+                <MessageCircle size={20} />
+                <span>Enviar comprobante por WhatsApp</span>
+              </button>
+            )}
+
             <button
               type="button"
               className="cat-order-more-btn"
