@@ -32,7 +32,16 @@ const isLocalEnv = () => {
 };
 
 export default function App() {
-  const [currentTab, setCurrentTab] = useState('pos'); // 'pos' | 'kds' | 'history' | 'menu'
+  const isDirectKitchenRoute = typeof window !== 'undefined' && (() => {
+    const hash = (window.location.hash || '').toLowerCase();
+    const search = (window.location.search || '').toLowerCase();
+    return hash === '#cocina' || hash === '#kds' || search.includes('tab=kds') || search.includes('tab=cocina');
+  })();
+
+  const [currentTab, setCurrentTab] = useState(() => {
+    if (isDirectKitchenRoute) return 'kds';
+    return 'pos';
+  });
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [cashShift, setCashShift] = useState(null);
@@ -40,6 +49,26 @@ export default function App() {
   const [currentCashier, setCurrentCashier] = useState(() => authService.getCurrentCashier());
   const [activeWhatsAppCount, setActiveWhatsAppCount] = useState(0);
   const [orderToLoadInPOS, setOrderToLoadInPOS] = useState(null);
+
+  // Modo Cocina Enfocado (Zen Mode / Pantalla Completa para cocineros en móviles y tablets)
+  const [isKitchenZenMode, setIsKitchenZenMode] = useState(() => {
+    if (isDirectKitchenRoute) return true;
+    try {
+      return localStorage.getItem('comandafast_kitchen_zen_mode') === 'true';
+    } catch (_) {
+      return false;
+    }
+  });
+
+  const handleToggleKitchenZenMode = (forcedValue) => {
+    setIsKitchenZenMode(prev => {
+      const next = typeof forcedValue === 'boolean' ? forcedValue : !prev;
+      try {
+        localStorage.setItem('comandafast_kitchen_zen_mode', String(next));
+      } catch (_) {}
+      return next;
+    });
+  };
 
   // Owner authentication & secret portal state
   const [isOwnerAuthenticated, setIsOwnerAuthenticated] = useState(() => authService.isAuthenticated());
@@ -975,7 +1004,8 @@ export default function App() {
   }
 
   // CASHIER LOGIN GATE: Solo pueden entrar los cajeros con credenciales válidas
-  if (!currentCashier) {
+  // (A menos que se acceda directamente a la pantalla de cocina #cocina o tab=kds)
+  if (!currentCashier && !isDirectKitchenRoute) {
     return (
       <CashierLogin 
         onLoginSuccess={handleCashierLoginSuccess}
@@ -983,12 +1013,17 @@ export default function App() {
           window.location.hash = '#dueno';
           setIsOwnerPortalRoute(true);
         }}
+        onOpenKitchen={() => {
+          window.location.hash = '#cocina';
+          setCurrentTab('kds');
+          setIsKitchenZenMode(true);
+        }}
       />
     );
   }
 
   return (
-    <div className="app-layout">
+    <div className={`app-layout ${currentTab === 'kds' && isKitchenZenMode ? 'kitchen-zen-active' : ''}`}>
       <Header 
         currentCashier={currentCashier}
         onLogoutCashier={handleLogoutCashier}
@@ -1003,6 +1038,8 @@ export default function App() {
         onOpenCashModal={() => setIsCashModalOpen(true)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
         onOpenCatalogQR={() => setIsCatalogQROpen(true)}
+        isKitchenZenMode={isKitchenZenMode}
+        onToggleKitchenZenMode={handleToggleKitchenZenMode}
       />
 
       <main className="main-content">
@@ -1024,6 +1061,8 @@ export default function App() {
             onUpdateStatus={handleUpdateOrderStatus}
             onReprintTicket={(order, type) => setPreviewOrder(order)}
             onReorderOrder={handleReorderOrder}
+            isZenMode={isKitchenZenMode}
+            onToggleZenMode={handleToggleKitchenZenMode}
           />
         )}
 

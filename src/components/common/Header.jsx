@@ -32,7 +32,9 @@ export default function Header({
   onToggleTheme,
   onOpenCashModal, 
   onOpenSettings,
-  onOpenCatalogQR
+  onOpenCatalogQR,
+  isKitchenZenMode,
+  onToggleKitchenZenMode
 }) {
   const isCloudSynced = supabaseSync.isConfigured();
 
@@ -208,6 +210,19 @@ export default function Header({
           <Settings size={15} />
         </button>
 
+        {/* Modo Cocina Zen Mode Toggle (Visible when on KDS tab) */}
+        {currentTab === 'kds' && onToggleKitchenZenMode && (
+          <button 
+            type="button"
+            className="header-icon-btn" 
+            onClick={onToggleKitchenZenMode}
+            title={isKitchenZenMode ? 'Salir de Modo Cocina' : 'Modo Cocina Enfocado / Pantalla Completa'}
+            style={{ color: 'var(--accent-orange)' }}
+          >
+            <ChefHat size={16} />
+          </button>
+        )}
+
         {/* Fullscreen Toggle (Desktop Only) */}
         <button 
           type="button"
@@ -236,7 +251,14 @@ export default function Header({
       <button 
         type="button"
         className={`mobile-nav-item ${currentTab === 'kds' ? 'active' : ''}`}
-        onClick={() => setCurrentTab('kds')}
+        onClick={() => {
+          if (currentTab === 'kds' && onToggleKitchenZenMode) {
+            onToggleKitchenZenMode(true);
+          } else {
+            setCurrentTab('kds');
+          }
+        }}
+        title={currentTab === 'kds' ? 'Toca para Modo Cocina Pantalla Completa' : 'Ver Cocina'}
       >
         <div className="mobile-nav-icon-box">
           <ChefHat size={19} />

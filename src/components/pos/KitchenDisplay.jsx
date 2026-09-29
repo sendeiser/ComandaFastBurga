@@ -1,25 +1,75 @@
-import React, { useState, useEffect } from 'react';
-import { ChefHat, Clock, CheckCircle2, Play, AlertCircle, Printer, MessageSquare, ShoppingBag, Utensils, RefreshCw, XCircle, ArrowLeftRight, ChevronUp, ChevronDown, RotateCcw } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  ChefHat, Clock, CheckCircle2, Play, AlertCircle, Printer, 
+  MessageSquare, ShoppingBag, Utensils, RefreshCw, XCircle, 
+  ArrowLeftRight, ChevronUp, ChevronDown, RotateCcw, Maximize2, 
+  Minimize2, Flame, Volume2, VolumeX, X, Sparkles
+} from 'lucide-react';
 import ConfirmModal from '../common/ConfirmModal';
 import { supabaseSync } from '../../services/supabaseClient';
+import { audioService } from '../../services/audioService';
 
 export default function KitchenDisplay({ 
-  orders, 
+  orders = [], 
   onUpdateStatus, 
   onReprintTicket,
-  onReorderOrder
+  onReorderOrder,
+  isZenMode = false,
+  onToggleZenMode
 }) {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [channelFilter, setChannelFilter] = useState('all');
   const [notifyingId, setNotifyingId] = useState(null);
-  const [mobileColumnTab, setMobileColumnTab] = useState('cocina'); // 'all' | 'pendiente' | 'cocina' | 'listo'
+  const [mobileColumnTab, setMobileColumnTab] = useState('activas'); // 'activas' | 'cocina' | 'pendiente' | 'listo'
   const [cancelModalOrder, setCancelModalOrder] = useState(null);
+  const [showGrillModal, setShowGrillModal] = useState(false);
+  
+  // Audio mute preference for kitchen
+  const [isAudioMuted, setIsAudioMuted] = useState(() => {
+    try {
+      return localStorage.getItem('comandafast_kitchen_mute') === 'true';
+    } catch (_) {
+      return false;
+    }
+  });
 
-  // Update timer tick every 10 seconds
+  const toggleAudioMute = () => {
+    setIsAudioMuted(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('comandafast_kitchen_mute', String(next));
+      } catch (_) {}
+      return next;
+    });
+  };
+
+  // Update timer tick every 10 seconds for real-time minutes
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(Date.now()), 10000);
     return () => clearInterval(interval);
   }, []);
+
+  // Haptic feedback trigger for tactile confirmation on touch devices
+  const triggerHaptic = () => {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        navigator.vibrate(35);
+      } catch (_) {}
+    }
+  };
+
+  // Status change handler with audio & vibration
+  const handleActionStatus = (orderId, newStatus, extraData) => {
+    triggerHaptic();
+    if (!isAudioMuted) {
+      if (newStatus === 'cocina') {
+        audioService.playOrderChime();
+      } else if (newStatus === 'listo') {
+        audioService.playReadyBell();
+      }
+    }
+    onUpdateStatus(orderId, newStatus, extraData);
+  };
 
   const handleNotifyWhatsApp = async (order) => {
     if (notifyingId) return;
@@ -69,23 +119,6 @@ export default function KitchenDisplay({
     return Math.floor(diffMs / 60000);
   };
 
-  const activeOrders = orders.filter(o => 
-    o.status !== 'entregado' && o.status !== 'cancelado' &&
-    (channelFilter === 'all' || o.channel === channelFilter)
-  );
-
-  const pendingOrders = activeOrders.filter(o => o.status === 'pendiente');
-  const cookingOrders = activeOrders.filter(o => o.status === 'cocina');
-  const readyOrders = activeOrders.filter(o => o.status === 'listo');
-
-  // En vista móvil, si no hay comandas marchando en cocina pero sí hay pedidos pendientes, mostrar la columna de pendientes
-  useEffect(() => {
-    if (cookingOrders.length === 0 && pendingOrders.length > 0 && mobileColumnTab === 'cocina') {
-      setMobileColumnTab('pendiente');
-    }
-  }, [cookingOrders.length, pendingOrders.length]);
-
-  
   const getSafeItems = (items) => {
     if (Array.isArray(items)) return items;
     if (typeof items === 'string') {
@@ -99,138 +132,172 @@ export default function KitchenDisplay({
     return [];
   };
 
+  // Orders filtering
+  const activeOrders = useMemo(() => {
+    return orders.filter(o => 
+      o.status !== 'entregado' && o.status !== 'cancelado' &&
+      (channelFilter === 'all' || o.channel === channelFilter)
+    );
+  }, [orders, channelFilter]);
+
+  const pendingOrders = useMemo(() => activeOrders.filter(o => o.status === 'pendiente'), [activeOrders]);
+  const cookingOrders = useMemo(() => activeOrders.filter(o => o.status === 'cocina'), [activeOrders]);
+  const readyOrders = useMemo(() => activeOrders.filter(o => o.status === 'listo'), [activeOrders]);
+
+  // Channel counts for filters
+  const channelCounts = useMemo(() => {
+    const nonDelivered = orders.filter(o => o.status !== 'entregado' && o.status !== 'cancelado');
+    return {
+      all: nonDelivered.length,
+      mesa: nonDelivered.filter(o => o.channel === 'mesa').length,
+      delivery: nonDelivered.filter(o => o.channel === 'delivery' || (o.channel === 'whatsapp' && o.deliveryType !== 'local')).length,
+      mostrador: nonDelivered.filter(o => o.channel === 'mostrador' || (o.channel === 'whatsapp' && o.deliveryType === 'local')).length
+    };
+  }, [orders]);
+
+  // Aggregated Grill / Kitchen Summary (items currently to cook across cooking + pending)
+  const grillSummary = useMemo(() => {
+    const map = {};
+    let totalItems = 0;
+    const relevantOrders = orders.filter(o => 
+      (o.status === 'cocina' || o.status === 'pendiente') &&
+      (channelFilter === 'all' || o.channel === channelFilter)
+    );
+
+    relevantOrders.forEach(order => {
+      const items = getSafeItems(order.items);
+      const isMesa = order.channel === 'mesa';
+      const channelLabel = isMesa 
+        ? `Mesa ${order.tableNumber || 'S/N'}` 
+        : `Ord #${order.orderNumber}`;
+
+      items.forEach(item => {
+        const name = (item.name || 'Sin nombre').trim();
+        const qty = Number(item.qty || item.quantity || 1);
+        totalItems += qty;
+
+        const key = name.toLowerCase();
+        if (!map[key]) {
+          map[key] = {
+            name,
+            totalQty: 0,
+            cookingQty: 0,
+            pendingQty: 0,
+            notes: []
+          };
+        }
+        map[key].totalQty += qty;
+        if (order.status === 'cocina') map[key].cookingQty += qty;
+        if (order.status === 'pendiente') map[key].pendingQty += qty;
+
+        if (item.notes) {
+          map[key].notes.push(`${channelLabel}: ⚠️ ${item.notes}`);
+        }
+        if (Array.isArray(item.modifiers) && item.modifiers.length > 0) {
+          map[key].notes.push(`${channelLabel}: + ${item.modifiers.join(', ')}`);
+        }
+      });
+    });
+
+    const list = Object.values(map).sort((a, b) => b.totalQty - a.totalQty);
+    return { list, totalItems };
+  }, [orders, channelFilter]);
+
+  // Live formatted time for kitchen clock
+  const liveClockString = new Date(currentTime).toLocaleTimeString('es-AR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+
   const renderOrderCard = (order) => {
     const elapsed = getElapsedMinutes(order.createdAt);
     const isDelayed = elapsed > 25;
     const isWarning = elapsed > 15;
+    const isCooking = order.status === 'cocina';
+    const isReady = order.status === 'listo';
+    const isPending = order.status === 'pendiente';
+
+    // Channel label & styling
+    const cleanTable = order.tableNumber ? (order.tableNumber.toLowerCase().startsWith('mesa') ? order.tableNumber.toUpperCase() : `MESA ${order.tableNumber}`) : 'SALÓN';
+    const channelLabel = order.channel === 'whatsapp' 
+      ? (order.deliveryType === 'local' ? '🛍️ WA RETIRO' : '🛵 WA DELIVERY')
+      : order.channel === 'mesa' ? `🍽️ ${cleanTable}`
+      : order.channel === 'delivery' ? '🛵 DELIVERY'
+      : '🛍️ MOSTRADOR';
 
     return (
       <div 
         key={order.id} 
-        className={`kds-order-card ${isDelayed ? 'delayed' : ''}`}
+        className={`kds-order-card ${isDelayed ? 'delayed' : ''} ${isCooking ? 'is-cooking-card' : ''} ${isReady ? 'is-ready-card' : ''}`}
       >
+        {/* CARD TOP BAR */}
         <div className="kds-card-top">
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span className="order-num-badge">#{order.orderNumber}</span>
-              {order.status === 'pendiente' && onReorderOrder && (
-                <div style={{ display: 'inline-flex', gap: '2px' }}>
-                  <button 
-                    type="button" 
-                    className="qty-btn" 
-                    style={{ width: '20px', height: '20px', padding: 0 }} 
-                    title="Subir prioridad en fila"
-                    onClick={() => onReorderOrder(order.id, -1)}
-                  >
-                    <ChevronUp size={12} />
-                  </button>
-                  <button 
-                    type="button" 
-                    className="qty-btn" 
-                    style={{ width: '20px', height: '20px', padding: 0 }} 
-                    title="Bajar prioridad en fila"
-                    onClick={() => onReorderOrder(order.id, 1)}
-                  >
-                    <ChevronDown size={12} />
-                  </button>
-                </div>
-              )}
-            </div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '1px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span className="order-num-badge">#{order.orderNumber}</span>
+            {isPending && onReorderOrder && (
+              <div style={{ display: 'inline-flex', gap: 2 }}>
+                <button 
+                  type="button" 
+                  className="qty-btn" 
+                  style={{ width: 22, height: 22, padding: 0 }} 
+                  title="Subir prioridad en cola"
+                  onClick={() => onReorderOrder(order.id, -1)}
+                >
+                  <ChevronUp size={13} />
+                </button>
+                <button 
+                  type="button" 
+                  className="qty-btn" 
+                  style={{ width: 22, height: 22, padding: 0 }} 
+                  title="Bajar prioridad en cola"
+                  onClick={() => onReorderOrder(order.id, 1)}
+                >
+                  <ChevronDown size={13} />
+                </button>
+              </div>
+            )}
+            <span className="kds-card-clock">
               {new Date(order.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
-            </div>
+            </span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span className={`order-type-chip ${order.channel}`}>
-              {order.channel === 'whatsapp' ? (order.deliveryType === 'local' ? '🛍️ WA RETIRO' : '🛵 WA DELIVERY') :
-               order.channel === 'mesa' ? `🍽️ MESA #${order.tableNumber || 'S/N'}` :
-               order.channel === 'delivery' ? '🛵 DELIVERY' :
-               '🛍️ MOSTRADOR'}
+              {channelLabel}
             </span>
 
             <div className={`kds-timer-chip ${isDelayed ? 'danger' : isWarning ? 'warning' : ''}`}>
               <Clock size={12} />
-              <span>{elapsed} min</span>
+              <span>{elapsed}m</span>
             </div>
           </div>
         </div>
 
+        {/* CUSTOMER & DESTINATION INFO */}
         {(order.customer?.name || typeof order.customer === 'string') && (
-          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-            <span>
+          <div className="kds-customer-row">
+            <span className="kds-customer-name">
               👤 {typeof order.customer === 'object' ? order.customer.name : order.customer}
-              {typeof order.customer === 'object' && order.customer.phone ? ` (${order.customer.phone})` : ''}
+              {typeof order.customer === 'object' && order.customer.phone ? ` • ${order.customer.phone}` : ''}
             </span>
-            {(order.channel === 'whatsapp' || (order.customer && order.customer.phone)) && (
-              <span 
-                title={
-                  order.notifiedStatuses?.includes(order.status)
-                    ? `Notificación de WhatsApp enviada para estado: ${order.status}`
-                    : 'Cliente con número de WhatsApp registrado'
-                }
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '3px',
-                  fontSize: '0.68rem',
-                  padding: '1px 6px',
-                  borderRadius: '10px',
-                  background: order.notifiedStatuses?.includes(order.status) ? 'rgba(16, 185, 129, 0.18)' : 'rgba(37, 211, 102, 0.1)',
-                  color: order.notifiedStatuses?.includes(order.status) ? '#10b981' : '#25d366',
-                  fontWeight: 600,
-                  border: '1px solid rgba(37, 211, 102, 0.25)',
-                  flexShrink: 0
-                }}
-              >
-                <MessageSquare size={10} />
-                {order.notifiedStatuses?.includes(order.status) ? 'WA Notificado' : 'WhatsApp'}
-              </span>
+            {typeof order.customer === 'object' && order.customer.address && order.deliveryType === 'delivery' && (
+              <span className="kds-delivery-address">📍 {order.customer.address}</span>
             )}
           </div>
         )}
 
-        {typeof order.customer === 'object' && order.customer.address && order.deliveryType === 'delivery' && (
-          <div style={{ fontSize: '0.75rem', color: 'var(--accent-amber)', marginTop: '2px', fontWeight: 600 }}>
-            📍 Envío: {order.customer.address}
-          </div>
-        )}
-
+        {/* HIGH VISIBILITY CRITICAL OBSERVATIONS / NOTES */}
         {order.customer?.notes && (
-          <div style={{ fontSize: '0.75rem', color: 'var(--accent-amber)', background: 'rgba(245, 158, 11, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>
-            Obs: {order.customer.notes}
+          <div className="kds-critical-notes">
+            <AlertCircle size={15} style={{ flexShrink: 0, color: '#f59e0b' }} />
+            <span><strong>ACLARACIÓN:</strong> {order.customer.notes}</span>
           </div>
         )}
 
-        {/* Indicador de Estado de Comprobante / Pago */}
+        {/* TRANSFER PAYMENT NOTICE */}
         {order.paymentMethod === 'transferencia' && (
-          <div style={{
-            fontSize: '0.72rem',
-            fontWeight: 700,
-            marginTop: '3px',
-            padding: '3px 8px',
-            borderRadius: '6px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '5px',
-            background: order.paymentConfirmed || order.paymentStatus === 'pagado'
-              ? 'rgba(16, 185, 129, 0.15)'
-              : order.paymentStatus === 'comprobante_recibido'
-              ? 'rgba(59, 130, 246, 0.2)'
-              : 'rgba(245, 158, 11, 0.18)',
-            color: order.paymentConfirmed || order.paymentStatus === 'pagado'
-              ? '#10b981'
-              : order.paymentStatus === 'comprobante_recibido'
-              ? '#60a5fa'
-              : '#f59e0b',
-            border: `1px solid ${
-              order.paymentConfirmed || order.paymentStatus === 'pagado'
-                ? 'rgba(16, 185, 129, 0.3)'
-                : order.paymentStatus === 'comprobante_recibido'
-                ? 'rgba(59, 130, 246, 0.4)'
-                : 'rgba(245, 158, 11, 0.3)'
-            }`
-          }}>
+          <div className={`kds-pay-badge ${order.paymentConfirmed || order.paymentStatus === 'pagado' ? 'paid' : order.paymentStatus === 'comprobante_recibido' ? 'proof' : 'waiting'}`}>
             {order.paymentConfirmed || order.paymentStatus === 'pagado' ? (
               <span>✅ Transferencia Acreditada</span>
             ) : order.paymentStatus === 'comprobante_recibido' ? (
@@ -241,66 +308,70 @@ export default function KitchenDisplay({
           </div>
         )}
 
-        {/* Item List */}
+        {/* ITEMS LIST (HIGH CONTRAST & LEGIBILITY) */}
         <div className="kds-items-list">
           {getSafeItems(order.items).map((item, idx) => (
-            <div key={idx} style={{ marginBottom: '4px' }}>
+            <div key={idx} className="kds-item-block">
               <div className="kds-item-line">
                 <span className="kds-item-qty">{item.qty || item.quantity || 1}x</span>
-                <span>{item.name.toUpperCase()}</span>
+                <span className="kds-item-name">{item.name.toUpperCase()}</span>
               </div>
               {Array.isArray(item.modifiers) && item.modifiers.length > 0 && (
                 <div className="kds-item-mod-list">
                   {item.modifiers.map((m, mi) => (
-                    <div key={mi}>• {m}</div>
+                    <span key={mi} className="kds-mod-tag">+ {m}</span>
+                  ))}
+                </div>
+              )}
+              {Array.isArray(item.selectedOptions) && item.selectedOptions.length > 0 && (
+                <div className="kds-item-mod-list">
+                  {item.selectedOptions.map((o, oi) => (
+                    <span key={oi} className="kds-mod-tag">→ {o.name || o}</span>
                   ))}
                 </div>
               )}
               {item.notes && (
-                <div style={{ fontSize: '0.75rem', fontStyle: 'italic', color: '#fca5a5', marginLeft: '1.75rem' }}>
-                  Nota: {item.notes}
+                <div className="kds-item-note-tag">
+                  ⚠️ NOTA: {item.notes}
                 </div>
               )}
             </div>
           ))}
         </div>
 
-        {/* Action Buttons */}
+        {/* PRIMARY TOUCH ACTION BUTTONS */}
         <div className="kds-card-actions">
-          {order.status === 'pendiente' && (
+          {isPending && (
             <>
               {order.paymentMethod === 'transferencia' && !(order.paymentConfirmed || order.paymentStatus === 'pagado') ? (
                 <button 
                   type="button"
-                  className="btn-kds-action"
+                  className="btn-kds-action big-touch"
                   style={{
                     background: order.paymentStatus === 'comprobante_recibido'
                       ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
                       : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                    color: '#ffffff',
-                    boxShadow: '0 2px 10px rgba(16, 185, 129, 0.35)',
-                    border: 'none',
-                    fontWeight: 700
+                    color: '#ffffff'
                   }}
-                  onClick={() => onUpdateStatus(order.id, 'cocina', {
+                  onClick={() => handleActionStatus(order.id, 'cocina', {
                     paymentConfirmed: true,
                     paymentStatus: 'pagado',
                     paymentConfirmedAt: new Date().toISOString()
                   })}
-                  title="Confirmar recepción física de transferencia y enviar pedido a la cocina"
+                  title="Confirmar transferencia y mandar a cocina"
                 >
-                  <CheckCircle2 size={14} />
+                  <CheckCircle2 size={16} />
                   <span>{order.paymentStatus === 'comprobante_recibido' ? 'Validar y Cocinar' : 'Confirmar Pago'}</span>
                 </button>
               ) : (
                 <button 
                   type="button"
-                  className="btn-kds-action to-cooking"
-                  onClick={() => onUpdateStatus(order.id, 'cocina')}
-                  title="Comenzar a Cocinar"
+                  className="btn-kds-action to-cooking big-touch"
+                  onClick={() => handleActionStatus(order.id, 'cocina')}
+                  title="Empezar a cocinar en plancha"
                 >
-                  <Play size={13} />
-                  <span>Cocinar</span>
+                  <Play size={16} fill="currentColor" />
+                  <span>EMPEZAR A COCINAR</span>
                 </button>
               )}
               <button 
@@ -309,79 +380,80 @@ export default function KitchenDisplay({
                 title="Cancelar Pedido"
                 onClick={() => setCancelModalOrder(order)}
               >
-                <XCircle size={13} />
-                <span>Cancelar</span>
+                <XCircle size={15} />
               </button>
             </>
           )}
 
-          {order.status === 'cocina' && (
+          {isCooking && (
             <button 
               type="button"
-              className="btn-kds-action to-ready"
-              onClick={() => onUpdateStatus(order.id, 'listo')}
-              title="Marcar pedido como ¡Listo!"
+              className="btn-kds-action to-ready big-touch"
+              onClick={() => handleActionStatus(order.id, 'listo')}
+              title="Marcar pedido como ¡Listo para servir/entregar!"
             >
-              <CheckCircle2 size={14} />
-              <span>¡Listo!</span>
+              <CheckCircle2 size={18} />
+              <span>✅ ¡MARCAR LISTO!</span>
             </button>
           )}
 
-          {order.status === 'listo' && (
+          {isReady && (
             <button 
               type="button"
-              className="btn-kds-action to-done"
-              onClick={() => onUpdateStatus(order.id, 'entregado')}
-              title="Despachar y entregar pedido"
+              className="btn-kds-action to-done big-touch"
+              onClick={() => handleActionStatus(order.id, 'entregado')}
+              title="Despachar y finalizar pedido"
             >
-              <CheckCircle2 size={14} />
-              <span>Despachar</span>
+              <CheckCircle2 size={18} />
+              <span>📦 DESPACHAR Y ENTREGAR</span>
             </button>
           )}
-
-          {(order.channel === 'whatsapp' || (order.customer && order.customer.phone)) && (
-            <button 
-              type="button"
-              className={`kds-icon-action-btn whatsapp ${notifyingId === order.id ? 'loading' : ''}`}
-              disabled={notifyingId === order.id}
-              title="Avisar / Reenviar estado por WhatsApp al cliente"
-              onClick={() => handleNotifyWhatsApp(order)}
-            >
-              <MessageSquare size={14} />
-            </button>
-          )}
-
-          <button 
-            type="button"
-            className="kds-icon-action-btn"
-            title="Reimprimir Comanda Cocina"
-            onClick={() => onReprintTicket(order, 'kitchen')}
-          >
-            <Printer size={14} />
-          </button>
         </div>
 
-        {/* Cambiar de lugar rápidamente */}
+        {/* SECONDARY UTILITY BAR */}
         <div className="kds-quick-move-bar">
-          <span className="kds-quick-move-label">
-            <ArrowLeftRight size={11} /> Mover:
-          </span>
-          <div style={{ display: 'flex', gap: '3px' }}>
-            {order.status !== 'pendiente' && (
-              <button type="button" className="kds-mini-move-btn" onClick={() => onUpdateStatus(order.id, 'pendiente')}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span className="kds-quick-move-label">
+              <ArrowLeftRight size={11} /> Mover:
+            </span>
+            {!isPending && (
+              <button type="button" className="kds-mini-move-btn" onClick={() => handleActionStatus(order.id, 'pendiente')}>
                 Pendiente
               </button>
             )}
-            {order.status !== 'cocina' && (
-              <button type="button" className="kds-mini-move-btn" onClick={() => onUpdateStatus(order.id, 'cocina')}>
+            {!isCooking && (
+              <button type="button" className="kds-mini-move-btn" onClick={() => handleActionStatus(order.id, 'cocina')}>
                 Cocina
               </button>
             )}
-            {order.status !== 'listo' && (
-              <button type="button" className="kds-mini-move-btn" onClick={() => onUpdateStatus(order.id, 'listo')}>
+            {!isReady && (
+              <button type="button" className="kds-mini-move-btn" onClick={() => handleActionStatus(order.id, 'listo')}>
                 Listo
               </button>
             )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {(order.channel === 'whatsapp' || (order.customer && order.customer.phone)) && (
+              <button 
+                type="button"
+                className={`kds-icon-action-btn whatsapp ${notifyingId === order.id ? 'loading' : ''}`}
+                disabled={notifyingId === order.id}
+                title="Reenviar estado al WhatsApp del cliente"
+                onClick={() => handleNotifyWhatsApp(order)}
+              >
+                <MessageSquare size={13} />
+              </button>
+            )}
+
+            <button 
+              type="button"
+              className="kds-icon-action-btn"
+              title="Reimprimir Comanda Cocina"
+              onClick={() => onReprintTicket(order, 'kitchen')}
+            >
+              <Printer size={13} />
+            </button>
           </div>
         </div>
       </div>
@@ -389,59 +461,116 @@ export default function KitchenDisplay({
   };
 
   return (
-    <div className="kds-container">
-      {/* Top Filter Bar */}
+    <div className={`kds-container ${isZenMode ? 'zen-mode' : ''}`}>
+      {/* 1. TOP HEADER BAR (COMPACT & ULTRA CLEAN) */}
       <div className="kds-header-bar">
-        <div className="kds-header-title-box">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-            <ChefHat size={20} style={{ color: 'var(--accent-orange)', flexShrink: 0 }} />
-            <span className="kds-header-title">Tablero KDS en Vivo</span>
+        <div className="kds-header-left">
+          <div className="kds-title-glow-box">
+            <ChefHat size={19} className="kds-chef-icon" />
+            <div>
+              <div className="kds-header-title">
+                {isZenMode ? 'MODO COCINA' : 'COCINA EN VIVO'}
+              </div>
+              <div className="kds-header-clock">
+                ⏱️ {liveClockString} hs
+              </div>
+            </div>
           </div>
-          <span className="brand-badge">{activeOrders.length} activas</span>
+
+          <div className="kds-count-pills-row">
+            <span className="kds-count-pill cooking">
+              🔥 {cookingOrders.length} en fuego
+            </span>
+            <span className="kds-count-pill pending">
+              ⏳ {pendingOrders.length} en espera
+            </span>
+            {readyOrders.length > 0 && (
+              <span className="kds-count-pill ready">
+                ✅ {readyOrders.length} listos
+              </span>
+            )}
+          </div>
         </div>
 
-        <div className="kds-channel-filters">
+        <div className="kds-header-right">
+          {/* GRILL / PLANCHA SUMMARY BUTTON */}
           <button 
             type="button"
-            className={`cat-pill-btn ${channelFilter === 'all' ? 'active' : ''}`}
-            onClick={() => setChannelFilter('all')}
+            className="kds-grill-summary-btn"
+            onClick={() => setShowGrillModal(true)}
+            title="Ver resumen consolidado de hamburguesas y guarniciones en plancha"
           >
-            Todas
+            <Flame size={15} />
+            <span>Plancha ({grillSummary.totalItems})</span>
           </button>
+
+          {/* AUDIO ALERTS TOGGLE */}
           <button 
             type="button"
-            className={`cat-pill-btn ${channelFilter === 'whatsapp' ? 'active' : ''}`}
-            onClick={() => setChannelFilter('whatsapp')}
+            className={`kds-topbar-btn ${isAudioMuted ? 'muted' : ''}`}
+            onClick={toggleAudioMute}
+            title={isAudioMuted ? 'Alertas de sonido desactivadas (Clic para activar)' : 'Alertas de sonido activadas'}
           >
-            <MessageSquare size={13} /> Delivery
+            {isAudioMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
           </button>
-          <button 
-            type="button"
-            className={`cat-pill-btn ${channelFilter === 'mostrador' ? 'active' : ''}`}
-            onClick={() => setChannelFilter('mostrador')}
-          >
-            <ShoppingBag size={13} /> Mostrador
-          </button>
-          <button 
-            type="button"
-            className={`cat-pill-btn ${channelFilter === 'mesa' ? 'active' : ''}`}
-            onClick={() => setChannelFilter('mesa')}
-          >
-            <Utensils size={13} /> Mesas
-          </button>
+
+          {/* FULLSCREEN / ZEN MODE TOGGLE */}
+          {onToggleZenMode && (
+            <button 
+              type="button"
+              className={`kds-zen-toggle-btn ${isZenMode ? 'active' : ''}`}
+              onClick={onToggleZenMode}
+              title={isZenMode ? 'Salir del Modo Cocina Enfocado' : 'Activar Modo Cocina Pantalla Completa (Oculta barras y maximiza espacio)'}
+            >
+              {isZenMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+              <span>{isZenMode ? 'Salir' : 'Modo Cocina'}</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Mobile Column Switcher Tabs */}
+      {/* 2. CHANNELS FILTER ROW */}
+      <div className="kds-channel-filters-row">
+        <button 
+          type="button"
+          className={`kds-channel-pill ${channelFilter === 'all' ? 'active' : ''}`}
+          onClick={() => setChannelFilter('all')}
+        >
+          Todas ({channelCounts.all})
+        </button>
+        <button 
+          type="button"
+          className={`kds-channel-pill ${channelFilter === 'mesa' ? 'active' : ''}`}
+          onClick={() => setChannelFilter('mesa')}
+        >
+          <Utensils size={13} /> Mesas ({channelCounts.mesa})
+        </button>
+        <button 
+          type="button"
+          className={`kds-channel-pill ${channelFilter === 'delivery' ? 'active' : ''}`}
+          onClick={() => setChannelFilter('delivery')}
+        >
+          <MessageSquare size={13} /> Delivery ({channelCounts.delivery})
+        </button>
+        <button 
+          type="button"
+          className={`kds-channel-pill ${channelFilter === 'mostrador' ? 'active' : ''}`}
+          onClick={() => setChannelFilter('mostrador')}
+        >
+          <ShoppingBag size={13} /> Retiro ({channelCounts.mostrador})
+        </button>
+      </div>
+
+      {/* 3. MOBILE VIEW SWITCHER TABS */}
       <div className="kds-mobile-tabs-bar">
         <button
           type="button"
-          className={`kds-mobile-tab-btn pending ${mobileColumnTab === 'pendiente' ? 'active' : ''}`}
-          onClick={() => setMobileColumnTab('pendiente')}
+          className={`kds-mobile-tab-btn active-all ${mobileColumnTab === 'activas' ? 'active' : ''}`}
+          onClick={() => setMobileColumnTab('activas')}
         >
-          <span className="kds-tab-dot pending" />
-          <span className="kds-tab-label">Pendientes</span>
-          <span className="kds-tab-badge">{pendingOrders.length}</span>
+          <Flame size={14} style={{ color: 'var(--accent-orange)' }} />
+          <span className="kds-tab-label">En Marcha</span>
+          <span className="kds-tab-badge">{cookingOrders.length + pendingOrders.length}</span>
         </button>
 
         <button
@@ -456,6 +585,16 @@ export default function KitchenDisplay({
 
         <button
           type="button"
+          className={`kds-mobile-tab-btn pending ${mobileColumnTab === 'pendiente' ? 'active' : ''}`}
+          onClick={() => setMobileColumnTab('pendiente')}
+        >
+          <span className="kds-tab-dot pending" />
+          <span className="kds-tab-label">En Espera</span>
+          <span className="kds-tab-badge">{pendingOrders.length}</span>
+        </button>
+
+        <button
+          type="button"
           className={`kds-mobile-tab-btn ready ${mobileColumnTab === 'listo' ? 'active' : ''}`}
           onClick={() => setMobileColumnTab('listo')}
         >
@@ -465,8 +604,46 @@ export default function KitchenDisplay({
         </button>
       </div>
 
-      {/* 3-Column Kanban Board */}
-      <div className={`kds-columns-grid mobile-${mobileColumnTab}`}>
+      {/* 4. MAIN BOARD: RESPONSIVE COLUMNS / MOBILE VIEW */}
+      {/* MOBILE COMBINED VIEW: 'ACTIVAS' (Cocina + Pendientes in continuous stream) */}
+      <div className={`kds-mobile-activas-stream ${mobileColumnTab !== 'activas' ? 'mobile-hidden' : ''}`}>
+        {cookingOrders.length === 0 && pendingOrders.length === 0 ? (
+          <div className="kds-empty-column">
+            <CheckCircle2 size={36} style={{ opacity: 0.35, marginBottom: 8, color: '#10b981' }} />
+            <strong style={{ fontSize: '1rem', color: '#fff' }}>¡Cocina despejada!</strong>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4 }}>
+              No hay pedidos pendientes ni en preparación en este momento.
+            </span>
+          </div>
+        ) : (
+          <>
+            {cookingOrders.length > 0 && (
+              <div className="kds-stream-section">
+                <div className="kds-stream-header cooking">
+                  <span>🔥 EN PREPARACIÓN ({cookingOrders.length})</span>
+                </div>
+                <div className="kds-cards-list">
+                  {cookingOrders.map(renderOrderCard)}
+                </div>
+              </div>
+            )}
+
+            {pendingOrders.length > 0 && (
+              <div className="kds-stream-section">
+                <div className="kds-stream-header pending">
+                  <span>⏳ EN ESPERA / POR INICIAR ({pendingOrders.length})</span>
+                </div>
+                <div className="kds-cards-list">
+                  {pendingOrders.map(renderOrderCard)}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* 3-COLUMN KANBAN BOARD FOR DESKTOP / AND SINGLE COLUMN FOR OTHER MOBILE TABS */}
+      <div className={`kds-columns-grid ${mobileColumnTab === 'activas' ? 'mobile-activas-hidden' : `mobile-${mobileColumnTab}`}`}>
         {/* Column 1: Pendientes */}
         <div className={`kds-column ${mobileColumnTab !== 'pendiente' ? 'mobile-hidden' : ''}`}>
           <div className="kds-column-header pending">
@@ -480,7 +657,7 @@ export default function KitchenDisplay({
           <div className="kds-cards-list">
             {pendingOrders.length === 0 ? (
               <div className="kds-empty-column">
-                <Clock size={28} style={{ opacity: 0.35, marginBottom: '6px' }} />
+                <Clock size={28} style={{ opacity: 0.35, marginBottom: 6 }} />
                 <span>Sin pedidos en espera</span>
               </div>
             ) : (
@@ -497,12 +674,12 @@ export default function KitchenDisplay({
               <span className="kds-col-header-title">EN COCINA</span>
               <span className="kds-col-count-badge">{cookingOrders.length}</span>
             </div>
-            <span className="kds-col-header-sub">En preparación</span>
+            <span className="kds-col-header-sub">En fuego / plancha</span>
           </div>
           <div className="kds-cards-list">
             {cookingOrders.length === 0 ? (
               <div className="kds-empty-column">
-                <ChefHat size={28} style={{ opacity: 0.35, marginBottom: '6px' }} />
+                <ChefHat size={28} style={{ opacity: 0.35, marginBottom: 6 }} />
                 <span>Cocina libre</span>
               </div>
             ) : (
@@ -511,20 +688,20 @@ export default function KitchenDisplay({
           </div>
         </div>
 
-        {/* Column 3: Listo / Por despachar */}
+        {/* Column 3: Listo / Despachar */}
         <div className={`kds-column ${mobileColumnTab !== 'listo' ? 'mobile-hidden' : ''}`}>
           <div className="kds-column-header ready">
             <div className="kds-col-header-left">
               <span className="kds-status-indicator ready" />
-              <span className="kds-col-header-title">LISTO / DESPACHAR</span>
+              <span className="kds-col-header-title">LISTO / SERVIR</span>
               <span className="kds-col-count-badge">{readyOrders.length}</span>
             </div>
-            <span className="kds-col-header-sub">Completados</span>
+            <span className="kds-col-header-sub">Por despachar</span>
           </div>
           <div className="kds-cards-list">
             {readyOrders.length === 0 ? (
               <div className="kds-empty-column">
-                <CheckCircle2 size={28} style={{ opacity: 0.35, marginBottom: '6px' }} />
+                <CheckCircle2 size={28} style={{ opacity: 0.35, marginBottom: 6 }} />
                 <span>Sin pedidos listos</span>
               </div>
             ) : (
@@ -534,7 +711,79 @@ export default function KitchenDisplay({
         </div>
       </div>
 
-      {/* MODAL DE CONFIRMACIÓN PARA CANCELAR PEDIDO */}
+      {/* 5. RESUMEN DE PLANCHA MODAL / BOTTOM SHEET */}
+      {showGrillModal && (
+        <div className="cat-modal-overlay" onClick={() => setShowGrillModal(false)}>
+          <div className="kds-grill-modal-card" onClick={e => e.stopPropagation()}>
+            <div className="kds-grill-modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div className="kds-grill-modal-icon">🔥</div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#fff' }}>
+                    Resumen de Plancha & Freidora
+                  </h3>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--accent-amber)', fontWeight: 700 }}>
+                    {grillSummary.totalItems} ítems en marcha ({cookingOrders.length} en fuego • {pendingOrders.length} en espera)
+                  </span>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                className="cat-sheet-close-btn" 
+                onClick={() => setShowGrillModal(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="kds-grill-modal-body">
+              {grillSummary.list.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '30px 16px', color: 'var(--text-muted)' }}>
+                  No hay ítems pendientes de cocinar en este momento.
+                </div>
+              ) : (
+                <div className="kds-grill-grid">
+                  {grillSummary.list.map((item, idx) => (
+                    <div key={idx} className="kds-grill-item-card">
+                      <div className="kds-grill-item-top">
+                        <span className="kds-grill-qty-badge">{item.totalQty}x</span>
+                        <span className="kds-grill-item-name">{item.name.toUpperCase()}</span>
+                      </div>
+                      <div className="kds-grill-item-split">
+                        {item.cookingQty > 0 && (
+                          <span className="kds-grill-split-cooking">🔥 {item.cookingQty} en cocina</span>
+                        )}
+                        {item.pendingQty > 0 && (
+                          <span className="kds-grill-split-pending">⏳ {item.pendingQty} en espera</span>
+                        )}
+                      </div>
+                      {item.notes.length > 0 && (
+                        <div className="kds-grill-notes-list">
+                          {item.notes.map((n, ni) => (
+                            <div key={ni} className="kds-grill-note-pill">{n}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="kds-grill-modal-footer">
+              <button 
+                type="button" 
+                className="kds-grill-close-btn"
+                onClick={() => setShowGrillModal(false)}
+              >
+                Cerrar Resumen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. MODAL DE CONFIRMACIÓN PARA CANCELAR PEDIDO */}
       <ConfirmModal
         isOpen={!!cancelModalOrder}
         title={`¿Cancelar el pedido #${cancelModalOrder?.orderNumber || ''}?`}
@@ -545,7 +794,7 @@ export default function KitchenDisplay({
         icon={XCircle}
         onConfirm={() => {
           if (cancelModalOrder) {
-            onUpdateStatus(cancelModalOrder.id, 'cancelado');
+            handleActionStatus(cancelModalOrder.id, 'cancelado');
             setCancelModalOrder(null);
           }
         }}
@@ -554,4 +803,3 @@ export default function KitchenDisplay({
     </div>
   );
 }
-

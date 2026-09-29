@@ -6,7 +6,7 @@ import {
 import { authService } from '../../services/authService';
 import { supabaseSync } from '../../services/supabaseClient';
 
-export default function CashierLogin({ onLoginSuccess, onOpenOwner }) {
+export default function CashierLogin({ onLoginSuccess, onOpenOwner, onOpenKitchen }) {
   const [activeTab, setActiveTab] = useState('login'); // 'login' | 'register'
   
   // Login form state
@@ -546,37 +546,68 @@ export default function CashierLogin({ onLoginSuccess, onOpenOwner }) {
           </form>
         )}
 
-        {/* Footer Link to Owner Portal */}
+        {/* Footer Link to Kitchen Display & Owner Portal */}
         <div style={{
           marginTop: '1.25rem',
           paddingTop: '1rem',
           borderTop: '1px solid var(--border-subtle)',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between'
+          flexDirection: 'column',
+          gap: '8px'
         }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            ¿Eres el dueño del local?
-          </span>
-          <button
-            type="button"
-            onClick={onOpenOwner}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--accent-amber)',
-              fontSize: '0.78rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              padding: '4px 6px'
-            }}
-          >
-            <Shield size={14} />
-            <span>Portal de Auditoría →</span>
-          </button>
+          {onOpenKitchen && (
+            <button
+              type="button"
+              onClick={onOpenKitchen}
+              style={{
+                width: '100%',
+                background: 'rgba(234, 88, 12, 0.12)',
+                border: '1.5px solid rgba(234, 88, 12, 0.4)',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                color: 'var(--accent-orange)',
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px'
+              }}
+            >
+              <span>👨‍🍳 ¿Estás en la cocina? Abrir Pantalla KDS →</span>
+            </button>
+          )}
+
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginTop: '2px'
+          }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              ¿Eres el dueño del local?
+            </span>
+            <button
+              type="button"
+              onClick={onOpenOwner}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--accent-amber)',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px 6px'
+              }}
+            >
+              <Shield size={14} />
+              <span>Portal de Auditoría →</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
