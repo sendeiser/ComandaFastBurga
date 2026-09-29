@@ -258,13 +258,12 @@ export default function Header({
         type="button"
         className={`mobile-nav-item ${currentTab === 'kds' ? 'active' : ''}`}
         onClick={() => {
-          if (currentTab === 'kds' && onToggleKitchenZenMode) {
+          setCurrentTab('kds');
+          if (onToggleKitchenZenMode) {
             onToggleKitchenZenMode(true);
-          } else {
-            setCurrentTab('kds');
           }
         }}
-        title={currentTab === 'kds' ? 'Toca para Modo Cocina Pantalla Completa' : 'Ver Cocina'}
+        title="Modo Cocina Pantalla Completa"
       >
         <div className="mobile-nav-icon-box">
           <ChefHat size={19} />

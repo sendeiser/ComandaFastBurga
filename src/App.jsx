@@ -66,6 +66,23 @@ export default function App() {
       try {
         localStorage.setItem('comandafast_kitchen_zen_mode', String(next));
       } catch (_) {}
+
+      // Trigger native browser fullscreen on user gesture (Android Chrome, iOS Safari, Desktop)
+      try {
+        if (next) {
+          const docEl = document.documentElement;
+          const reqFs = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
+          if (reqFs && !document.fullscreenElement && !document.webkitFullscreenElement) {
+            reqFs.call(docEl).catch(() => {});
+          }
+        } else {
+          const exitFs = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+          if (exitFs && (document.fullscreenElement || document.webkitFullscreenElement)) {
+            exitFs.call(document).catch(() => {});
+          }
+        }
+      } catch (_) {}
+
       return next;
     });
   };
