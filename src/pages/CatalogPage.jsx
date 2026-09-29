@@ -8,7 +8,7 @@ import {
   Search, Menu, Info, X, Clock, MapPin, 
   MessageCircle, ExternalLink, ChevronRight, Check,
   ShoppingBag, ArrowLeft, Plus, Minus, Trash2, Phone,
-  Flame, Sparkles, Tag
+  Flame, Sparkles, Tag, RefreshCw, ChefHat, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import { supabaseSync, DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_ANON_KEY } from '../services/supabaseClient';
 import { storageService } from '../services/storageService';
@@ -508,13 +508,30 @@ export default function CatalogPage({ initialCashShift }) {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [showCategoriesDrawer, setShowCategoriesDrawer] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [view, setView] = useState('catalog'); // 'catalog' | 'cart' | 'checkout'
+  const [view, setView] = useState('catalog'); // 'catalog' | 'cart' | 'checkout' | 'order_status'
   const initialMesa = getMesaFromUrl();
   const [tableNumber, setTableNumber] = useState(initialMesa);
   const [isQrTable, setIsQrTable] = useState(Boolean(initialMesa));
   const [serviceType, setServiceType] = useState(initialMesa ? 'dine_in' : null); // 'dine_in' | 'takeaway' | 'delivery'
   const [toast, setToast] = useState('');
   const [logoError, setLogoError] = useState(false);
+
+  // Pedido activo de mesa para seguimiento en vivo y reordenar
+  const [activeTableOrder, setActiveTableOrder] = useState(() => {
+    try {
+      const saved = localStorage.getItem('comandafast_active_table_order');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const age = Date.now() - new Date(parsed.createdAt || 0).getTime();
+        if (age < 12 * 60 * 60 * 1000) {
+          return parsed;
+        }
+      }
+    } catch (_) {}
+    return null;
+  });
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
 
   // Escuchar cambios de URL por si se entra con ?mesa=X
   useEffect(() => {
@@ -813,14 +830,164 @@ export default function CatalogPage({ initialCashShift }) {
     showToast(`✅ ${product.name} agregado`);
   };
 
-  // ---- Send order via WhatsApp ----
-  const handleSendOrder = () => {
-    if (!customerName.trim()) {
-      showToast('⚠️ Ingresá tu nombre');
+  // ---- Sincronización en tiempo real del pedido de la mesa ----
+  const refreshOrderStatus = useCallback(async (showNotification = false) => {
+    if (!activeTableOrder || !activeTableOrder.id) return;
+    setIsRefreshingStatus(true);
+    try {
+      // 1. Chequear local
+      const localOrders = storageService.getOrders();
+      const localMatch = localOrders.find(o => o.id === activeTableOrder.id);
+      let newest = localMatch || null;
+
+      // 2. Chequear Supabase Cloud (fuente de verdad global)
+      if (supabaseSync.isConfigured()) {
+        const cloudMatch = await supabaseSync.fetchOrderById(activeTableOrder.id);
+        if (cloudMatch) {
+          newest = cloudMatch;
+        }
+      }
+
+      if (newest) {
+        setActiveTableOrder(prev => {
+          const updated = { ...prev, ...newest };
+          try {
+            localStorage.setItem('comandafast_active_table_order', JSON.stringify(updated));
+            storageService.saveOrder(updated);
+          } catch (_) {}
+          return updated;
+        });
+        if (showNotification) {
+          showToast('✅ Estado actualizado');
+        }
+      }
+    } catch (e) {
+      console.warn('[CatalogPage] Error refrescando pedido de mesa:', e);
+    } finally {
+      setIsRefreshingStatus(false);
+    }
+  }, [activeTableOrder, showToast]);
+
+  // Polling automático cada 3 segundos si el pedido está en curso
+  useEffect(() => {
+    if (!activeTableOrder || !activeTableOrder.id) return;
+    if (activeTableOrder.status === 'entregado' || activeTableOrder.status === 'cancelado') return;
+
+    const interval = setInterval(() => {
+      refreshOrderStatus(false);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [activeTableOrder?.id, activeTableOrder?.status, refreshOrderStatus]);
+
+  // ---- Enviar pedido de mesa directo a la Base de Datos / Cocina (sin WhatsApp) ----
+  const handleSendDineInOrder = async () => {
+    if (!tableNumber.trim()) {
+      showToast('⚠️ Ingresá tu número de mesa');
       return;
     }
-    if (serviceType === 'dine_in' && !tableNumber.trim()) {
-      showToast('⚠️ Ingresá tu número de mesa');
+    if (cart.items.length === 0) {
+      showToast('⚠️ Tu carrito está vacío');
+      return;
+    }
+
+    setIsSubmittingOrder(true);
+    try {
+      const nextNum = await storageService.getNextOrderNumberAsync();
+      const orderId = `ord-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      const cleanTable = tableNumber.trim();
+      const resolvedCustomerName = customerName.trim() || (cleanTable.toLowerCase().startsWith('mesa') ? cleanTable : `Mesa ${cleanTable}`);
+
+      const orderPayload = {
+        id: orderId,
+        orderNumber: nextNum,
+        channel: 'mesa',
+        tableNumber: cleanTable,
+        customer: {
+          name: resolvedCustomerName,
+          phone: customerPhone.trim() || '',
+          notes: orderNotes.trim()
+        },
+        items: cart.items.map(item => ({
+          id: item.productId || item.cartId,
+          productId: item.productId,
+          name: item.name,
+          qty: item.qty,
+          unitPrice: item.unitPrice,
+          basePrice: item.basePrice || item.unitPrice,
+          selectedMods: item.selectedMods || [],
+          selectedOptions: item.selectedOptions || [],
+          notes: item.notes || '',
+          emoji: item.emoji || '🍔',
+          image: item.image || ''
+        })),
+        subtotal: cart.subtotal,
+        deliveryFee: 0,
+        total: cart.subtotal,
+        paymentMethod: paymentMethod || 'efectivo',
+        status: 'pendiente',
+        statusTimestamps: {
+          pendiente: new Date().toISOString(),
+          createdAt: new Date().toISOString()
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: Date.now()
+      };
+
+      // 1. Guardar localmente
+      storageService.saveOrder(orderPayload);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('comandafast:new-order', { detail: orderPayload }));
+      }
+
+      // 2. Enviar a Supabase Cloud (notifica inmediatamente a Cocina y POS en tiempo real)
+      if (supabaseSync.isConfigured()) {
+        try {
+          await supabaseSync.createOrder(orderPayload);
+        } catch (supaErr) {
+          console.warn('[CatalogPage] Error enviando comanda a Supabase:', supaErr);
+        }
+      }
+
+      // 3. Notificar al servidor LAN si está disponible
+      try {
+        if (typeof window !== 'undefined' && window.location) {
+          const botHost = window.location.hostname || 'localhost';
+          fetch(`http://${botHost}:3002/api/orders`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(orderPayload)
+          }).catch(() => {});
+        }
+      } catch (_) {}
+
+      // 4. Guardar pedido activo en estado y localStorage
+      setActiveTableOrder(orderPayload);
+      try {
+        localStorage.setItem('comandafast_active_table_order', JSON.stringify(orderPayload));
+      } catch (_) {}
+
+      // 5. Limpiar carrito y mostrar pantalla de seguimiento
+      cart.clearCart();
+      setOrderNotes('');
+      setView('order_status');
+      showToast('🚀 ¡Pedido enviado a cocina con éxito!');
+    } catch (err) {
+      console.error('[CatalogPage] Error enviando pedido a cocina:', err);
+      showToast('❌ Ocurrió un error al enviar el pedido. Intentá nuevamente.');
+    } finally {
+      setIsSubmittingOrder(false);
+    }
+  };
+
+  // ---- Send order via WhatsApp (Takeaway / Delivery) ----
+  const handleSendOrder = () => {
+    if (serviceType === 'dine_in') {
+      return handleSendDineInOrder();
+    }
+
+    if (!customerName.trim()) {
+      showToast('⚠️ Ingresá tu nombre');
       return;
     }
     if (serviceType === 'delivery' && !customerAddress.trim()) {
@@ -1018,7 +1185,9 @@ export default function CatalogPage({ initialCashShift }) {
             </div>
             {paymentMethod === 'transferencia' && (
               <div className="cat-payment-notice">
-                ℹ️ Al enviar el pedido recibirás el Alias y CBU por WhatsApp para transferir y adjuntar el comprobante.
+                {serviceType === 'dine_in' 
+                  ? `ℹ️ Podés transferir con el Alias: ${settings.alias_banco || 'burga.chamical.nx'} (${settings.banco || 'Mercado Pago'}) o abonar en caja/mesa.`
+                  : 'ℹ️ Al enviar el pedido recibirás el Alias y CBU por WhatsApp para transferir y adjuntar el comprobante.'}
               </div>
             )}
           </div>
@@ -1028,10 +1197,268 @@ export default function CatalogPage({ initialCashShift }) {
             <textarea className="cat-form-textarea" placeholder="Ej: Timbre blanco, sin cebolla, etc." value={orderNotes} onChange={e => setOrderNotes(e.target.value)} />
           </div>
 
-          <button className="cat-send-order-btn" onClick={handleSendOrder}>
-            <MessageCircle size={20} />
-            Enviar pedido por WhatsApp
-          </button>
+          {serviceType === 'dine_in' ? (
+            <button 
+              type="button"
+              className="cat-send-dinein-btn" 
+              onClick={handleSendDineInOrder}
+              disabled={isSubmittingOrder}
+            >
+              {isSubmittingOrder ? (
+                <>
+                  <div className="cat-spinner-sm" />
+                  <span>Enviando pedido a cocina...</span>
+                </>
+              ) : (
+                <>
+                  <span style={{ fontSize: '1.25rem' }}>🚀</span>
+                  <span>Confirmar y Enviar a Cocina</span>
+                </>
+              )}
+            </button>
+          ) : (
+            <button type="button" className="cat-send-order-btn" onClick={handleSendOrder}>
+              <MessageCircle size={20} />
+              Enviar pedido por WhatsApp
+            </button>
+          )}
+        </div>
+        <Toast message={toast} />
+      </div>
+    );
+  }
+
+  // ---- ORDER STATUS VIEW (SEGUIMIENTO EN VIVO EN MESA) ----
+  if (view === 'order_status') {
+    if (!activeTableOrder) {
+      return (
+        <div className="catalog-app">
+          <div className="cat-order-status-page">
+            <div className="cat-status-top-bar">
+              <button type="button" className="cat-cart-back-btn" onClick={() => setView('catalog')}>
+                <ArrowLeft size={16} /> Volver a la carta
+              </button>
+            </div>
+            <div className="cat-empty" style={{ marginTop: 40 }}>
+              <div className="cat-empty-icon">🍽️</div>
+              <div className="cat-empty-text">No tenés ningún pedido activo en este momento.</div>
+              <button
+                style={{ marginTop: 16, background: '#ef4444', color: 'white', border: 'none', borderRadius: 10, padding: '12px 24px', cursor: 'pointer', fontWeight: 800, fontSize: '0.95rem' }}
+                onClick={() => setView('catalog')}
+              >
+                VER CARTA
+              </button>
+            </div>
+          </div>
+          <Toast message={toast} />
+        </div>
+      );
+    }
+
+    const currentStatus = activeTableOrder.status || 'pendiente';
+    const cleanTable = activeTableOrder.tableNumber ? (activeTableOrder.tableNumber.toLowerCase().startsWith('mesa') ? activeTableOrder.tableNumber : `Mesa ${activeTableOrder.tableNumber}`) : 'En Salón';
+    const orderCreatedAt = activeTableOrder.createdAt ? new Date(activeTableOrder.createdAt) : new Date();
+    const orderTimeFormatted = orderCreatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // Step configuration
+    const stepsConfig = [
+      { key: 'pendiente', label: 'Pedido recibido', desc: 'Comanda ingresada al sistema POS', icon: '📋' },
+      { key: 'cocina', label: 'En cocina', desc: 'Preparando y marchando tu pedido a la plancha', icon: '👨‍🍳' },
+      { key: 'listo', label: 'Listo para servir', desc: 'Salió de cocina y va en camino a tu mesa', icon: '🍽️' },
+      { key: 'entregado', label: 'Entregado en mesa', desc: '¡Servido! Que disfrutes tu comida', icon: '✅' },
+    ];
+
+    const statusOrderMap = { pendiente: 0, cocina: 1, listo: 2, entregado: 3, cancelado: -1 };
+    const currentStepIndex = statusOrderMap[currentStatus] ?? 0;
+
+    return (
+      <div className="catalog-app">
+        <div className="cat-order-status-page">
+          {/* Top Bar */}
+          <div className="cat-status-top-bar">
+            <button type="button" className="cat-cart-back-btn" onClick={() => setView('catalog')}>
+              <ArrowLeft size={16} /> Volver a la carta
+            </button>
+            <button 
+              type="button" 
+              className="cat-refresh-status-btn" 
+              style={{ width: 'auto', padding: '6px 12px', fontSize: '0.78rem' }}
+              onClick={() => refreshOrderStatus(true)}
+              disabled={isRefreshingStatus}
+            >
+              <RefreshCw size={14} className={isRefreshingStatus ? 'cat-spinner-sm' : ''} />
+              <span>{isRefreshingStatus ? 'Actualizando...' : 'Actualizar'}</span>
+            </button>
+          </div>
+
+          {/* Hero Card */}
+          <div className="cat-status-hero-card">
+            <div className="cat-status-hero-header">
+              <div className="cat-status-table-pill">
+                <span>🍽️</span>
+                <span>{cleanTable}</span>
+              </div>
+              <div className="cat-status-order-num">
+                #{activeTableOrder.orderNumber}
+              </div>
+            </div>
+
+            {/* Current Status Highlight */}
+            {currentStatus === 'cancelado' ? (
+              <div className="cat-status-current-badge" style={{ borderColor: 'rgba(239, 68, 68, 0.4)', background: 'rgba(239, 68, 68, 0.1)' }}>
+                <span className="cat-status-current-icon">❌</span>
+                <div>
+                  <div className="cat-status-current-title" style={{ color: '#ef4444' }}>Pedido Cancelado</div>
+                  <div className="cat-status-current-desc">Este pedido fue cancelado. Por favor consultá al personal o al mozo en el salón.</div>
+                </div>
+              </div>
+            ) : currentStatus === 'entregado' ? (
+              <div className="cat-status-current-badge" style={{ borderColor: 'rgba(34, 197, 94, 0.4)', background: 'rgba(34, 197, 94, 0.1)' }}>
+                <span className="cat-status-current-icon">🎉</span>
+                <div>
+                  <div className="cat-status-current-title" style={{ color: '#4ade80' }}>¡Pedido Entregado!</div>
+                  <div className="cat-status-current-desc">¡A disfrutar! Si necesitas pedir algo más o una segunda ronda, podés hacerlo cuando gustes.</div>
+                </div>
+              </div>
+            ) : currentStatus === 'listo' ? (
+              <div className="cat-status-current-badge" style={{ borderColor: 'rgba(34, 197, 94, 0.4)', background: 'rgba(34, 197, 94, 0.1)' }}>
+                <span className="cat-status-current-icon">🍽️</span>
+                <div>
+                  <div className="cat-status-current-title" style={{ color: '#4ade80' }}>¡Tu pedido está listo!</div>
+                  <div className="cat-status-current-desc">Salió de cocina y el personal lo está llevando a tu mesa.</div>
+                </div>
+              </div>
+            ) : currentStatus === 'cocina' ? (
+              <div className="cat-status-current-badge" style={{ borderColor: 'rgba(249, 115, 22, 0.4)', background: 'rgba(249, 115, 22, 0.1)' }}>
+                <span className="cat-status-current-icon">👨‍🍳</span>
+                <div>
+                  <div className="cat-status-current-title" style={{ color: '#fb923c' }}>En preparación en cocina</div>
+                  <div className="cat-status-current-desc">El equipo de cocina está cocinando y armando tus hamburguesas a la plancha.</div>
+                </div>
+              </div>
+            ) : (
+              <div className="cat-status-current-badge" style={{ borderColor: 'rgba(239, 68, 68, 0.4)', background: 'rgba(239, 68, 68, 0.08)' }}>
+                <span className="cat-status-current-icon">⏳</span>
+                <div>
+                  <div className="cat-status-current-title" style={{ color: '#f87171' }}>Comanda recibida en sistema</div>
+                  <div className="cat-status-current-desc">Tu pedido ya está en la pantalla del salón. En instantes comienza la preparación en cocina.</div>
+                </div>
+              </div>
+            )}
+
+            <div className="cat-status-meta-info">
+              <span>👤 {activeTableOrder.customer?.name || cleanTable}</span>
+              <span>🕒 Hora de comanda: {orderTimeFormatted} hs</span>
+            </div>
+          </div>
+
+          {/* Stepper Card */}
+          {currentStatus !== 'cancelado' && (
+            <div className="cat-status-stepper">
+              <div className="cat-status-stepper-title">Progreso de la comanda</div>
+              <div className="cat-step-list">
+                {stepsConfig.map((s, idx) => {
+                  const isDone = currentStepIndex > idx;
+                  const isActive = currentStepIndex === idx;
+                  const isUpcoming = currentStepIndex < idx;
+
+                  return (
+                    <div key={s.key} className="cat-step-item">
+                      {idx < stepsConfig.length - 1 && (
+                        <div className={`cat-step-line ${isDone ? 'done' : ''}`} />
+                      )}
+                      <div className={`cat-step-circle ${isDone ? 'done' : ''} ${isActive ? 'active' : ''}`}>
+                        {isDone ? '✓' : idx + 1}
+                      </div>
+                      <div className="cat-step-content">
+                        <div className={`cat-step-label ${isUpcoming ? 'upcoming' : ''}`}>
+                          {s.icon} {s.label}
+                        </div>
+                        <div className="cat-step-desc">
+                          {s.desc}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Order Summary Details */}
+          <div className="cat-checkout-summary" style={{ marginTop: 0 }}>
+            <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff', marginBottom: 12, textTransform: 'uppercase' }}>
+              Detalle del pedido
+            </div>
+            {(activeTableOrder.items || []).map((item, i) => (
+              <div key={item.id || item.cartId || i} className="cat-checkout-summary-item" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                  <strong>{item.qty}x {item.name}</strong>
+                  <span>{formatPrice(item.unitPrice * item.qty)}</span>
+                </div>
+                {item.selectedMods && item.selectedMods.length > 0 && (
+                  <div style={{ fontSize: '0.75rem', color: 'var(--cat-text-muted)', paddingLeft: 12 }}>
+                    + {item.selectedMods.map(m => m.name).join(', ')}
+                  </div>
+                )}
+                {item.selectedOptions && item.selectedOptions.length > 0 && (
+                  <div style={{ fontSize: '0.75rem', color: 'var(--cat-text-muted)', paddingLeft: 12 }}>
+                    → {item.selectedOptions.map(o => o.name).join(', ')}
+                  </div>
+                )}
+                {item.notes && (
+                  <div style={{ fontSize: '0.75rem', color: '#fed7aa', paddingLeft: 12 }}>
+                    📝 {item.notes}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            <div className="cat-divider" />
+            <div className="cat-checkout-summary-total">
+              <span>Total a abonar</span>
+              <span>{formatPrice(activeTableOrder.total || activeTableOrder.subtotal || 0)}</span>
+            </div>
+
+            <div style={{ marginTop: 14, fontSize: '0.8rem', color: 'var(--cat-text-muted)', background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: 8 }}>
+              {activeTableOrder.paymentMethod === 'transferencia' ? (
+                <div>
+                  <strong>Forma de pago:</strong> Transferencia bancaria<br/>
+                  Alias: <span style={{ color: '#fff', fontWeight: 700 }}>{settings.alias_banco || 'burga.chamical.nx'}</span> ({settings.banco || 'Mercado Pago'})
+                </div>
+              ) : (
+                <div>
+                  <strong>Forma de pago:</strong> Efectivo 💵<br/>
+                  Abonás en la mesa al mozo o al finalizar en caja.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="cat-status-actions">
+            <button
+              type="button"
+              className="cat-order-more-btn"
+              onClick={() => {
+                setServiceType('dine_in');
+                setView('catalog');
+              }}
+            >
+              <span>🍔</span>
+              <span>Pedir algo más / Agregar a la mesa</span>
+            </button>
+
+            <button
+              type="button"
+              className="cat-refresh-status-btn"
+              onClick={() => refreshOrderStatus(true)}
+              disabled={isRefreshingStatus}
+            >
+              <RefreshCw size={16} className={isRefreshingStatus ? 'cat-spinner-sm' : ''} />
+              <span>{isRefreshingStatus ? 'Comprobando estado...' : 'Actualizar estado del pedido'}</span>
+            </button>
+          </div>
         </div>
         <Toast message={toast} />
       </div>
@@ -1306,6 +1733,29 @@ export default function CatalogPage({ initialCashShift }) {
               <span>🍽️ ¿Estás en el local?</span>
             </button>
           )}
+
+          {activeTableOrder && activeTableOrder.status !== 'cancelado' && (
+            <button
+              type="button"
+              onClick={() => setView('order_status')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1.5px solid rgba(239, 68, 68, 0.45)',
+                borderRadius: 20,
+                padding: '4px 12px',
+                fontSize: '0.8rem',
+                fontWeight: 800,
+                color: '#f87171',
+                cursor: 'pointer'
+              }}
+            >
+              <span className={`cat-active-order-pulse ${activeTableOrder.status === 'cocina' ? 'orange' : ''}`} style={{ width: 8, height: 8 }} />
+              <span>Pedido #{activeTableOrder.orderNumber}: {activeTableOrder.status === 'cocina' ? 'En cocina' : activeTableOrder.status === 'listo' ? 'Listo' : activeTableOrder.status === 'entregado' ? 'Entregado' : 'Recibido'}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1543,6 +1993,31 @@ export default function CatalogPage({ initialCashShift }) {
           })
         )}
       </div>
+
+      {/* 5.1 FLOATING ACTIVE TABLE ORDER BANNER */}
+      {activeTableOrder && activeTableOrder.status !== 'cancelado' && (
+        <div 
+          className="cat-active-order-banner" 
+          style={{ bottom: cart.totalItems > 0 ? '90px' : '24px' }}
+          onClick={() => setView('order_status')}
+        >
+          <div className="cat-active-order-banner-left">
+            <span className={`cat-active-order-pulse ${activeTableOrder.status === 'cocina' ? 'orange' : ''}`} />
+            <div className="cat-active-order-text">
+              <strong>{activeTableOrder.tableNumber?.toLowerCase().startsWith('mesa') ? activeTableOrder.tableNumber : `Mesa ${activeTableOrder.tableNumber}`} • Pedido #{activeTableOrder.orderNumber}</strong>
+              <small>
+                {activeTableOrder.status === 'pendiente' && '⏳ Comanda recibida en sistema'}
+                {activeTableOrder.status === 'cocina' && '👨‍🍳 En preparación en cocina'}
+                {activeTableOrder.status === 'listo' && '🍽️ ¡Listo para servir en tu mesa!'}
+                {activeTableOrder.status === 'entregado' && '✅ Entregado a la mesa'}
+              </small>
+            </div>
+          </div>
+          <button type="button" className="cat-active-order-btn">
+            Ver estado ➔
+          </button>
+        </div>
+      )}
 
       {/* 6. FLOATING MOBILE CART BAR */}
       {cart.totalItems > 0 && (

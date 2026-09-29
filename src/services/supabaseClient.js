@@ -257,6 +257,22 @@ export const supabaseSync = {
     return this.fetchOrders(limit);
   },
 
+  async fetchOrderById(orderId) {
+    if (!this.isConfigured() || !orderId) return null;
+    try {
+      const res = await fetch(this._url('orders', `id=eq.${encodeURIComponent(orderId)}&select=*&limit=1`), {
+        headers: this._headers()
+      });
+      if (res.ok) {
+        const rows = await res.json();
+        return Array.isArray(rows) && rows.length > 0 ? mapOrderFromDB(rows[0]) : null;
+      }
+    } catch (e) {
+      console.warn('[Supabase] fetchOrderById error:', e);
+    }
+    return null;
+  },
+
   async createOrder(order) {
     if (!this.isConfigured()) return;
     try {
