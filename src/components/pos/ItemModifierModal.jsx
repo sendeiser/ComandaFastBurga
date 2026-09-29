@@ -34,13 +34,7 @@ export default function ItemModifierModal({ product, onAddToCart, onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div 
-        className="modal-card" 
-        style={{ 
-          maxWidth: '430px', 
-          padding: '1.1rem', 
-          gap: '0.75rem', 
-          borderRadius: '16px' 
-        }} 
+        className="modal-card item-modifier-modal-card" 
         onClick={e => e.stopPropagation()}
       >
         <div className="modal-header" style={{ paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-subtle)' }}>

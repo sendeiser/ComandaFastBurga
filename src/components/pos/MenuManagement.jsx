@@ -499,205 +499,146 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
       {/* MODAL CREAR / EDITAR PRODUCTO & FOTO                     */}
       {/* ========================================================= */}
       {editingProduct && (
-        <div className="modal-overlay" onClick={() => setEditingProduct(null)}>
-          <div className="modal-card" style={{ maxWidth: '520px', width: '95%' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Camera size={18} style={{ color: 'var(--accent-amber)' }} />
+        <div className="modal-overlay product-edit-modal-overlay" onClick={() => setEditingProduct(null)}>
+          <div className="modal-card product-edit-modal-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-header product-edit-modal-header">
+              <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Camera size={19} style={{ color: 'var(--accent-amber)' }} />
                 <span>{editingProduct.id ? 'Editar Producto & Foto' : 'Crear Nuevo Producto'}</span>
               </div>
-              <button className="btn-close-modal" onClick={() => setEditingProduct(null)}>✕</button>
+              <button type="button" className="btn-close-modal" onClick={() => setEditingProduct(null)}>✕</button>
             </div>
 
-            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              {/* SECCIÓN FOTO DEL PRODUCTO */}
-              <div style={{
-                background: 'var(--bg-main)',
-                border: '1.5px dashed var(--border-subtle)',
-                borderRadius: 'var(--radius-md)',
-                padding: '0.85rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.65rem'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <ImageIcon size={14} style={{ color: 'var(--accent-amber)' }} />
-                    <span>Foto del Producto</span>
-                  </span>
+            <form onSubmit={handleSave} className="product-edit-form">
+              <div className="product-edit-scroll-body">
+                {/* SECCIÓN FOTO DEL PRODUCTO */}
+                <div className="product-edit-photo-card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <ImageIcon size={14} style={{ color: 'var(--accent-amber)' }} />
+                      <span>Foto del Producto</span>
+                    </span>
 
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setImageMode('upload')}
-                      style={{
-                        background: imageMode === 'upload' ? 'var(--accent-amber)' : 'transparent',
-                        color: imageMode === 'upload' ? '#000' : 'var(--text-muted)',
-                        border: 'none',
-                        borderRadius: '4px',
-                        padding: '2px 6px',
-                        fontSize: '0.68rem',
-                        fontWeight: 800,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Archivo
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setImageMode('url')}
-                      style={{
-                        background: imageMode === 'url' ? 'var(--accent-amber)' : 'transparent',
-                        color: imageMode === 'url' ? '#000' : 'var(--text-muted)',
-                        border: 'none',
-                        borderRadius: '4px',
-                        padding: '2px 6px',
-                        fontSize: '0.68rem',
-                        fontWeight: 800,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Enlace URL
-                    </button>
-                  </div>
-                </div>
-
-                {/* PREVISUALIZACIÓN O SUBIDA */}
-                {image ? (
-                  <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', maxHeight: '160px', border: '1px solid var(--border-subtle)' }}>
-                    <img
-                      src={image}
-                      alt="Previsualización"
-                      style={{ width: '100%', height: '150px', objectFit: 'cover', display: 'block' }}
-                    />
-                    <div style={{
-                      position: 'absolute',
-                      top: '6px',
-                      right: '6px',
-                      display: 'flex',
-                      gap: '6px'
-                    }}>
+                    <div style={{ display: 'flex', gap: '4px' }}>
                       <button
                         type="button"
-                        onClick={() => fileInputRef.current?.click()}
+                        onClick={() => setImageMode('upload')}
                         style={{
-                          background: 'rgba(0,0,0,0.75)',
-                          color: '#fff',
+                          background: imageMode === 'upload' ? 'var(--accent-amber)' : 'transparent',
+                          color: imageMode === 'upload' ? '#000' : 'var(--text-muted)',
                           border: 'none',
-                          borderRadius: '6px',
-                          padding: '5px 9px',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '5px'
+                          borderRadius: '4px',
+                          padding: '2px 8px',
+                          fontSize: '0.68rem',
+                          fontWeight: 800,
+                          cursor: 'pointer'
                         }}
                       >
-                        <RefreshCw size={13} />
-                        <span>Cambiar Foto</span>
+                        Archivo
                       </button>
                       <button
                         type="button"
-                        onClick={() => setImage('')}
+                        onClick={() => setImageMode('url')}
                         style={{
-                          background: 'rgba(239, 68, 68, 0.9)',
-                          color: '#fff',
+                          background: imageMode === 'url' ? 'var(--accent-amber)' : 'transparent',
+                          color: imageMode === 'url' ? '#000' : 'var(--text-muted)',
                           border: 'none',
-                          borderRadius: '6px',
-                          padding: '5px 8px',
-                          fontSize: '0.72rem',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
+                          borderRadius: '4px',
+                          padding: '2px 8px',
+                          fontSize: '0.68rem',
+                          fontWeight: 800,
+                          cursor: 'pointer'
                         }}
-                        title="Eliminar foto"
                       >
-                        <X size={13} />
-                        <span>Quitar</span>
+                        Enlace URL
                       </button>
                     </div>
                   </div>
-                ) : imageMode === 'upload' ? (
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    style={{
-                      background: 'var(--bg-card)',
-                      borderRadius: '8px',
-                      padding: '1.25rem',
-                      textAlign: 'center',
-                      cursor: 'pointer',
-                      border: '1px dashed var(--accent-amber)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '8px',
-                      transition: 'border-color 0.2s'
-                    }}
-                  >
-                    <Upload size={28} style={{ color: 'var(--accent-amber)' }} />
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 800 }}>
-                      {compressing ? 'Procesando y optimizando imagen...' : '📷 Subir foto desde este dispositivo / celular'}
-                    </span>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                      Toca aquí para seleccionar foto (JPG, PNG, WEBP)
-                    </span>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <input
-                      type="url"
-                      placeholder="https://ejemplo.com/hamburguesa.jpg"
-                      value={image}
-                      onChange={e => setImage(e.target.value)}
-                      className="custom-input-sm"
-                      style={{ width: '100%', padding: '0.6rem 0.75rem', fontSize: '0.82rem' }}
-                    />
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                      Ingresa una URL directa a la imagen en internet.
-                    </span>
-                  </div>
-                )}
 
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileUpload}
-                  style={{ display: 'none' }}
-                />
-              </div>
+                  {/* PREVISUALIZACIÓN O SUBIDA */}
+                  {image ? (
+                    <div className="product-edit-photo-preview-wrap">
+                      <img
+                        src={image}
+                        alt="Previsualización"
+                        className="product-edit-photo-preview-img"
+                      />
+                      <div className="product-edit-photo-actions-overlay">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="btn-photo-action-change"
+                        >
+                          <RefreshCw size={13} />
+                          <span>Cambiar</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setImage('')}
+                          className="btn-photo-action-remove"
+                          title="Eliminar foto"
+                        >
+                          <X size={13} />
+                          <span>Quitar</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : imageMode === 'upload' ? (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="product-edit-photo-dropzone"
+                    >
+                      <Upload size={26} style={{ color: 'var(--accent-amber)' }} />
+                      <span className="dropzone-text-title">
+                        {compressing ? 'Procesando imagen...' : 'Subir foto desde este dispositivo / celular'}
+                      </span>
+                      <span className="dropzone-text-sub">
+                        Toca aquí para elegir foto o sacar con la cámara (JPG, PNG, WEBP)
+                      </span>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <input
+                        type="url"
+                        placeholder="https://ejemplo.com/hamburguesa.jpg"
+                        value={image}
+                        onChange={e => setImage(e.target.value)}
+                        className="custom-input-sm"
+                        style={{ width: '100%', padding: '0.6rem 0.75rem', fontSize: '0.82rem' }}
+                      />
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                        Ingresa una URL directa a la imagen en internet.
+                      </span>
+                    </div>
+                  )}
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    style={{ display: 'none' }}
+                  />
+                </div>
 
               {/* CAMPOS DEL PRODUCTO */}
-              <div>
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>Nombre del Producto:</label>
+              <div className="product-form-field">
+                <label className="product-form-label">Nombre del Producto:</label>
                 <input
                   type="text"
                   required
-                  className="custom-input-sm"
+                  className="custom-input-sm product-form-input"
                   placeholder="Ej: Hamburguesa Doble Cheddar"
                   value={name}
                   onChange={e => setName(e.target.value)}
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 1fr', gap: '8px' }}>
-                <div>
-                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>Emoji:</label>
-                  <input
-                    type="text"
-                    className="custom-input-sm"
-                    value={emoji}
-                    onChange={e => setEmoji(e.target.value)}
-                    style={{ textAlign: 'center', fontSize: '1.2rem' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>Categoría:</label>
+              <div className="product-form-meta-grid">
+                <div className="product-form-field field-category">
+                  <label className="product-form-label">Categoría:</label>
                   <select
-                    className="custom-input-sm"
+                    className="custom-input-sm product-form-input"
                     value={category}
                     onChange={e => setCategory(e.target.value)}
                   >
@@ -707,12 +648,22 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
                   </select>
                 </div>
 
-                <div>
-                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>Precio ($):</label>
+                <div className="product-form-field field-emoji">
+                  <label className="product-form-label">Emoji:</label>
+                  <input
+                    type="text"
+                    className="custom-input-sm product-form-input product-form-emoji-input"
+                    value={emoji}
+                    onChange={e => setEmoji(e.target.value)}
+                  />
+                </div>
+
+                <div className="product-form-field field-price">
+                  <label className="product-form-label">Precio ($):</label>
                   <input
                     type="number"
                     required
-                    className="custom-input-sm"
+                    className="custom-input-sm product-form-input"
                     placeholder="8000"
                     value={price}
                     onChange={e => setPrice(e.target.value)}
@@ -721,40 +672,32 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
               </div>
 
               {/* SECCIÓN CONFIGURACIÓN DE PROMO Y DESCUENTOS */}
-              <div style={{
-                background: 'rgba(245, 158, 11, 0.05)',
-                border: '1px solid rgba(245, 158, 11, 0.25)',
-                borderRadius: 'var(--radius-md)',
-                padding: '0.75rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.65rem'
-              }}>
-                <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--accent-amber)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <div className="product-form-promo-card">
+                <div className="product-form-section-title text-amber">
                   <span>🏷️ Configuración de Promoción / Descuento (Opcional)</span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                  <div>
-                    <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+                <div className="product-form-promo-grid">
+                  <div className="product-form-field">
+                    <label className="product-form-label">
                       Precio antes / Tachado ($):
                     </label>
                     <input
                       type="number"
-                      className="custom-input-sm"
+                      className="custom-input-sm product-form-input"
                       placeholder="Ej: 18500"
                       value={originalPrice}
                       onChange={e => setOriginalPrice(e.target.value)}
                     />
                   </div>
 
-                  <div>
-                    <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+                  <div className="product-form-field">
+                    <label className="product-form-label">
                       Etiqueta Promo:
                     </label>
                     <input
                       type="text"
-                      className="custom-input-sm"
+                      className="custom-input-sm product-form-input"
                       placeholder="Ej: 25% OFF, 2x1..."
                       value={discountBadge}
                       onChange={e => setDiscountBadge(e.target.value)}
@@ -762,111 +705,95 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
                   </div>
                 </div>
 
-                <label style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '8px', 
-                  cursor: 'pointer',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  color: 'var(--text-primary)',
-                  paddingTop: '2px'
-                }}>
+                <label className="product-form-checkbox-label">
                   <input
                     type="checkbox"
                     checked={freeShipping}
                     onChange={e => setFreeShipping(e.target.checked)}
-                    style={{ width: '16px', height: '16px', accentColor: '#10b981', cursor: 'pointer' }}
+                    className="product-form-checkbox"
                   />
                   <span>🛵 <strong>Incluye Envío Gratis</strong> (Bonifica el delivery a $0 en POS y WhatsApp)</span>
                 </label>
               </div>
 
               {/* SECCIÓN DISPONIBILIDAD Y CONTROL DE STOCK */}
-              <div style={{
-                background: available ? 'rgba(16, 185, 129, 0.05)' : 'rgba(239, 68, 68, 0.05)',
-                border: available ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid rgba(239, 68, 68, 0.3)',
-                borderRadius: 'var(--radius-md)',
-                padding: '0.75rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.65rem'
-              }}>
-                <div style={{ fontSize: '0.78rem', fontWeight: 800, color: available ? '#10b981' : '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div className={`product-form-stock-card ${available ? 'stock-active' : 'stock-inactive'}`}>
+                <div className="product-form-section-title stock-header">
                   <span>📦 Disponibilidad & Control de Stock</span>
-                  <span style={{ fontSize: '0.7rem', padding: '2px 7px', borderRadius: '10px', background: available ? '#10b981' : '#ef4444', color: '#fff' }}>
+                  <span className={`stock-badge ${available ? 'badge-active' : 'badge-inactive'}`}>
                     {available ? '🟢 Activo en Menú' : '🔴 Agotado / Pausado'}
                   </span>
                 </div>
 
-                <label style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '8px', 
-                  cursor: 'pointer',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  color: 'var(--text-primary)'
-                }}>
+                <label className="product-form-checkbox-label">
                   <input
                     type="checkbox"
                     checked={available}
                     onChange={e => setAvailable(e.target.checked)}
-                    style={{ width: '16px', height: '16px', accentColor: '#10b981', cursor: 'pointer' }}
+                    className="product-form-checkbox"
                   />
                   <span><strong>Producto Disponible para la Venta</strong> (Si lo desmarcas, se muestra como Agotado en WhatsApp y Carta Digital)</span>
                 </label>
 
-                <div>
-                  <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+                <div className="product-form-field">
+                  <label className="product-form-label">
                     Stock límite (Opcional - dejar vacío para ilimitado):
                   </label>
                   <input
                     type="number"
                     min="0"
-                    className="custom-input-sm"
+                    className="custom-input-sm product-form-input"
                     placeholder="Ej: 15 (se descuenta automáticamente al confirmar pedidos)"
                     value={stock}
                     onChange={e => setStock(e.target.value)}
                     disabled={!available}
                   />
-                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginTop: '3px' }}>
+                  <span className="product-form-hint">
                     💡 Cuando el stock llega a 0, el producto se marca como Agotado y desaparece de las alertas de promos.
                   </span>
                 </div>
               </div>
 
-              <div>
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>Descripción / Ingredientes:</label>
+              <div className="product-form-field">
+                <label className="product-form-label">Descripción / Ingredientes:</label>
                 <input
                   type="text"
-                  className="custom-input-sm"
+                  className="custom-input-sm product-form-input"
                   placeholder="Detalle de carne, queso, pan..."
                   value={description}
                   onChange={e => setDescription(e.target.value)}
                 />
               </div>
 
-              <div>
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>Agregados & Modificadores (Separados por coma):</label>
+              <div className="product-form-field">
+                <label className="product-form-label">Agregados & Modificadores (Separados por coma):</label>
                 <input
                   type="text"
-                  className="custom-input-sm"
+                  className="custom-input-sm product-form-input"
                   placeholder="Sin cebolla, Extra Cheddar (+$800), Salsa BBQ"
                   value={modifiersStr}
                   onChange={e => setModifiersStr(e.target.value)}
                 />
               </div>
+            </div> {/* Fin de product-edit-scroll-body */}
 
+            <div className="product-edit-footer">
+              <button
+                type="button"
+                className="btn-cancel-product"
+                onClick={() => setEditingProduct(null)}
+              >
+                Cancelar
+              </button>
               <button
                 type="submit"
                 disabled={compressing}
-                className="btn-confirm-order"
-                style={{ marginTop: '0.5rem', height: '40px' }}
+                className="btn-confirm-order btn-save-product-submit"
               >
-                {compressing ? 'Procesando foto...' : 'Guardar Producto & Foto'}
+                {compressing ? 'Procesando foto...' : (editingProduct.id ? '💾 Guardar Cambios' : '➕ Crear Producto')}
               </button>
-            </form>
+            </div>
+          </form>
           </div>
         </div>
       )}
