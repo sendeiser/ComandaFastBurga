@@ -236,7 +236,7 @@ export default function KitchenDisplay({
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span className="order-num-badge">#{order.orderNumber}</span>
             {isPending && onReorderOrder && (
-              <div style={{ display: 'inline-flex', gap: 2 }}>
+              <div className="kds-reorder-btns" style={{ display: 'inline-flex', gap: 2 }}>
                 <button 
                   type="button" 
                   className="qty-btn" 
@@ -279,7 +279,9 @@ export default function KitchenDisplay({
           <div className="kds-customer-row">
             <span className="kds-customer-name">
               👤 {typeof order.customer === 'object' ? order.customer.name : order.customer}
-              {typeof order.customer === 'object' && order.customer.phone ? ` • ${order.customer.phone}` : ''}
+              {typeof order.customer === 'object' && order.customer.phone && (
+                <span className="kds-customer-phone"> • {order.customer.phone}</span>
+              )}
             </span>
             {typeof order.customer === 'object' && order.customer.address && order.deliveryType === 'delivery' && (
               <span className="kds-delivery-address">📍 {order.customer.address}</span>

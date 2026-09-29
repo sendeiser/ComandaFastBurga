@@ -2619,23 +2619,78 @@ h1, h2, h3, h4, .brand-title {
      KDS MOBILE RESPONSIVE UI / UX
      ========================================================= */
   /* =========================================================
-     KDS MOBILE ENHANCEMENTS & SPACE OPTIMIZATION
+     KDS MOBILE ENHANCEMENTS & SPACE OPTIMIZATION (ONLY WHAT THE COOK NEEDS)
      ========================================================= */
+  .kitchen-zen-active .kds-container {
+    padding: 0.45rem 0.5rem !important;
+    gap: 0.35rem !important;
+  }
+
   .kds-container {
-    gap: 0.4rem !important;
+    gap: 0.35rem !important;
   }
 
-  .kds-header-bar {
-    padding: 0.45rem 0.65rem !important;
-    gap: 0.4rem !important;
+  /* Hide non-essential desktop clutter for the cook on mobile */
+  .kds-channel-filters-row {
+    display: none !important;
   }
 
-  .kds-header-left {
-    gap: 0.4rem !important;
+  .kds-quick-move-bar {
+    display: none !important;
+  }
+
+  .kds-delivery-address {
+    display: none !important;
+  }
+
+  .kds-customer-phone {
+    display: none !important;
+  }
+
+  .kds-card-clock {
+    display: none !important;
+  }
+
+  .kds-header-clock {
+    display: none !important;
+  }
+
+  .kds-reorder-btns {
+    display: none !important;
   }
 
   .kds-count-pills-row {
     display: none !important;
+  }
+
+  .kds-header-bar {
+    padding: 0.35rem 0.65rem !important;
+    gap: 0.35rem !important;
+    min-height: 40px !important;
+  }
+
+  .kds-header-left {
+    gap: 0.35rem !important;
+  }
+
+  .kds-header-title {
+    font-size: 0.85rem !important;
+    letter-spacing: 0.01em !important;
+  }
+
+  .kds-grill-summary-btn {
+    padding: 0.28rem 0.5rem !important;
+    font-size: 0.72rem !important;
+  }
+
+  .kds-topbar-btn {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  .kds-zen-toggle-btn {
+    padding: 0.28rem 0.5rem !important;
+    font-size: 0.72rem !important;
   }
 
   /* 4-Tab Switcher Bar on Mobile */
@@ -2654,7 +2709,7 @@ h1, h2, h3, h4, .brand-title {
     background: transparent !important;
     border: 1px solid transparent !important;
     border-radius: var(--radius-sm) !important;
-    padding: 0.35rem 0.15rem !important;
+    padding: 0.3rem 0.15rem !important;
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
@@ -2665,7 +2720,7 @@ h1, h2, h3, h4, .brand-title {
     font-weight: 700 !important;
     cursor: pointer !important;
     touch-action: manipulation;
-    min-height: 40px !important;
+    min-height: 38px !important;
   }
 
   .kds-mobile-tab-btn.active {
@@ -2774,14 +2829,82 @@ h1, h2, h3, h4, .brand-title {
     display: none !important;
   }
 
-  /* Compact Order Card on Mobile with Giant Touch Target */
+  /* Compact Order Card on Mobile - Clean, bold & thumb-friendly */
   .kds-order-card {
-    padding: 0.75rem 0.85rem !important;
-    gap: 0.5rem !important;
+    padding: 0.65rem 0.75rem !important;
+    gap: 0.45rem !important;
+    border-radius: var(--radius-md) !important;
+  }
+
+  .kds-card-top {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 0.4rem !important;
   }
 
   .order-num-badge {
-    font-size: 1.35rem !important;
+    font-size: 1.25rem !important;
+    font-weight: 900 !important;
+  }
+
+  .order-type-chip {
+    font-size: 0.72rem !important;
+    padding: 2px 7px !important;
+    font-weight: 800 !important;
+  }
+
+  .kds-timer-chip {
+    font-size: 0.72rem !important;
+    padding: 2px 6px !important;
+  }
+
+  .kds-customer-row {
+    font-size: 0.78rem !important;
+    gap: 4px !important;
+    margin-top: -2px !important;
+  }
+
+  .kds-customer-name {
+    font-weight: 700 !important;
+    color: var(--text-primary) !important;
+  }
+
+  .kds-critical-notes {
+    padding: 4px 8px !important;
+    font-size: 0.78rem !important;
+  }
+
+  .kds-items-list {
+    gap: 0.35rem !important;
+    padding: 0.25rem 0 !important;
+  }
+
+  .kds-item-line {
+    font-size: 0.95rem !important;
+    font-weight: 800 !important;
+  }
+
+  .kds-item-qty {
+    font-size: 0.9rem !important;
+    font-weight: 900 !important;
+    padding: 2px 6px !important;
+    background: rgba(234, 88, 12, 0.15) !important;
+    color: #fb923c !important;
+    border-radius: 4px !important;
+  }
+
+  .kds-mod-tag {
+    font-size: 0.72rem !important;
+    padding: 1px 5px !important;
+  }
+
+  .kds-item-note-tag {
+    font-size: 0.72rem !important;
+  }
+
+  .kds-card-actions {
+    margin-top: 0.35rem !important;
   }
 
   .btn-kds-action.big-touch {
@@ -2789,17 +2912,8 @@ h1, h2, h3, h4, .brand-title {
     min-height: 48px !important;
     font-size: 0.94rem !important;
     font-weight: 900 !important;
-    border-radius: 10px !important;
+    border-radius: 8px !important;
     letter-spacing: 0.02em !important;
-  }
-
-  .kds-item-qty {
-    font-size: 0.88rem !important;
-    padding: 2px 7px !important;
-  }
-
-  .kds-item-line {
-    font-size: 0.95rem !important;
   }
 
   /* Mobile Inputs: Prevent auto-zoom in iOS Safari */
@@ -3400,9 +3514,37 @@ h1, h2, h3, h4, .brand-title {
   height: 100dvh !important;
   max-height: 100dvh !important;
   border-radius: 0 !important;
-  padding: 0.5rem !important;
-  gap: 0.45rem !important;
+  padding: 1rem 1.25rem !important;
+  gap: 0.85rem !important;
   background: #090d16 !important;
+  box-sizing: border-box !important;
+}
+
+.kitchen-zen-active .kds-header-bar {
+  padding: 0.65rem 1.15rem !important;
+  border-radius: var(--radius-lg) !important;
+  gap: 0.75rem !important;
+}
+
+.kitchen-zen-active .kds-channel-filters-row {
+  padding: 0 0.25rem !important;
+  gap: 0.5rem !important;
+}
+
+.kitchen-zen-active .kds-columns-grid {
+  gap: 0.95rem !important;
+  padding-bottom: 0.5rem !important;
+}
+
+.kitchen-zen-active .kds-column {
+  border-radius: var(--radius-lg) !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.kitchen-zen-active .kds-cards-list {
+  padding: 0.75rem !important;
+  gap: 0.75rem !important;
 }
 
 /* =========================================================
