@@ -1059,7 +1059,7 @@ export default function CatalogPage({ initialCashShift }) {
   };
 
   // ---- Send order via WhatsApp (Takeaway / Delivery) ----
-  const handleSendOrder = () => {
+  const handleSendOrder = async () => {
     if (serviceType === 'dine_in') {
       return handleSendDineInOrder();
     }
@@ -1080,41 +1080,121 @@ export default function CatalogPage({ initialCashShift }) {
       }
     }
 
-    const waPhone = formatWhatsAppPhone(settings.telefono_whatsapp || settings.telefono_contacto);
-    const deliveryFee = serviceType === 'delivery' ? (Number(settings.costo_envio) || 1500) : 0;
+    setIsSubmittingOrder(true);
+    try {
+      const nextNum = await storageService.getNextOrderNumberAsync();
+      const orderId = `ord-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      const deliveryFee = serviceType === 'delivery' ? (Number(settings.costo_envio) || 1500) : 0;
+      const totalAmount = cart.subtotal + deliveryFee;
 
-    const message = generateWhatsAppMessage(
-      cart.items,
-      cart.subtotal,
-      serviceType,
-      customerName,
-      customerAddress,
-      customerPhone,
-      deliveryFee,
-      orderNotes,
-      paymentMethod,
-      tableNumber
-    );
+      const orderPayload = {
+        id: orderId,
+        orderNumber: nextNum,
+        channel: serviceType === 'delivery' ? 'delivery' : 'mostrador',
+        tableNumber: '',
+        customer: {
+          name: customerName.trim(),
+          phone: customerPhone.trim() || '',
+          address: serviceType === 'delivery' ? customerAddress.trim() : 'Retiro en Local (Mostrador)',
+          notes: orderNotes.trim()
+        },
+        items: cart.items.map(item => ({
+          id: item.productId || item.cartId,
+          productId: item.productId,
+          name: item.name,
+          qty: item.qty,
+          unitPrice: item.unitPrice,
+          basePrice: item.basePrice || item.unitPrice,
+          selectedMods: item.selectedMods || [],
+          selectedOptions: item.selectedOptions || [],
+          notes: item.notes || '',
+          emoji: item.emoji || '🍔',
+          image: item.image || '',
+          onlyTakeaway: Boolean(item.onlyTakeaway),
+          freeShipping: Boolean(item.freeShipping)
+        })),
+        subtotal: cart.subtotal,
+        deliveryFee: deliveryFee,
+        total: totalAmount,
+        paymentMethod: paymentMethod || 'efectivo',
+        status: 'pendiente',
+        statusTimestamps: {
+          pendiente: new Date().toISOString(),
+          createdAt: new Date().toISOString()
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: Date.now(),
+        source: 'catalogo_online'
+      };
 
-    const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(message)}`;
+      // 1. Guardar localmente y notificar al POS de inmediato
+      storageService.saveOrder(orderPayload);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('comandafast:new-order', { detail: orderPayload }));
+      }
 
-    window.open(waUrl, '_blank');
-    cart.clearCart();
-    setView('catalog');
-    setCustomerName('');
-    setCustomerPhone('');
-    setCustomerAddress('');
-    setOrderNotes('');
-    setPaymentMethod('efectivo');
-    // Si la mesa vino por URL se conserva, sino se limpia
-    const urlMesa = getMesaFromUrl();
-    if (!urlMesa) {
-      setTableNumber('');
-      setServiceType(null);
-    } else {
-      setServiceType('dine_in');
+      // 2. Enviar a Supabase Cloud (notifica inmediatamente a Cocina y POS en tiempo real)
+      if (supabaseSync.isConfigured()) {
+        try {
+          await supabaseSync.createOrder(orderPayload);
+        } catch (supaErr) {
+          console.warn('[CatalogPage] Error enviando pedido a Supabase:', supaErr);
+        }
+      }
+
+      // 3. Notificar al servidor LAN si está disponible
+      try {
+        if (typeof window !== 'undefined' && window.location) {
+          const botHost = window.location.hostname || 'localhost';
+          fetch(`http://${botHost}:3002/api/orders`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(orderPayload)
+          }).catch(() => {});
+        }
+      } catch (_) {}
+
+      // 4. Generar y abrir enlace de WhatsApp
+      const waPhone = formatWhatsAppPhone(settings.telefono_whatsapp || settings.telefono_contacto);
+      const message = generateWhatsAppMessage(
+        cart.items,
+        cart.subtotal,
+        serviceType,
+        customerName,
+        customerAddress,
+        customerPhone,
+        deliveryFee,
+        orderNotes,
+        paymentMethod,
+        tableNumber,
+        nextNum
+      );
+
+      const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(message)}`;
+
+      window.open(waUrl, '_blank');
+      cart.clearCart();
+      setView('catalog');
+      setCustomerName('');
+      setCustomerPhone('');
+      setCustomerAddress('');
+      setOrderNotes('');
+      setPaymentMethod('efectivo');
+
+      const urlMesa = getMesaFromUrl();
+      if (!urlMesa) {
+        setTableNumber('');
+        setServiceType(null);
+      } else {
+        setServiceType('dine_in');
+      }
+      showToast(`🎉 ¡Pedido #${nextNum} registrado y enviado a WhatsApp!`);
+    } catch (err) {
+      console.error('[CatalogPage] Error al procesar pedido:', err);
+      showToast('❌ Ocurrió un error al procesar el pedido.');
+    } finally {
+      setIsSubmittingOrder(false);
     }
-    showToast('🎉 Pedido enviado por WhatsApp');
   };
 
   const businessOpen = isCashOpen;

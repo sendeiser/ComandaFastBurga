@@ -1124,12 +1124,16 @@ pause
         <span 
           className="bot-tab-badge" 
           style={{ 
-            background: (settings.menu_mode || 'catalog') === 'catalog' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(99, 102, 241, 0.2)', 
-            color: (settings.menu_mode || 'catalog') === 'catalog' ? '#10b981' : '#818cf8',
+            background: (settings.menu_mode === 'catalog_direct')
+              ? 'rgba(14, 165, 233, 0.2)'
+              : ((settings.menu_mode || 'catalog') === 'catalog' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(99, 102, 241, 0.2)'), 
+            color: (settings.menu_mode === 'catalog_direct')
+              ? '#38bdf8'
+              : ((settings.menu_mode || 'catalog') === 'catalog' ? '#10b981' : '#818cf8'),
             fontSize: '0.65rem'
           }}
         >
-          {(settings.menu_mode || 'catalog') === 'catalog' ? 'Catálogo' : 'Texto'}
+          {(settings.menu_mode === 'catalog_direct') ? 'Directo POS' : ((settings.menu_mode || 'catalog') === 'catalog' ? 'Catálogo' : 'Texto')}
         </span>
       )
     },
@@ -1280,12 +1284,20 @@ pause
                     fontSize: '0.72rem',
                     padding: '3px 10px',
                     borderRadius: '12px',
-                    background: (settings.menu_mode || 'catalog') === 'catalog' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(99, 102, 241, 0.15)',
-                    color: (settings.menu_mode || 'catalog') === 'catalog' ? '#10b981' : '#818cf8',
+                    background: (settings.menu_mode === 'catalog_direct')
+                      ? 'rgba(14, 165, 233, 0.15)'
+                      : ((settings.menu_mode || 'catalog') === 'catalog' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(99, 102, 241, 0.15)'),
+                    color: (settings.menu_mode === 'catalog_direct')
+                      ? '#38bdf8'
+                      : ((settings.menu_mode || 'catalog') === 'catalog' ? '#10b981' : '#818cf8'),
                     fontWeight: 700,
-                    border: (settings.menu_mode || 'catalog') === 'catalog' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(99, 102, 241, 0.3)'
+                    border: (settings.menu_mode === 'catalog_direct')
+                      ? '1px solid rgba(14, 165, 233, 0.35)'
+                      : ((settings.menu_mode || 'catalog') === 'catalog' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(99, 102, 241, 0.3)')
                   }}>
-                    {(settings.menu_mode || 'catalog') === 'catalog' ? '● Activo: Catálogo Web Online' : '● Activo: Menú de Plantillas de Texto'}
+                    {(settings.menu_mode === 'catalog_direct')
+                      ? '● Activo: Catálogo Directo al POS (Pausa Automática a Cajera)'
+                      : ((settings.menu_mode || 'catalog') === 'catalog' ? '● Activo: Catálogo Web Online' : '● Activo: Menú de Plantillas de Texto')}
                   </span>
                 </div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '3px' }}>
@@ -1337,18 +1349,18 @@ pause
                   padding: '0.9rem 1.1rem',
                   borderRadius: 'var(--radius-md)',
                   cursor: 'pointer',
-                  border: (settings.menu_mode || 'catalog') === 'templates' 
+                  border: (settings.menu_mode === 'templates') 
                     ? '2px solid #6366f1' 
                     : '1px solid var(--border-subtle)',
-                  background: (settings.menu_mode || 'catalog') === 'templates'
+                  background: (settings.menu_mode === 'templates')
                     ? 'rgba(99, 102, 241, 0.08)'
                     : 'var(--bg-main)',
                   transition: 'all 0.2s ease',
-                  boxShadow: (settings.menu_mode || 'catalog') === 'templates' ? '0 0 16px rgba(99, 102, 241, 0.15)' : 'none'
+                  boxShadow: (settings.menu_mode === 'templates') ? '0 0 16px rgba(99, 102, 241, 0.15)' : 'none'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: (settings.menu_mode || 'catalog') === 'templates' ? '#818cf8' : 'inherit', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: (settings.menu_mode === 'templates') ? '#818cf8' : 'inherit', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span>📋</span> Menú de Plantillas de Texto
                   </div>
                   <span style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(99, 102, 241, 0.2)', color: '#818cf8', fontWeight: 700 }}>
@@ -1360,6 +1372,40 @@ pause
                 </div>
                 <div style={{ marginTop: '8px', fontSize: '0.74rem', color: '#818cf8', fontWeight: 600 }}>
                   <span>Flujo conversacional paso a paso por WhatsApp</span>
+                </div>
+              </div>
+
+              {/* Opción 3: Catálogo Directo al POS + Pausa Automática a Cajera */}
+              <div 
+                onClick={() => handleToggleMenuMode('catalog_direct')}
+                style={{
+                  padding: '0.9rem 1.1rem',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                  border: (settings.menu_mode === 'catalog_direct') 
+                    ? '2px solid #0284c7' 
+                    : '1px solid var(--border-subtle)',
+                  background: (settings.menu_mode === 'catalog_direct')
+                    ? 'rgba(14, 165, 233, 0.08)'
+                    : 'var(--bg-main)',
+                  transition: 'all 0.2s ease',
+                  position: 'relative',
+                  boxShadow: (settings.menu_mode === 'catalog_direct') ? '0 0 16px rgba(14, 165, 233, 0.18)' : 'none'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: (settings.menu_mode === 'catalog_direct') ? '#38bdf8' : 'inherit', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>🚀</span> Catálogo Directo al POS
+                  </div>
+                  <span style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(14, 165, 233, 0.2)', color: '#38bdf8', fontWeight: 700 }}>
+                    Pausa a Cajera
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '5px', lineHeight: 1.4 }}>
+                  El bot sólo envía el enlace al catálogo. El cliente pide desde allí y el pedido entra directo al POS. Al enviar el mensaje por WhatsApp, el bot le confirma el pedido, se pausa automáticamente y le avisa a la cajera.
+                </div>
+                <div style={{ marginTop: '8px', fontSize: '0.74rem', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                  <span>⚡ Sin chatbot intermedio + Alerta a cajera</span>
                 </div>
               </div>
             </div>

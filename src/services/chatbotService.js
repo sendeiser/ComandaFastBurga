@@ -20,6 +20,88 @@ import { supabaseSync } from './supabaseClient';
 const BOT_SETTINGS_KEY = 'comandafast_bot_settings';
 const BOT_VARIABLES_KEY = 'comandafast_bot_variables';
 
+function parseCatalogCurrency(val) {
+  if (!val) return 0;
+  let clean = String(val).replace(/[^\d\.,]/g, '').trim();
+  if (clean.includes(',') && clean.includes('.')) {
+    if (clean.indexOf('.') < clean.indexOf(',')) {
+      clean = clean.replace(/\./g, '').replace(',', '.');
+    } else {
+      clean = clean.replace(/,/g, '');
+    }
+    return Math.round(parseFloat(clean)) || 0;
+  }
+  if (clean.includes(',')) {
+    clean = clean.replace(',', '.');
+    return Math.round(parseFloat(clean)) || 0;
+  }
+  if (/^\d{1,3}(\.\d{3})+$/.test(clean)) {
+    return parseInt(clean.replace(/\./g, ''), 10) || 0;
+  }
+  return Math.round(parseFloat(clean)) || 0;
+}
+
+export function parseCatalogOrder(text) {
+  if (!text || typeof text !== 'string') return null;
+  const isCatalogOrder = (text.includes("Mi Pedido") || text.includes("Mi pedido") || text.includes("MI PEDIDO") || text.includes("Pedido #")) && 
+                         (text.includes("Subtotal") || text.includes("TOTAL") || text.includes("Tipo de entrega") || text.includes("Mesa"));
+  if (!isCatalogOrder) return null;
+
+  const itemRegex = /[•\*\-]?\s*(\d+)x\s+([^—\n]+?)\s*—\s*\$?\s*([\d\.,]+)/g;
+  let match;
+  const items = [];
+  while ((match = itemRegex.exec(text)) !== null) {
+    items.push({
+      qty: parseInt(match[1], 10) || 1,
+      name: match[2].trim(),
+      price: parseCatalogCurrency(match[3])
+    });
+  }
+
+  const orderNumMatch = text.match(/Mi Pedido\s*#?(\d+)/i) || text.match(/Pedido\s*#?(\d+)/i);
+  const orderNumber = orderNumMatch ? parseInt(orderNumMatch[1], 10) : null;
+
+  const subMatch = text.match(/Subtotal[^\d\n]*([$\d\.,]+)/i);
+  const subtotal = subMatch ? parseCatalogCurrency(subMatch[1]) : 0;
+  const delMatch = text.match(/Delivery[^\d\n]*([$\d\.,]+)/i);
+  const deliveryFee = delMatch ? parseCatalogCurrency(delMatch[1]) : 0;
+  const totMatch = text.match(/\bTOTAL[^\d\n]*([$\d\.,]+)/i);
+  const total = totMatch ? parseCatalogCurrency(totMatch[1]) : (subtotal + deliveryFee);
+
+  const nameMatch = text.match(/Nombre:\*?\s*([^\n]+)/i);
+  const addrMatch = text.match(/Direcci[oó]n:\*?\s*([^\n]+)/i);
+  const phoneMatch = text.match(/Tel[eé]fono:\*?\s*([^\n]+)/i);
+  const typeMatch = text.match(/Tipo de entrega:\*?\s*([^\n]+)/i);
+  const payMatch = text.match(/Forma de pago:\*?\s*([^\n]+)/i) || text.match(/Pago:\*?\s*([^\n]+)/i);
+  const notesMatch = text.match(/Aclaraciones:\*?\s*([^\n]+)/i);
+
+  const serviceType = (typeMatch && (typeMatch[1].toLowerCase().includes("llevar") || typeMatch[1].toLowerCase().includes("retiro") || typeMatch[1].toLowerCase().includes("local"))) 
+    ? 'local' 
+    : 'delivery';
+
+  let paymentMethod = 'efectivo';
+  if (payMatch) {
+    const rawPay = payMatch[1].toLowerCase();
+    if (rawPay.includes('transf') || rawPay.includes('alias') || rawPay.includes('banco') || rawPay.includes('mp') || rawPay.includes('mercado')) {
+      paymentMethod = 'transferencia';
+    }
+  }
+
+  return {
+    orderNumber,
+    items,
+    subtotal: subtotal || total,
+    deliveryFee,
+    total: total || subtotal,
+    customerName: nameMatch ? nameMatch[1].trim() : '',
+    customerAddress: addrMatch ? addrMatch[1].trim() : '',
+    customerPhone: phoneMatch ? phoneMatch[1].trim() : '',
+    serviceType,
+    paymentMethod,
+    notes: notesMatch ? notesMatch[1].trim() : ''
+  };
+}
+
 export const chatbotService = {
   // --- GESTIÓN DE VARIABLES GLOBALES DEL BOT ---
   getBotVariables() {
@@ -557,6 +639,86 @@ export const chatbotService = {
       : storageService.getProducts();
 
     // -------------------------------------------------------------
+    // 0. DETECCIÓN Y PROCESAMIENTO AUTOMÁTICO DE PEDIDOS DEL CATÁLOGO ONLINE
+    // -------------------------------------------------------------
+    const parsedCatalogOrder = parseCatalogOrder(incomingText);
+    if (parsedCatalogOrder && parsedCatalogOrder.items && parsedCatalogOrder.items.length > 0) {
+      const orderNum = parsedCatalogOrder.orderNumber || (storageService.getNextOrderNumber ? storageService.getNextOrderNumber() : 1);
+      const chosenMethod = parsedCatalogOrder.paymentMethod || 'efectivo';
+      const isTransfer = chosenMethod === 'transferencia';
+      const itemsSummary = parsedCatalogOrder.items.map(it => `• ${it.qty}x ${it.name} - $${(it.price * it.qty).toLocaleString('es-AR')}`).join('\n');
+      const shippingLabel = parsedCatalogOrder.serviceType === 'delivery' 
+        ? `🛵 Envío a Domicilio (${parsedCatalogOrder.customerAddress || 'A convenir'})` 
+        : '🛍️ Retiro por el Local (Mostrador)';
+
+      const currentMenuMode = settings.menu_mode || 'catalog';
+
+      let payInstructions = '';
+      if (isTransfer) {
+        payInstructions = `💳 *Datos para la Transferencia Bancaria:* 🏦\n` +
+          `• *Alias:* \`${settings.bank_alias || 'comandafast.mp'}\`\n` +
+          `• *Banco:* ${settings.bank_name || 'Mercado Pago'}\n` +
+          `• *Titular:* ${settings.bank_holder || "Burga's"}` +
+          (settings.bank_cbu ? `\n• *CBU:* \`${settings.bank_cbu}\`` : '') +
+          `\n\n📸 *Por favor enviá la captura o comprobante por este chat.*`;
+      } else {
+        payInstructions = `💵 *Abonás en efectivo al ${parsedCatalogOrder.serviceType === 'delivery' ? 'recibir tu pedido' : 'retirar por el local'}.*`;
+      }
+
+      if (currentMenuMode === 'catalog_direct') {
+        const rawConfirmation = settings.template_catalog_direct_confirmation || DEFAULT_TEMPLATES.template_catalog_direct_confirmation;
+        reply = this.interpolateTemplate(rawConfirmation, {
+          ...commonVars,
+          cliente: parsedCatalogOrder.customerName || persona.name || 'amigo/a',
+          pedido_id: orderNum,
+          detalle_pedido: `📋 *Detalle del pedido:*\n${itemsSummary}`,
+          total: parsedCatalogOrder.total.toLocaleString('es-AR'),
+          tipo_entrega: shippingLabel,
+          instrucciones_pago: payInstructions
+        });
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('comandafast:cashier-alert', {
+            detail: {
+              type: 'catalog_direct_order',
+              orderNumber: orderNum,
+              customerName: parsedCatalogOrder.customerName || persona.name,
+              total: parsedCatalogOrder.total,
+              paymentMethod: chosenMethod,
+              phone: persona.phone
+            }
+          }));
+        }
+
+        return { reply, newState: { ...newState, step: 'IDLE' } };
+      }
+
+      if (isTransfer) {
+        reply = `🎉 *¡RECIBIMOS TU PEDIDO #${orderNum} DESDE NUESTRO CATÁLOGO ONLINE!* 🍔🔥\n\n` +
+          `¡Muchas gracias *${parsedCatalogOrder.customerName || persona.name}*! Tu comanda ya ingresó al sistema de nuestra cocina.\n\n` +
+          `📋 *Detalle del pedido:*\n${itemsSummary}\n\n` +
+          `💵 *Subtotal:* $${parsedCatalogOrder.subtotal.toLocaleString('es-AR')}\n` +
+          (parsedCatalogOrder.deliveryFee > 0 ? `🛵 *Envío:* $${parsedCatalogOrder.deliveryFee.toLocaleString('es-AR')}\n` : '') +
+          `💰 *TOTAL A TRANSFERIR:* $${parsedCatalogOrder.total.toLocaleString('es-AR')}\n` +
+          `🚀 *Entrega:* ${shippingLabel}` +
+          (parsedCatalogOrder.notes ? `\n📝 *Aclaraciones:* ${parsedCatalogOrder.notes}` : '') +
+          `\n\n${payInstructions}\n\n¡Muchas gracias! 🔥🍔`;
+        return { reply, newState: { ...newState, step: 'IDLE' } };
+      } else {
+        reply = `🎉 *¡PEDIDO #${orderNum} CONFIRMADO Y ENVIADO A LA COCINA!* 🔥🍔\n\n` +
+          `¡Muchas gracias *${parsedCatalogOrder.customerName || persona.name}*! Tu comanda ya ingresó a la cocina y está confirmada.\n\n` +
+          `📋 *Detalle del pedido:*\n${itemsSummary}\n\n` +
+          `💵 *Subtotal:* $${parsedCatalogOrder.subtotal.toLocaleString('es-AR')}\n` +
+          (parsedCatalogOrder.deliveryFee > 0 ? `🛵 *Envío:* $${parsedCatalogOrder.deliveryFee.toLocaleString('es-AR')}\n` : '') +
+          `💰 *TOTAL EN EFECTIVO:* $${parsedCatalogOrder.total.toLocaleString('es-AR')}\n` +
+          `🚀 *Entrega:* ${shippingLabel}` +
+          (parsedCatalogOrder.notes ? `\n📝 *Aclaraciones:* ${parsedCatalogOrder.notes}` : '') +
+          `\n\n${payInstructions} ¡Nuestros cocineros ya están marchando tus burgers! 🍔✨`;
+        return { reply, newState: { ...newState, step: 'IDLE' } };
+      }
+    }
+
+    // -------------------------------------------------------------
     // 1. FILTRO ANTI-SPAM / MENSAJES PERSONALES
     // -------------------------------------------------------------
     if (persona.isIgnored || (settings.require_keywords_for_chatbot && (lower.includes('futbol') || lower.includes('fútbol') || lower.includes('juntamos') || lower.includes('amigo') || lower.includes('asado') || lower.includes('hola che') || lower.includes('almorzar')))) {
@@ -804,8 +966,8 @@ export const chatbotService = {
     // -------------------------------------------------------------
     if (lower === 'comprar' || lower === 'pedir' || lower === 'quiero pedir' || ((lower === '4' || lower.includes('catalogo') || lower.includes('menu')) && newState.step === 'IDLE')) {
       const mode = settings.menu_mode || 'catalog';
-      if (mode === 'catalog') {
-        const catalogUrl = (settings.store_website_url || window.location.origin).replace(/\/$/, '');
+      if (mode === 'catalog' || mode === 'catalog_direct') {
+        const catalogUrl = (settings.store_website_url || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/$/, '');
         reply = `🍔 *¡Mirá nuestra carta completa con fotos reales y precios!* 📸\n\n👉 ${catalogUrl}/#catalog\n\nElegí tus burgers con fotos reales, armá tu carrito y envialo directamente por acá en un click. ¡Te esperamos! 🔥`;
         return { reply, newState };
       }
@@ -1076,6 +1238,21 @@ export const chatbotService = {
     if (promoProducts.length > 0) {
       const promoNames = promoProducts.slice(0, 3).map(p => `• *${p.name}* ($${Number(p.price).toLocaleString('es-AR')})`).join('\n');
       promosAlerta = `🏷️💥 *¡HOY TENEMOS PROMOS Y COMBOS ESPECIALES!* 🛵🍔\n⚠️ _(Válido únicamente hasta agotar stock)_\n${promoNames}\n\n`;
+    }
+
+    if (currentMenuMode === 'catalog_direct') {
+      const catalogUrl = (settings.store_website_url || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/$/, '');
+      const clientName = persona.name ? persona.name.trim() : 'amigo/a';
+      const storeName = commonVars.nombre_local || "Burga's Chamical";
+      const rawDirect = settings.template_catalog_direct_welcome || DEFAULT_TEMPLATES.template_catalog_direct_welcome;
+      reply = this.interpolateTemplate(rawDirect, {
+        ...commonVars,
+        cliente: clientName,
+        nombre_local: storeName,
+        promos_alerta: promosAlerta,
+        catalogo_url: catalogUrl
+      });
+      return { reply, newState: { ...newState, step: 'IDLE' } };
     }
 
     if (currentMenuMode === 'catalog') {

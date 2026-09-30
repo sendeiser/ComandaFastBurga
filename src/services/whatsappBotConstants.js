@@ -41,7 +41,7 @@ export const DEFAULT_TEMPLATES = {
   human_mode_sleep_minutes: 25,
   bot_typing_delay_ms: 2500,
   bot_typing_mode: 'human_dynamic', // 'human_dynamic' | 'fixed'
-  menu_mode: 'catalog', // 'catalog' (Catálogo Web Online con fotos y carrito) | 'templates' (Menú numerado de texto clásico)
+  menu_mode: 'catalog', // 'catalog' (Catálogo Web Online) | 'templates' (Menú de texto clásico) | 'catalog_direct' (Catálogo Directo al POS + Pausa a Cajera)
   anti_loop_gratitude: DEFAULT_ANTI_LOOP_GRATITUDE,
   anti_loop_farewell: DEFAULT_ANTI_LOOP_FAREWELL,
   anti_loop_acknowledge: DEFAULT_ANTI_LOOP_ACKNOWLEDGE,
@@ -62,6 +62,10 @@ export const DEFAULT_TEMPLATES = {
   menu_response_4: `🍔 *Menú & Precios de {nombre_local}* 🔥\n\n{catalogo_lista}\n\n👉 *Respondé con el NÚMERO (1, 2, 3...) de la burger para pedir o escribí COMPRAR.*\n🌐 *Menú digital:* {catalogo_url}`,
   
   menu_response_5: `👤 *¡Entendido {cliente}! Un encargado de {nombre_local} te responderá a la brevedad.* 🍔\n\nPor favor dejanos tu consulta detallada para que podamos ayudarte lo antes posible. ¡Muchas gracias!`,
+  
+  // Modo Directo: Catálogo al POS + Pausa Automática
+  template_catalog_direct_welcome: `🍔 *¡Hola {cliente}! Bienvenido a {nombre_local}* 🔥\n\n{promos_alerta}📱 *Hacé tu pedido directo desde nuestra Carta Online con fotos reales y precios:*\n👉 {catalogo_url}/#catalog\n\nArmá tu pedido en un toque y al enviarlo ingresa directamente a nuestra cocina y POS. ¡Te esperamos! 🛵✨`,
+  template_catalog_direct_confirmation: `🎉 *¡Recibimos tu pedido #{pedido_id}!* 🍔🔥\n\n¡Muchas gracias *{cliente}*! Tu comanda ya ingresó al sistema de nuestra cocina y caja.\n\n{detalle_pedido}\n\n💵 *Total:* \${total}\n🚀 *Entrega:* {tipo_entrega}\n\n{instrucciones_pago}\n\n👩‍💼 *En instantes nuestra cajera confirma tu pedido y te avisa el tiempo estimado. ¡Muchas gracias!*`,
 
   // 2. Flujo de Compra y Pedido
   template_buy_catalog: `🍔 *¡Vamos a armar tu pedido!* 🔥\n\n{catalogo_lista}\n\n👉 *Respondé con el NÚMERO (1, 2, 3...) de la hamburguesa o combo que quieras pedir.*`,
@@ -99,6 +103,8 @@ export const DEFAULT_TEMPLATES = {
 };
 
 export const ALL_TEMPLATE_NODES = [
+  { id: 'template_catalog_direct_welcome', label: 'Modo Directo: Envío de Carta Online', category: 'menu', description: 'Mensaje directo con enlace a la carta web online sin pasos intermedios' },
+  { id: 'template_catalog_direct_confirmation', label: 'Modo Directo: Confirmación y Pausa', category: 'buy_flow', description: 'Confirmación al recibir pedido del catálogo y aviso de atención de la cajera' },
   { id: 'template_menu', label: 'Menú y Bienvenida Principal', category: 'menu', description: 'Mensaje inicial con catálogo directo, selección rápida y alerta de promos del día' },
   { id: 'template_welcome', label: 'Saludo de Bienvenida Alternativo', category: 'menu', description: 'Mensaje de saludo genérico o secundario' },
   { id: 'template_buy_catalog', label: 'Catálogo de Compras', category: 'buy_flow', description: 'Inicio del flujo de selección de productos' },
