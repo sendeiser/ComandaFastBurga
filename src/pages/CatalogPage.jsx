@@ -1083,8 +1083,8 @@ export default function CatalogPage({ initialCashShift }) {
     }
   };
 
-  // ---- Send order via WhatsApp (Takeaway / Delivery) ----
-  const handleSendOrder = async () => {
+  // ---- Send order via WhatsApp / Direct (Takeaway / Delivery) ----
+  const handleSendOrder = async (forceOpenWhatsApp = false) => {
     if (serviceType === 'dine_in') {
       return handleSendDineInOrder();
     }
@@ -1208,30 +1208,28 @@ export default function CatalogPage({ initialCashShift }) {
 
       const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(message)}`;
 
-      const isDirectMode = settings.menu_mode === 'catalog_direct' || Boolean(customerPhone.trim());
-
-      if (isDirectMode) {
-        // Modo directo: la orden ya ingresó al POS y cocina. El Bot le envía el WhatsApp al cliente.
-        setOrderSuccessData({
-          orderNumber: nextNum,
-          customerName: customerName.trim(),
-          customerPhone: customerPhone.trim(),
-          customerAddress: serviceType === 'delivery' ? customerAddress.trim() : 'Retiro en Local (Mostrador)',
-          serviceType,
-          paymentMethod: paymentMethod || 'efectivo',
-          total: totalAmount,
-          subtotal: cart.subtotal,
-          deliveryFee,
-          items: [...cart.items],
-          waUrl
-        });
-        setShowOrderSuccessModal(true);
-      } else {
-        // Modo clásico: abrir WhatsApp directamente
+      // Si el usuario eligió enviar manualmente por WhatsApp, abrirlo
+      if (forceOpenWhatsApp) {
         try {
           window.open(waUrl, '_blank');
         } catch (_) {}
       }
+
+      // Siempre preparamos los datos del modal de éxito para confirmar la comanda y ofrecer el botón opcional de WhatsApp
+      setOrderSuccessData({
+        orderNumber: nextNum,
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        customerAddress: serviceType === 'delivery' ? customerAddress.trim() : 'Retiro en Local (Mostrador)',
+        serviceType,
+        paymentMethod: paymentMethod || 'efectivo',
+        total: totalAmount,
+        subtotal: cart.subtotal,
+        deliveryFee,
+        items: [...cart.items],
+        waUrl
+      });
+      setShowOrderSuccessModal(true);
 
       cart.clearCart();
       setView('catalog');
@@ -1474,10 +1472,51 @@ export default function CatalogPage({ initialCashShift }) {
               )}
             </button>
           ) : (
-            <button type="button" className="cat-send-order-btn" onClick={handleSendOrder}>
-              <MessageCircle size={20} />
-              Enviar pedido por WhatsApp
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '18px' }}>
+              <button 
+                type="button" 
+                className="cat-send-dinein-btn" 
+                style={{ marginTop: 0 }}
+                onClick={() => handleSendOrder(false)}
+                disabled={isSubmittingOrder}
+              >
+                {isSubmittingOrder ? (
+                  <>
+                    <div className="cat-spinner-sm" />
+                    <span>Enviando pedido a cocina...</span>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ fontSize: '1.2rem' }}>🚀</span>
+                    <span>Confirmar y Enviar Pedido</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSendOrder(true)}
+                disabled={isSubmittingOrder}
+                style={{
+                  background: 'rgba(37, 211, 102, 0.1)',
+                  border: '1px solid rgba(37, 211, 102, 0.35)',
+                  color: '#25D366',
+                  borderRadius: '12px',
+                  padding: '11px 16px',
+                  fontWeight: 700,
+                  fontSize: '0.86rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <MessageCircle size={18} />
+                <span>Enviar pedido por WhatsApp (Opcional)</span>
+              </button>
+            </div>
           )}
         </div>
         <Toast message={toast} />
@@ -2585,7 +2624,7 @@ export default function CatalogPage({ initialCashShift }) {
                 </strong>
                 {orderSuccessData.customerPhone ? (
                   <span>
-                    El bot de WhatsApp te envió un mensaje a <strong>{orderSuccessData.customerPhone}</strong> con la confirmación del pedido.
+                    El bot de WhatsApp te enviará un mensaje automático a <strong>{orderSuccessData.customerPhone}</strong> con la confirmación de tu pedido.
                   </span>
                 ) : (
                   <span>
@@ -2665,9 +2704,19 @@ export default function CatalogPage({ initialCashShift }) {
               </div>
             )}
 
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {orderSuccessData.waUrl && (
+            {/* Respaldo Opcional por si el Bot no envía la notificación */}
+            {orderSuccessData.waUrl && (
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px dashed rgba(37, 211, 102, 0.35)',
+                borderRadius: '16px',
+                padding: '14px',
+                marginBottom: '16px',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginBottom: '10px', lineHeight: 1.4 }}>
+                  💬 ¿No recibiste la notificación del bot? Podés enviar el pedido a nuestro WhatsApp manualmente:
+                </div>
                 <a
                   href={orderSuccessData.waUrl}
                   target="_blank"
@@ -2676,38 +2725,44 @@ export default function CatalogPage({ initialCashShift }) {
                     background: '#25D366',
                     color: '#fff',
                     textDecoration: 'none',
-                    borderRadius: '14px',
-                    padding: '13px',
+                    borderRadius: '12px',
+                    padding: '11px 18px',
                     fontWeight: 800,
-                    fontSize: '0.9rem',
-                    display: 'flex',
+                    fontSize: '0.88rem',
+                    display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    boxShadow: '0 4px 16px rgba(37, 211, 102, 0.4)'
+                    boxShadow: '0 4px 14px rgba(37, 211, 102, 0.35)',
+                    width: '100%',
+                    boxSizing: 'border-box'
                   }}
                 >
-                  <MessageCircle size={20} />
-                  <span>Abrir WhatsApp con el Local</span>
+                  <MessageCircle size={18} />
+                  <span>Enviar Pedido por WhatsApp (Opcional)</span>
                 </a>
-              )}
-              <button
-                type="button"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  color: '#fff',
-                  borderRadius: '14px',
-                  padding: '12px',
-                  fontWeight: 700,
-                  fontSize: '0.86rem',
-                  cursor: 'pointer'
-                }}
-                onClick={() => setShowOrderSuccessModal(false)}
-              >
-                Volver a la Carta
-              </button>
-            </div>
+              </div>
+            )}
+
+            {/* Botón principal para cerrar y volver */}
+            <button
+              type="button"
+              style={{
+                background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+                border: 'none',
+                color: '#fff',
+                borderRadius: '14px',
+                padding: '13px',
+                fontWeight: 800,
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                width: '100%',
+                boxShadow: '0 4px 16px rgba(239, 68, 68, 0.35)'
+              }}
+              onClick={() => setShowOrderSuccessModal(false)}
+            >
+              ✓ Entendido, Volver a la Carta
+            </button>
           </div>
         </div>
       )}
