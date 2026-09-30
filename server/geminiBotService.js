@@ -358,6 +358,12 @@ export class GeminiBotService {
       ? activeOrderItems.map(it => `• ${it.name} (x${it.qty || 1}) - $${(it.price * (it.qty || 1)).toLocaleString('es-AR')}`).join('\n')
       : '';
 
+    let directCatalogUrl = (context.catalogUrl || bInfo.catalogo_url || 'https://burgasystem.netlify.app/#catalog').trim();
+    if (!directCatalogUrl.includes('#catalog')) {
+      directCatalogUrl = directCatalogUrl.replace(/\/$/, '') + '/#catalog';
+    }
+    directCatalogUrl = directCatalogUrl.replace(/(#catalog)(?:\/#catalog)+/gi, '$1');
+
     const systemPrompt = `
 Eres el Asistente Virtual Inteligente de "${storeName}" (un local gastronómico artesanal de hamburguesas premium).
 Tu objetivo es responder consultas de clientes con calidez, entusiasmo gastronómico y brevedad (estilo WhatsApp, usando emojis pertinentes 🍔🔥).
@@ -374,9 +380,9 @@ REGLAS OBLIGATORIAS PARA PEDIDOS EN CURSO:
 1. ESTÁ TOTALMENTE PROHIBIDO saludarlo diciendo "¡Hola! Bienvenido a ${storeName}". El cliente NO está saludando, ya fue recibido y está en medio del proceso de compra.
 2. Si el cliente dice "sumar", "otro número", "agregar", "otra", "otro" o pregunta opciones, explícale con amabilidad y brevedad que puede responder con el NÚMERO del producto (ej: 1 al 33) o su nombre para sumarlo a su carrito, o escribir *LISTO* para finalizar y elegir la entrega.
 3. Si pregunta sobre ingredientes, celíacos o dudas, respóndele concretamente y anímalo a continuar su pedido actual.
-` : (context.menuMode === 'catalog' ? `MODALIDAD DE ATENCIÓN: CATÁLOGO ONLINE WEB ACTIVADO.
-En este negocio, los pedidos se realizan a través de la Carta Digital interactiva con fotos: ${context.catalogUrl || 'https://comandafast.online'}/#catalog
-Cuando un cliente salude o consulte sobre el menú o pedidos, salúdalo con calidez en nombre de "${storeName}" y compártele directamente el link a la Carta Digital (${context.catalogUrl || 'https://comandafast.online'}/#catalog). No le des opciones de menú numerado en texto.\n` : (welcomeGreeting ? `SALUDO OFICIAL Y BIENVENIDA CONFIGURADA POR EL DUEÑO:
+` : (context.menuMode === 'catalog' || context.menuMode === 'catalog_direct' ? `MODALIDAD DE ATENCIÓN: CATÁLOGO ONLINE WEB ACTIVADO.
+En este negocio, los pedidos se realizan a través de la Carta Digital interactiva con fotos: ${directCatalogUrl}
+Cuando un cliente salude o consulte sobre el menú o pedidos, salúdalo con calidez en nombre de "${storeName}" y compártele directamente el link a la Carta Digital (${directCatalogUrl}). No le des opciones de menú numerado en texto.\n` : (welcomeGreeting ? `SALUDO OFICIAL Y BIENVENIDA CONFIGURADA POR EL DUEÑO:
 "${welcomeGreeting}"
 Cuando un cliente salude por primera vez o diga "hola", "buenas noches", "buen día", etc., salúdalo cordialmente en nombre de "${storeName}" inspirándote en este mensaje, y recuérdale que puede escribir *MENU* para ver la carta o *COMPRAR* para armar su pedido.\n` : ''))}
 
@@ -405,11 +411,11 @@ REGLA CRÍTICA DE STOCK Y PROMOCIONES AGOTADAS:
   2. NUNCA afirmes que hay promociones si están agotadas ni ofrezcas productos sin stock.
   3. Ofrécele inmediatamente 3 alternativas deliciosas del menú regular que SÍ están disponibles (por ejemplo: ${topAlternatives || 'nuestras hamburguesas clásicas, dobles o smash'}) y recuérdale que puede escribir MENU o CARTA para ver la carta completa.
 
-${context.menuMode === 'catalog' ? `1. Si el cliente saluda (hola, buenas noches, etc.), dale la bienvenida cordial en nombre de "${storeName}" y compártele el enlace a nuestra Carta Digital (${context.catalogUrl || 'https://comandafast.online'}/#catalog) para que pueda ver las fotos y armar su pedido en un click.
-2. Si el cliente pregunta por promociones o la carta, invítalo a verlas con fotos y precios actualizados en la Carta Digital (${context.catalogUrl || 'https://comandafast.online'}/#catalog).
+${context.menuMode === 'catalog' || context.menuMode === 'catalog_direct' ? `1. Si el cliente saluda (hola, buenas noches, etc.), dale la bienvenida cordial en nombre de "${storeName}" y compártele el enlace a nuestra Carta Digital (${directCatalogUrl}) para que pueda ver las fotos y armar su pedido en un click.
+2. Si el cliente pregunta por promociones o la carta, invítalo a verlas con fotos y precios actualizados en la Carta Digital (${directCatalogUrl}).
 3. Si el cliente pregunta qué comer, qué le recomendás o qué opciones hay, recomendale 2 o 3 opciones tentadoras con su precio y descripción real, y déjale el link al catálogo.
 4. Si pregunta por ingredientes, celíacos o vegetarianos, sé honesto y empático mencionando lo que tenemos.
-5. Si el cliente quiere hacer un pedido o ver fotos, envíale el enlace a la Carta Digital (${context.catalogUrl || 'https://comandafast.online'}/#catalog).
+5. Si el cliente quiere hacer un pedido o ver fotos, envíale el enlace a la Carta Digital (${directCatalogUrl}).
 6. Respuestas concisas y atractivas (máximo 2 a 3 párrafos cortos). No des discursos largos ni menús numerados en texto.
 7. TERMINOLOGÍA OBLIGATORIA: Usa SIEMPRE la palabra "pedido" o "pedidos". Está TERMINANTEMENTE PROHIBIDO usar la palabra "comanda" con el cliente. Habla siempre de "tu pedido", "armar tu pedido", "confirmar tu pedido".` : `1. Si el cliente saluda (hola, buenas noches, etc.), dale la bienvenida cordial en nombre de "${storeName}" y recuérdale que puede escribir *MENU* para ver la carta o *COMPRAR* para pedir.
 2. Si el cliente pregunta por promociones, ofertas o qué promos hay, si hay activas detállalas con entusiasmo. Si están agotadas, aclara que se agotaron (hasta agotar stock) y ofrécele las 3 alternativas.

@@ -503,8 +503,12 @@ export const chatbotService = {
   interpolateTemplate(template, vars = {}) {
     let res = template || '';
     for (const [k, v] of Object.entries(vars)) {
+      if (k === 'catalogo_url' && String(v).includes('#catalog')) {
+        res = res.replace(/\{catalogo_url\}\/?#catalog/gi, String(v));
+      }
       res = res.replace(new RegExp(`\\{${k}\\}`, 'gi'), String(v ?? ''));
     }
+    res = res.replace(/(#catalog)(?:\/#catalog)+/gi, '$1');
     return res;
   },
 
@@ -535,7 +539,12 @@ export const chatbotService = {
       direccion: botVars.direccion || botVars.direccion_local || s.pickup_address || 'Av. Perón 145 (frente al super x día)',
       horarios: botVars.horarios || s.opening_hours || 'Martes a Domingos de 19:30 a 00:30 hs',
       costo_envio: botVars.costo_envio || '$2.000',
-      catalogo_url: botVars.catalogo_url || s.store_website_url || (typeof window !== 'undefined' ? window.location.origin : '')
+      catalogo_url: (() => {
+        let u = (botVars.catalogo_url || s.store_website_url || (typeof window !== 'undefined' ? window.location.origin : '')).trim();
+        if (!u) return 'https://burgasystem.netlify.app/#catalog';
+        if (!u.includes('#catalog')) u = u.replace(/\/$/, '') + '/#catalog';
+        return u.replace(/(#catalog)(?:\/#catalog)+/gi, '$1');
+      })()
     };
   },
 
@@ -967,8 +976,8 @@ export const chatbotService = {
     if (lower === 'comprar' || lower === 'pedir' || lower === 'quiero pedir' || ((lower === '4' || lower.includes('catalogo') || lower.includes('menu')) && newState.step === 'IDLE')) {
       const mode = settings.menu_mode || 'catalog';
       if (mode === 'catalog' || mode === 'catalog_direct') {
-        const catalogUrl = (settings.store_website_url || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/$/, '');
-        reply = `🍔 *¡Mirá nuestra carta completa con fotos reales y precios!* 📸\n\n👉 ${catalogUrl}/#catalog\n\nElegí tus burgers con fotos reales, armá tu carrito y envialo directamente por acá en un click. ¡Te esperamos! 🔥`;
+        const catalogUrl = commonVars.catalogo_url;
+        reply = `🍔 *¡Mirá nuestra carta completa con fotos reales y precios!* 📸\n\n👉 ${catalogUrl}\n\nElegí tus burgers con fotos reales, armá tu carrito y envialo directamente por acá en un click. ¡Te esperamos! 🔥`;
         return { reply, newState };
       }
       newState.step = 'SELECTING_PRODUCTS';
@@ -1241,7 +1250,7 @@ export const chatbotService = {
     }
 
     if (currentMenuMode === 'catalog_direct') {
-      const catalogUrl = (settings.store_website_url || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/$/, '');
+      const catalogUrl = commonVars.catalogo_url;
       const clientName = persona.name ? persona.name.trim() : 'amigo/a';
       const storeName = commonVars.nombre_local || "Burga's Chamical";
       const rawDirect = settings.template_catalog_direct_welcome || DEFAULT_TEMPLATES.template_catalog_direct_welcome;
@@ -1256,13 +1265,13 @@ export const chatbotService = {
     }
 
     if (currentMenuMode === 'catalog') {
-      const catalogUrl = (settings.store_website_url || window.location.origin).replace(/\/$/, '');
+      const catalogUrl = commonVars.catalogo_url;
       const clientName = persona.name ? persona.name.trim() : 'amigo/a';
       const storeName = commonVars.nombre_local || "Burga's Chamical";
       reply = `🍔 *¡Hola ${clientName}! Bienvenido a ${storeName}* 🔥\n\n` +
         promosAlerta +
         `📱 *¡Hacé tu pedido directo desde nuestra Carta Digital interactiva con fotos reales y precios!* 📸\n` +
-        `👉 ${catalogUrl}/#catalog\n\n` +
+        `👉 ${catalogUrl}\n\n` +
         `Allí podés ver fotos reales de cada hamburguesa, armar tu combo con adicionales y enviar tu pedido a la cocina en un toque con un solo click. ¡Te esperamos! 🛵✨\n\n` +
         `_Si necesitás consultar por un pedido en curso o hablar con nosotros, podés escribir *ESTADO* o *HUMANO*._`;
       return { reply, newState };

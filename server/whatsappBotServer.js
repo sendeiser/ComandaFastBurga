@@ -546,7 +546,7 @@ const DEFAULT_SERVER_VARIABLES = [
   { key: 'direccion', label: 'Dirección para Retiros', category: 'business', value: 'Av. Belgrano 1234, Centro', defaultValue: 'Av. Belgrano 1234, Centro', description: 'Ubicación física del local para Take Away y cadetes' },
   { key: 'horarios', label: 'Días y Horarios de Atención', category: 'business', value: 'Miércoles a Domingos de 19:30 a 00:30 hs', defaultValue: 'Miércoles a Domingos de 19:30 a 00:30 hs', description: 'Turnos en los que la cocina se encuentra abierta y despachando' },
   { key: 'telefono_contacto', label: 'Teléfono / WhatsApp de Atención', category: 'business', value: '+54 9 3826 43-0159', defaultValue: '+54 9 3826 43-0159', description: 'Número de línea directa para consultas o derivación a humano' },
-  { key: 'catalogo_url', label: 'Enlace a la Carta Web', category: 'business', value: 'https://comandafast.online', defaultValue: 'https://comandafast.online', description: 'URL de la carta digital para ver fotos y promociones' },
+  { key: 'catalogo_url', label: 'Enlace a la Carta Web', category: 'business', value: 'https://burgasystem.netlify.app/#catalog', defaultValue: 'https://burgasystem.netlify.app/#catalog', description: 'URL de la carta digital para ver fotos y promociones' },
   { key: 'zona_envio', label: 'Zona de Cobertura de Envíos', category: 'business', value: 'Casco céntrico y barrios aledaños (hasta 5 km)', defaultValue: 'Casco céntrico y barrios aledaños (hasta 5 km)', description: 'Área geográfica de despacho del delivery' },
   { key: 'alias_banco', label: 'Alias Bancario / Mercado Pago', category: 'payments', value: 'comandafast.mp', defaultValue: 'comandafast.mp', description: 'Alias corto para transferencias bancarias o virtuales' },
   { key: 'banco', label: 'Entidad Bancaria o Billetera', category: 'payments', value: 'Mercado Pago / Banco Galicia', defaultValue: 'Mercado Pago / Banco Galicia', description: 'Nombre del banco emisor o app financiera' },
@@ -639,7 +639,7 @@ const DEFAULT_SERVER_TEMPLATES = {
   menu_response_3: `📍 *Ubicación y Horarios de Atención:* 🕒\n\n🍔 *Dirección:* {direccion}\n⏰ *Horarios de Cocina:* {horarios}\n\n¡Te esperamos con las mejores burgers a la plancha! 🔥\n\n_Enviá *MENU* para volver al menú principal._`,
   menu_response_4: `🍔 *Carta Completa de {nombre_local}* 🔥\n\n📱 *¡Mirá nuestra carta interactiva con fotos!*\n👉 {catalogo_url}\n\n_También podés elegir por acá:_\n{catalogo_lista}\n\n👉 *Respondé con el NÚMERO de lo que querés pedir o escribí COMPRAR.*`,
   menu_response_5: `👤 *¡Entendido {cliente}! Un encargado de {nombre_local} te responderá a la brevedad.* 🍔\n\nPor favor dejanos tu consulta detallada para que podamos ayudarte lo antes posible. ¡Muchas gracias!`,
-  template_catalog_direct_welcome: `🍔 *¡Hola {cliente}! Bienvenido a {nombre_local}* 🔥\n\n{promos_alerta}📱 *Hacé tu pedido directo desde nuestra Carta Online con fotos reales y precios:*\n👉 {catalogo_url}/#catalog\n\nArmá tu pedido en un toque y al enviarlo ingresa directamente a nuestra cocina y POS. ¡Te esperamos! 🛵✨`,
+  template_catalog_direct_welcome: `🍔 *¡Hola {cliente}! Bienvenido a {nombre_local}* 🔥\n\n{promos_alerta}📱 *Hacé tu pedido directo desde nuestra Carta Online con fotos reales y precios:*\n👉 {catalogo_url}\n\nArmá tu pedido en un toque y al enviarlo ingresa directamente a nuestra cocina y POS. ¡Te esperamos! 🛵✨`,
   template_catalog_direct_confirmation: `🎉 *¡Recibimos tu pedido #{pedido_id}!* 🍔🔥\n\n¡Muchas gracias *{cliente}*! Tu comanda ya ingresó al sistema de nuestra cocina y caja.\n\n{detalle_pedido}\n\n💵 *Total:* \${total}\n🚀 *Entrega:* {tipo_entrega}\n\n{instrucciones_pago}\n\n👩‍💼 *En instantes nuestra cajera confirma tu pedido y te avisa el tiempo estimado. ¡Muchas gracias!*`,
   template_buy_catalog: `🍔 *¡Vamos a armar tu pedido!* 🔥\n\n{catalogo_lista}\n\n👉 *Respondé con el NÚMERO (1, 2, 3...) de la hamburguesa o combo que quieras pedir.*`,
   template_order_summary: `🍔 *RESUMEN DE TU PEDIDO* 🔥\n\n🛒 *Items:*\n{carrito_items}\n\n💵 *Subtotal:* \${subtotal}\n🛵 *Entrega:* {metodo_entrega}\n📍 *Dirección:* {direccion}\n👤 *Cliente:* {cliente}\n💳 *Forma de Pago:* {medio_pago}\n\n💵 *TOTAL A PAGAR:* \${total}\n\n¿Está todo perfecto para mandar a la cocina?\n👉 Respondé *SI* para confirmar tu pedido o *CANCELAR*.`,
@@ -734,10 +734,25 @@ function saveBotTemplates(tpls) {
   }
 }
 
+// Normalizar enlace directo al catálogo con fragmento #catalog único
+function normalizeCatalogUrl(url) {
+  let clean = (url || '').trim();
+  if (!clean) return 'https://burgasystem.netlify.app/#catalog';
+  if (!clean.includes('#catalog')) {
+    clean = clean.replace(/\/$/, '') + '/#catalog';
+  }
+  return clean.replace(/(#catalog)(?:\/#catalog)+/gi, '$1');
+}
+
 // Obtener contexto unificado del negocio (Supabase Cloud + Variables Locales)
 function getBusinessContext() {
   const vars = getBotVariablesMap();
   const tpls = getBotTemplates();
+
+  const rawCatalog = vars.catalogo_url || tpls.catalogo_url || vars.sitio_web || tpls.store_website_url || 'https://burgasystem.netlify.app/#catalog';
+  const fullCatalogUrl = normalizeCatalogUrl(rawCatalog);
+  const baseWebsite = fullCatalogUrl.replace(/\/?#catalog.*$/, '').replace(/\/$/, '');
+
   return {
     nombre_local: vars.nombre_local || tpls.store_name || "Burga's Chamical",
     alias_banco: vars.alias_banco || tpls.bank_alias || 'Burgachamical.nx',
@@ -748,7 +763,8 @@ function getBusinessContext() {
     horarios: vars.horarios || tpls.opening_hours || 'Martes a Domingos de 19:30 a 00:30 hs',
     costo_envio: vars.costo_envio || '$2.000',
     envio_gratis_desde: vars.envio_gratis_desde || '$18.000',
-    sitio_web: tpls.store_website_url || vars.sitio_web || '',
+    catalogo_url: fullCatalogUrl,
+    sitio_web: vars.sitio_web || tpls.store_website_url || baseWebsite,
     mensaje_bienvenida: vars.mensaje_bienvenida || tpls.template_menu || tpls.template_welcome || ''
   };
 }
@@ -756,8 +772,12 @@ function getBusinessContext() {
 function interpolateTemplate(template, vars = {}) {
   let res = String(template || '');
   for (const [k, v] of Object.entries(vars)) {
+    if (k === 'catalogo_url' && String(v).includes('#catalog')) {
+      res = res.replace(/\{catalogo_url\}\/?#catalog/gi, String(v));
+    }
     res = res.replace(new RegExp(`\\{${k}\\}`, 'gi'), String(v ?? ''));
   }
+  res = res.replace(/(#catalog)(?:\/#catalog)+/gi, '$1');
   return res;
 }
 
@@ -1315,7 +1335,7 @@ function buildMainMenuMessage(customerName = '') {
   const storeName = biz.nombre_local || "Burga's Chamical";
   const clientName = customerName ? customerName.trim() : 'amigo/a';
   const menuMode = tpls.menu_mode || 'templates';
-  const catalogUrl = (biz.catalogo_url || biz.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
+  const catalogUrl = biz.catalogo_url;
 
   const prods = getStoredProducts();
   const availableProds = prods.filter(isProductAvailable);
@@ -1347,7 +1367,7 @@ function buildMainMenuMessage(customerName = '') {
     return `🍔 *¡Hola ${clientName}! Bienvenido a ${storeName}* 🔥\n\n` +
       promosAlerta +
       `📱 *¡Hacé tu pedido directo desde nuestra Carta Digital interactiva con fotos reales y precios!* 📸\n` +
-      `👉 ${catalogUrl}/#catalog\n\n` +
+      `👉 ${catalogUrl}\n\n` +
       `Allí podés ver fotos reales de cada hamburguesa, armar tu combo con adicionales y enviar tu pedido directo a la cocina en un toque. ¡Te esperamos! 🛵✨\n\n` +
       `_Si necesitás consultar por un pedido en curso o hablar con nosotros, podés escribir *ESTADO* o *HUMANO*._`;
   }
@@ -3397,10 +3417,10 @@ class WhatsAppBotServer {
                 const itemsBrief = session.items.map(it => `• ${it.name} (x${it.qty || 1})`).join(', ');
                 const cartHeader = `🛒 *Tu pedido actual sigue guardado:* ${itemsBrief} *(Subtotal: $${(session.total || session.subtotal || 0).toLocaleString('es-AR')})*\n\n`;
 
-                if (menuModeSel === 'catalog') {
+                if (menuModeSel === 'catalog' || menuModeSel === 'catalog_direct') {
                   const biz = getBusinessContext();
-                  const catalogUrl = (biz.catalogo_url || biz.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
-                  const reply = `${cartHeader}📱 *¡Mirá nuestra Carta Digital con fotos para elegir qué sumar!* 📸\n👉 ${catalogUrl}/#catalog\n\n_O respondé *LISTO* para avanzar con la entrega._`;
+                  const catalogUrl = biz.catalogo_url;
+                  const reply = `${cartHeader}📱 *¡Mirá nuestra Carta Digital con fotos para elegir qué sumar!* 📸\n👉 ${catalogUrl}\n\n_O respondé *LISTO* para avanzar con la entrega._`;
                   await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
                   continue;
                 } else {
@@ -3610,10 +3630,10 @@ class WhatsAppBotServer {
               const itemsBrief = session.items.map(it => `• ${it.name} (x${it.qty || 1})`).join(', ');
               const cartHeader = `🛒 *Tu pedido actual sigue guardado:* ${itemsBrief} *(Subtotal: $${(session.total || session.subtotal || 0).toLocaleString('es-AR')})*\n\n`;
 
-              if (menuModeSel === 'catalog') {
+              if (menuModeSel === 'catalog' || menuModeSel === 'catalog_direct') {
                 const biz = getBusinessContext();
-                const catalogUrl = (biz.catalogo_url || biz.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
-                const reply = `${cartHeader}📱 *¡Mirá nuestra Carta Digital con fotos para elegir qué sumar!* 📸\n👉 ${catalogUrl}/#catalog\n\n_O respondé *LISTO* para finalizar tu pedido._`;
+                const catalogUrl = biz.catalogo_url;
+                const reply = `${cartHeader}📱 *¡Mirá nuestra Carta Digital con fotos para elegir qué sumar!* 📸\n👉 ${catalogUrl}\n\n_O respondé *LISTO* para finalizar tu pedido._`;
                 await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
                 continue;
               } else {
@@ -3719,8 +3739,8 @@ class WhatsAppBotServer {
             const tplsPromo = getBotTemplates();
             if (tplsPromo.menu_mode === 'catalog' || tplsPromo.menu_mode === 'catalog_direct') {
               const biz0 = getBusinessContext();
-              const catalogUrl0 = (biz0.catalogo_url || biz0.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
-              const promoReply = `🏷️ *¡Mirá todas las promociones y combos del día con fotos y precios especiales!* 🍔🔥\n\n📱 Entrá a nuestra carta digital:\n👉 ${catalogUrl0}/#catalog\n\nElegí tu promo favorita con fotos reales y enviala en un toque. ¡Te esperamos! ✨`;
+              const catalogUrl0 = biz0.catalogo_url;
+              const promoReply = `🏷️ *¡Mirá todas las promociones y combos del día con fotos y precios especiales!* 🍔🔥\n\n📱 Entrá a nuestra carta digital:\n👉 ${catalogUrl0}\n\nElegí tu promo favorita con fotos reales y enviala en un toque. ¡Te esperamos! ✨`;
               await this.safeSendMessage(remoteJid, { text: promoReply }, msg.key);
               continue;
             }
@@ -3761,10 +3781,10 @@ class WhatsAppBotServer {
             if (lower === 'promo' || lower === 'promos' || lower === 'ofertas' || lower === 'combos') {
               const tpls0 = getBotTemplates();
               const menuMode0 = tpls0.menu_mode || 'catalog';
-              if (menuMode0 === 'catalog') {
+              if (menuMode0 === 'catalog' || menuMode0 === 'catalog_direct') {
                 const biz0 = getBusinessContext();
-                const catalogUrl0 = (biz0.catalogo_url || biz0.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
-                const promoReply = `🏷️ *¡Mirá todas las promociones y combos del día con fotos y precios especiales!* 🍔🔥\n\n📱 Entrá a nuestra carta digital:\n👉 ${catalogUrl0}/#catalog\n\nElegí tu promo favorita con fotos reales y enviala en un toque. ¡Te esperamos! ✨`;
+                const catalogUrl0 = biz0.catalogo_url;
+                const promoReply = `🏷️ *¡Mirá todas las promociones y combos del día con fotos y precios especiales!* 🍔🔥\n\n📱 Entrá a nuestra carta digital:\n👉 ${catalogUrl0}\n\nElegí tu promo favorita con fotos reales y enviala en un toque. ¡Te esperamos! ✨`;
                 await this.safeSendMessage(remoteJid, { text: promoReply }, msg.key);
               } else {
                 session.step = 'SELECTING';
@@ -3845,8 +3865,8 @@ class WhatsAppBotServer {
               const menuMode = tpls4.menu_mode || 'templates';
               if (menuMode === 'catalog' || menuMode === 'catalog_direct') {
                 // MODO CATÁLOGO ONLINE: envía link al catálogo web con fotos obligatoriamente
-                const catalogUrl = (biz4.catalogo_url || biz4.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
-                const catalogLink = `🍔 *¡Mirá nuestra carta completa con fotos reales y precios!* 📸\n\n👉 ${catalogUrl}/#catalog\n\nElegí tus burgers, combos y adicionales con fotos, armá tu carrito y envialo directamente por acá en segundos. ¡Te esperamos! 🔥`;
+                const catalogUrl = biz4.catalogo_url;
+                const catalogLink = `🍔 *¡Mirá nuestra carta completa con fotos reales y precios!* 📸\n\n👉 ${catalogUrl}\n\nElegí tus burgers, combos y adicionales con fotos, armá tu carrito y envialo directamente por acá en segundos. ¡Te esperamos! 🔥`;
                 await this.safeSendMessage(remoteJid, { text: catalogLink }, msg.key);
               } else {
                 // MODO PLANTILLAS CLÁSICO: menú numerado de texto
@@ -3876,8 +3896,8 @@ class WhatsAppBotServer {
               const bizCmp = getBusinessContext();
               const menuModeCmp = tplsCmp.menu_mode || 'templates';
               if (menuModeCmp === 'catalog' || menuModeCmp === 'catalog_direct') {
-                const catalogUrl = (bizCmp.catalogo_url || bizCmp.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
-                const catalogLink = `🛒 *¡Para realizar tu pedido ingresá a nuestra Carta Digital con fotos!* 🍔📸\n\n👉 ${catalogUrl}/#catalog\n\nAllí podés ver fotos reales de cada producto, elegir tus adicionales favoritos y enviar tu pedido directo a la cocina con un click. ¡Te esperamos! 🔥`;
+                const catalogUrl = bizCmp.catalogo_url;
+                const catalogLink = `🛒 *¡Para realizar tu pedido ingresá a nuestra Carta Digital con fotos!* 🍔📸\n\n👉 ${catalogUrl}\n\nAllí podés ver fotos reales de cada producto, elegir tus adicionales favoritos y enviar tu pedido directo a la cocina con un click. ¡Te esperamos! 🔥`;
                 await this.safeSendMessage(remoteJid, { text: catalogLink }, msg.key);
               } else {
                 session.step = 'SELECTING';
@@ -3943,8 +3963,8 @@ class WhatsAppBotServer {
             if (menuModeDirect === 'catalog' || menuModeDirect === 'catalog_direct') {
               // MODO CATÁLOGO ONLINE: no se permite pedir por texto ni plantillas
               const biz = getBusinessContext();
-              const catalogUrl = (biz.catalogo_url || biz.sitio_web || 'https://comandafast.online').replace(/\/$/, '');
-              const reply = `🍔 *¡Para pedir ${matchedProd.name}, ingresá a nuestra Carta Digital con fotos!* 📸\n\n👉 ${catalogUrl}/#catalog\n\nDesde allí podés ver fotos reales, elegir los ingredientes o combos y enviar tu pedido directo a la cocina con un click.`;
+              const catalogUrl = biz.catalogo_url;
+              const reply = `🍔 *¡Para pedir ${matchedProd.name}, ingresá a nuestra Carta Digital con fotos!* 📸\n\n👉 ${catalogUrl}\n\nDesde allí podés ver fotos reales, elegir los ingredientes o combos y enviar tu pedido directo a la cocina con un click.`;
               await this.safeSendMessage(remoteJid, { text: reply }, msg.key);
               continue;
             }
@@ -4083,7 +4103,7 @@ class WhatsAppBotServer {
               currentOrder: session.items || [],
               orderStep: session.step,
               menuMode: tplsAI.menu_mode || 'catalog',
-              catalogUrl: (biz.catalogo_url || biz.sitio_web || 'https://comandafast.online').replace(/\/$/, '')
+              catalogUrl: biz.catalogo_url
             });
 
             if (aiReply) {

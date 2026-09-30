@@ -106,6 +106,6 @@
   "template_anti_loop_farewell": "¡Hasta la próxima! 👋 Gracias por contactarte con {nombre_local}. ¡Que tengas un excelente descanso! ✨🍔",
   "template_anti_loop_gratitude": "¡De nada! 🙌 Que lo disfrutes un montón. Si querés consultar la carta o volver a pedir, escribí *MENU* cuando gustes. ¡Buen provecho! 🍔🔥",
   "template_anti_loop_acknowledge": "¡Bárbaro! 👍 Quedamos atentos ante cualquier duda. Escribí *MENU* en cualquier momento para hacer un nuevo pedido.",
-  "template_catalog_direct_welcome": "🍔 *¡Hola {cliente}! Bienvenido a {nombre_local}* 🔥\n\n{promos_alerta}📱 *Hacé tu pedido directo desde nuestra Carta Online con fotos reales y precios:*\n👉 {catalogo_url}/#catalog\n\nArmá tu pedido en un toque y al enviarlo ingresa directamente a nuestra cocina y POS. ¡Te esperamos! 🛵✨",
+  "template_catalog_direct_welcome": "🍔 *¡Hola {cliente}! Bienvenido a {nombre_local}* 🔥\n\n{promos_alerta}📱 *Hacé tu pedido directo desde nuestra Carta Online con fotos reales y precios:*\n👉 {catalogo_url}\n\nArmá tu pedido en un toque y al enviarlo ingresa directamente a nuestra cocina y POS. ¡Te esperamos! 🛵✨",
   "template_catalog_direct_confirmation": "🎉 *¡Recibimos tu pedido #{pedido_id}!* 🍔🔥\n\n¡Muchas gracias *{cliente}*! Tu comanda ya ingresó al sistema de nuestra cocina y caja.\n\n{detalle_pedido}\n\n💵 *Total:* ${total}\n🚀 *Entrega:* {tipo_entrega}\n\n{instrucciones_pago}\n\n👩‍💼 *En instantes nuestra cajera confirma tu pedido y te avisa el tiempo estimado. ¡Muchas gracias!*"
 }

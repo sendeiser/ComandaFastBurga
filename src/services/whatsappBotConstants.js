@@ -64,7 +64,7 @@ export const DEFAULT_TEMPLATES = {
   menu_response_5: `👤 *¡Entendido {cliente}! Un encargado de {nombre_local} te responderá a la brevedad.* 🍔\n\nPor favor dejanos tu consulta detallada para que podamos ayudarte lo antes posible. ¡Muchas gracias!`,
   
   // Modo Directo: Catálogo al POS + Pausa Automática
-  template_catalog_direct_welcome: `🍔 *¡Hola {cliente}! Bienvenido a {nombre_local}* 🔥\n\n{promos_alerta}📱 *Hacé tu pedido directo desde nuestra Carta Online con fotos reales y precios:*\n👉 {catalogo_url}/#catalog\n\nArmá tu pedido en un toque y al enviarlo ingresa directamente a nuestra cocina y POS. ¡Te esperamos! 🛵✨`,
+  template_catalog_direct_welcome: `🍔 *¡Hola {cliente}! Bienvenido a {nombre_local}* 🔥\n\n{promos_alerta}📱 *Hacé tu pedido directo desde nuestra Carta Online con fotos reales y precios:*\n👉 {catalogo_url}\n\nArmá tu pedido en un toque y al enviarlo ingresa directamente a nuestra cocina y POS. ¡Te esperamos! 🛵✨`,
   template_catalog_direct_confirmation: `🎉 *¡Recibimos tu pedido #{pedido_id}!* 🍔🔥\n\n¡Muchas gracias *{cliente}*! Tu comanda ya ingresó al sistema de nuestra cocina y caja.\n\n{detalle_pedido}\n\n💵 *Total:* \${total}\n🚀 *Entrega:* {tipo_entrega}\n\n{instrucciones_pago}\n\n👩‍💼 *En instantes nuestra cajera confirma tu pedido y te avisa el tiempo estimado. ¡Muchas gracias!*`,
 
   // 2. Flujo de Compra y Pedido
@@ -443,8 +443,8 @@ export const DEFAULT_BOT_VARIABLES = [
     key: 'catalogo_url',
     label: 'Enlace a la Carta Web',
     category: 'business',
-    defaultValue: 'https://comandafast.online',
-    value: 'https://comandafast.online',
+    defaultValue: 'https://burgasystem.netlify.app/#catalog',
+    value: 'https://burgasystem.netlify.app/#catalog',
     description: 'URL de la carta digital para que los clientes vean fotos y promociones',
     icon: 'Globe'
   },
