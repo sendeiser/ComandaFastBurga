@@ -5628,6 +5628,21 @@ h1, h2, h3, h4, .brand-title {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
+.badge-promo-takeaway {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(124, 58, 237, 0.28));
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.45);
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
 .product-card-promo-tags {
   display: flex;
   flex-wrap: wrap;

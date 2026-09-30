@@ -123,6 +123,44 @@ export default function ProductModal({ product, onClose, onAddToCart }) {
               )}
             </div>
 
+            {product.onlyTakeaway && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: 'rgba(139, 92, 246, 0.14)',
+                border: '1.5px solid rgba(139, 92, 246, 0.4)',
+                borderRadius: 8,
+                padding: '8px 12px',
+                margin: '10px 0',
+                color: '#c084fc',
+                fontSize: '0.85rem',
+                fontWeight: 700
+              }}>
+                <span style={{ fontSize: '1.2rem' }}>🛍️</span>
+                <span>Promo exclusiva para <strong>Retiro en el Local</strong> (Take Away / No disponible para delivery)</span>
+              </div>
+            )}
+
+            {product.freeShipping && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: 'rgba(52, 211, 153, 0.12)',
+                border: '1.5px solid rgba(52, 211, 153, 0.4)',
+                borderRadius: 8,
+                padding: '8px 12px',
+                margin: '10px 0',
+                color: '#34d399',
+                fontSize: '0.85rem',
+                fontWeight: 700
+              }}>
+                <span style={{ fontSize: '1.2rem' }}>🛵</span>
+                <span>¡Esta promo incluye <strong>Envío Gratis</strong> para tu pedido!</span>
+              </div>
+            )}
+
             {/* Grupos de toppings incrementales */}
             {incrementGroups.map((group, gi) => (
               <div key={gi} className="cat-mod-group">

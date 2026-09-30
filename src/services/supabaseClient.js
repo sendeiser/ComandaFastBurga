@@ -59,6 +59,7 @@ function mapProductFromDB(p, metadata = {}) {
     originalPrice: meta.originalPrice !== undefined && meta.originalPrice !== null ? Number(meta.originalPrice) : null,
     discountBadge: meta.discountBadge || null,
     freeShipping: Boolean(meta.freeShipping),
+    onlyTakeaway: Boolean(meta.onlyTakeaway),
     emoji: p.emoji || '🍔',
     description: p.description || '',
     modifiers: Array.isArray(p.modifiers) ? p.modifiers : [],
@@ -617,6 +618,7 @@ export const supabaseSync = {
             originalPrice: product.originalPrice !== undefined && product.originalPrice !== null && product.originalPrice !== '' ? Number(product.originalPrice) : null,
             discountBadge: product.discountBadge ? String(product.discountBadge).trim() : null,
             freeShipping: Boolean(product.freeShipping),
+            onlyTakeaway: Boolean(product.onlyTakeaway),
             stock: product.stock !== undefined && product.stock !== null && product.stock !== '' && !isNaN(Number(product.stock)) ? Number(product.stock) : null,
             available: product.available !== false && product.is_active !== false
           }
@@ -662,6 +664,7 @@ export const supabaseSync = {
             ...(patchData.originalPrice !== undefined ? { originalPrice: patchData.originalPrice ? Number(patchData.originalPrice) : null } : {}),
             ...(patchData.discountBadge !== undefined ? { discountBadge: patchData.discountBadge ? String(patchData.discountBadge).trim() : null } : {}),
             ...(patchData.freeShipping !== undefined ? { freeShipping: Boolean(patchData.freeShipping) } : {}),
+            ...(patchData.onlyTakeaway !== undefined ? { onlyTakeaway: Boolean(patchData.onlyTakeaway) } : {}),
             ...(patchData.stock !== undefined ? { stock: patchData.stock !== null && patchData.stock !== '' && !isNaN(Number(patchData.stock)) ? Number(patchData.stock) : null } : {}),
             ...(patchData.available !== undefined ? { available: Boolean(patchData.available) } : {})
           }
@@ -716,6 +719,7 @@ export const supabaseSync = {
             originalPrice: p.originalPrice !== undefined && p.originalPrice !== null && p.originalPrice !== '' ? Number(p.originalPrice) : null,
             discountBadge: p.discountBadge ? String(p.discountBadge).trim() : null,
             freeShipping: Boolean(p.freeShipping),
+            onlyTakeaway: Boolean(p.onlyTakeaway),
             stock: p.stock !== undefined && p.stock !== null && p.stock !== '' && !isNaN(Number(p.stock)) ? Number(p.stock) : null,
             available: p.available !== false && p.is_active !== false
           };

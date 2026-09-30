@@ -22,6 +22,7 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
   const [originalPrice, setOriginalPrice] = useState('');
   const [discountBadge, setDiscountBadge] = useState('');
   const [freeShipping, setFreeShipping] = useState(false);
+  const [onlyTakeaway, setOnlyTakeaway] = useState(false);
   const [emoji, setEmoji] = useState('🍔');
   const [image, setImage] = useState('');
   const [imageMode, setImageMode] = useState('upload'); // 'upload' | 'url'
@@ -56,6 +57,7 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
     setOriginalPrice('');
     setDiscountBadge('');
     setFreeShipping(false);
+    setOnlyTakeaway(false);
     setEmoji(defaultEmoji);
     setImage('');
     setDescription('');
@@ -73,6 +75,7 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
     setOriginalPrice(p.originalPrice ? p.originalPrice.toString() : '');
     setDiscountBadge(p.discountBadge || '');
     setFreeShipping(Boolean(p.freeShipping));
+    setOnlyTakeaway(Boolean(p.onlyTakeaway));
     setEmoji(p.emoji || '🍔');
     setImage(p.image || '');
     setDescription(p.description || '');
@@ -163,6 +166,7 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
         originalPrice: originalPrice ? parseFloat(originalPrice) : null,
         discountBadge: discountBadge.trim() || null,
         freeShipping: Boolean(freeShipping),
+        onlyTakeaway: Boolean(onlyTakeaway),
         emoji: emoji || '🍔',
         image: image.trim(),
         description: description.trim(),
@@ -422,7 +426,7 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
                       <div className="menu-card-cat">
                         {prod.category}
                       </div>
-                      {(prod.freeShipping || prod.discountBadge || !isAvailable) && (
+                      {(prod.freeShipping || prod.onlyTakeaway || prod.discountBadge || !isAvailable) && (
                         <div className="product-card-promo-tags">
                           {!isAvailable && (
                             <span style={{
@@ -438,6 +442,9 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
                           )}
                           {prod.freeShipping && isAvailable && (
                             <span className="badge-promo-free-shipping">🛵 Envío Gratis</span>
+                          )}
+                          {prod.onlyTakeaway && isAvailable && (
+                            <span className="badge-promo-takeaway">🛍️ Solo Retiro</span>
                           )}
                           {prod.discountBadge && isAvailable && (
                             <span className="badge-promo-tag">🏷️ {prod.discountBadge}</span>
@@ -744,10 +751,28 @@ export default function MenuManagement({ products = [], onSaveProducts, onOpenCa
                   <input
                     type="checkbox"
                     checked={freeShipping}
-                    onChange={e => setFreeShipping(e.target.checked)}
+                    onChange={e => {
+                      const val = e.target.checked;
+                      setFreeShipping(val);
+                      if (val) setOnlyTakeaway(false);
+                    }}
                     className="product-form-checkbox"
                   />
                   <span>🛵 <strong>Incluye Envío Gratis</strong> (Bonifica el delivery a $0 en POS y WhatsApp)</span>
+                </label>
+
+                <label className="product-form-checkbox-label" style={{ marginTop: '0.55rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={onlyTakeaway}
+                    onChange={e => {
+                      const val = e.target.checked;
+                      setOnlyTakeaway(val);
+                      if (val) setFreeShipping(false);
+                    }}
+                    className="product-form-checkbox"
+                  />
+                  <span>🛍️ <strong>Solo para Retirar por el Local</strong> (Exclusivo Take Away / No disponible para delivery)</span>
                 </label>
               </div>
 

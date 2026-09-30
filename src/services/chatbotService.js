@@ -375,7 +375,10 @@ export const chatbotService = {
       const list = prods.map((p, i) => {
         const numBadge = formatItemNumber(i + 1);
         const photoBadge = p.image ? '📸' : '';
-        return `${numBadge} *${p.name}* — $${Number(p.price).toLocaleString('es-AR')} ${photoBadge}`;
+        const takeawayBadge = p.onlyTakeaway ? '🛍️ [Solo Retiro]' : '';
+        const freeShipBadge = p.freeShipping ? '🛵 [Envío Gratis]' : '';
+        const extraBadge = [takeawayBadge, freeShipBadge, photoBadge].filter(Boolean).join(' ');
+        return `${numBadge} *${p.name}* — $${Number(p.price).toLocaleString('es-AR')}${extraBadge ? ' ' + extraBadge : ''}`;
       }).join('\n');
 
       const botVars = this.getBotVariablesMap();
@@ -392,7 +395,10 @@ export const chatbotService = {
       const globalIdx = startIdx + i + 1;
       const numBadge = formatItemNumber(globalIdx);
       const photoBadge = p.image ? '📸' : '';
-      return `${numBadge} *${p.name}* — $${Number(p.price).toLocaleString('es-AR')} ${photoBadge}`;
+      const takeawayBadge = p.onlyTakeaway ? '🛍️ [Solo Retiro]' : '';
+      const freeShipBadge = p.freeShipping ? '🛵 [Envío Gratis]' : '';
+      const extraBadge = [takeawayBadge, freeShipBadge, photoBadge].filter(Boolean).join(' ');
+      return `${numBadge} *${p.name}* — $${Number(p.price).toLocaleString('es-AR')}${extraBadge ? ' ' + extraBadge : ''}`;
     }).join('\n');
 
     let navInstructions = '';
@@ -823,8 +829,17 @@ export const chatbotService = {
           reply = '⚠️ Tu comanda está vacía. Escribí el *NÚMERO* de la burger que querés o escribí *MENU*.';
           return { reply, newState };
         }
+        const hasTakeawayOnly = newState.items.some(it => {
+          const p = prods.find(prod => prod.id === it.productId || prod.id === it.id);
+          return p && p.onlyTakeaway;
+        });
+
         newState.step = 'ASK_SHIPPING_METHOD';
-        reply = `🛵 *¿Cómo querés recibir tu comanda?*\n\nRespondé con el número de opción:\n1️⃣ *Retiro por el local (Take Away)* 🏷️ Sin costo\n2️⃣ *Envío a domicilio con cadete (Delivery)*`;
+        if (hasTakeawayOnly) {
+          reply = `🛍️ *Tu comanda incluye promos exclusivas para RETIRAR POR EL LOCAL.*\n\nRespondé con el número de opción:\n1️⃣ *Retiro por el local (Take Away)* 🏷️ Confirmar retiro\n*(La opción de delivery no está disponible para esta orden)*`;
+        } else {
+          reply = `🛵 *¿Cómo querés recibir tu comanda?*\n\nRespondé con el número de opción:\n1️⃣ *Retiro por el local (Take Away)* 🏷️ Sin costo\n2️⃣ *Envío a domicilio con cadete (Delivery)*`;
+        }
         return { reply, newState };
       }
 
@@ -877,6 +892,14 @@ export const chatbotService = {
         reply = '👤 *¿A nombre de quién registramos la comanda?* (Escribí tu nombre y apellido):';
         return { reply, newState };
       } else if (lower === '2' || lower.includes('envio') || lower.includes('delivery') || lower.includes('domicilio')) {
+        const hasTakeawayOnly = newState.items.some(it => {
+          const p = prods.find(prod => prod.id === it.productId || prod.id === it.id);
+          return p && p.onlyTakeaway;
+        });
+        if (hasTakeawayOnly) {
+          reply = '⚠️ Tu comanda contiene productos exclusivos para *Retiro en el local* 🛍️ (no disponibles para delivery).\n\nPor favor respondé *1* para confirmar el retiro por el local.';
+          return { reply, newState };
+        }
         newState.shippingMethod = 'delivery';
         newState.step = 'ASK_ADDRESS';
         reply = '📍 *Por favor escribí tu dirección exacta y entrecalles para el cadete:*';

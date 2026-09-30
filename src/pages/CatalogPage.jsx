@@ -62,6 +62,7 @@ function generateWhatsAppMessage(items, subtotal, serviceType, customerName, cus
   const lines = items.map(item => {
     const mods = [...(item.selectedMods || []).map(m => `  + ${m.name}`),
                   ...(item.selectedOptions || []).map(o => `  → ${o.name}`),
+                  item.onlyTakeaway ? '  🛍️ [Solo Retiro en Local]' : '',
                   item.notes ? `  📝 ${item.notes}` : ''].filter(Boolean);
     return `• ${item.qty}x ${item.name} — ${formatPrice(item.unitPrice * item.qty)}${mods.length ? '\n' + mods.join('\n') : ''}`;
   });
@@ -124,6 +125,8 @@ function useCart() {
       selectedMods: selectedMods || [],
       selectedOptions: selectedOptions || [],
       notes: notes || '',
+      onlyTakeaway: Boolean(product.onlyTakeaway),
+      freeShipping: Boolean(product.freeShipping),
     };
     setItems(prev => [...prev, cartItem]);
   };
@@ -251,6 +254,11 @@ function ProductCard({ product, onOpen }) {
               Envío gratis
             </span>
           )}
+          {product.onlyTakeaway && !isSoldOut && (
+            <span className="cat-product-card-badge takeaway-only">
+              🛍️ Solo Retiro
+            </span>
+          )}
         </div>
       </div>
 
@@ -354,6 +362,23 @@ function CartItemRow({ item, onUpdateQty, onRemove }) {
             <Trash2 size={15} />
           </button>
         </div>
+        {item.onlyTakeaway && (
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            background: 'rgba(139, 92, 246, 0.14)',
+            color: '#c084fc',
+            border: '1px solid rgba(139, 92, 246, 0.35)',
+            borderRadius: '4px',
+            padding: '2px 6px',
+            fontSize: '0.68rem',
+            fontWeight: 700,
+            marginTop: '3px'
+          }}>
+            🛍️ Solo Retiro en Local
+          </div>
+        )}
         {modLabels && <div className="cat-cart-item-mods">↓ {modLabels}</div>}
         {item.notes && <div className="cat-cart-item-mods">📝 {item.notes}</div>}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
@@ -682,6 +707,7 @@ export default function CatalogPage({ initialCashShift }) {
                 originalPrice: meta.originalPrice ? Number(meta.originalPrice) : (p.original_price ? Number(p.original_price) : null),
                 discountBadge: meta.discountBadge || p.discount_badge || null,
                 freeShipping: meta.freeShipping !== undefined ? Boolean(meta.freeShipping) : Boolean(p.free_shipping),
+                onlyTakeaway: meta.onlyTakeaway !== undefined ? Boolean(meta.onlyTakeaway) : Boolean(p.only_takeaway),
                 emoji: p.emoji || '🍔',
                 description: p.description || '',
                 modifiers: Array.isArray(p.modifiers) ? p.modifiers : [],
@@ -1042,9 +1068,16 @@ export default function CatalogPage({ initialCashShift }) {
       showToast('⚠️ Ingresá tu nombre');
       return;
     }
-    if (serviceType === 'delivery' && !customerAddress.trim()) {
-      showToast('⚠️ Ingresá tu dirección');
-      return;
+    if (serviceType === 'delivery') {
+      const hasTakeawayOnly = cart.items.some(item => item.onlyTakeaway);
+      if (hasTakeawayOnly) {
+        showToast('⚠️ Tu carrito contiene productos exclusivos para retirar por el local.');
+        return;
+      }
+      if (!customerAddress.trim()) {
+        showToast('⚠️ Ingresá tu dirección');
+        return;
+      }
     }
 
     const waPhone = formatWhatsAppPhone(settings.telefono_whatsapp || settings.telefono_contacto);
@@ -1682,6 +1715,17 @@ export default function CatalogPage({ initialCashShift }) {
                 </div>
               ) : (
                 <div className="cat-service-selector">
+                  {cart.items.some(item => item.onlyTakeaway) && (
+                    <div className="cat-takeaway-only-alert">
+                      <span className="cat-takeaway-only-alert-icon">🛍️</span>
+                      <div>
+                        <div className="cat-takeaway-only-alert-title">¡Promo Exclusiva para Retirar!</div>
+                        <div className="cat-takeaway-only-alert-desc">
+                          Tu pedido incluye productos o promos que son <strong>exclusivas para retirar por el local</strong>. La opción de delivery no está disponible.
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="cat-service-label">Seleccioná cómo recibirás tu pedido:</div>
                   <div className="cat-service-btns">
                     <button
@@ -1704,12 +1748,23 @@ export default function CatalogPage({ initialCashShift }) {
                     </button>
                     <button
                       type="button"
-                      className={`cat-service-btn ${serviceType === 'delivery' ? 'active' : ''}`}
-                      onClick={() => { setServiceType('delivery'); setView('checkout'); }}
+                      className={`cat-service-btn ${serviceType === 'delivery' ? 'active' : ''} ${cart.items.some(item => item.onlyTakeaway) ? 'disabled-btn' : ''}`}
+                      disabled={cart.items.some(item => item.onlyTakeaway)}
+                      onClick={() => {
+                        if (cart.items.some(item => item.onlyTakeaway)) {
+                          showToast('🛍️ Tu pedido tiene promos exclusivas para retiro por el local.');
+                          return;
+                        }
+                        setServiceType('delivery');
+                        setView('checkout');
+                      }}
+                      title={cart.items.some(item => item.onlyTakeaway) ? 'No disponible para delivery (promo exclusivo retiro)' : ''}
                     >
                       <span className="cat-service-btn-icon">🛵</span>
                       A domicilio
-                      <span className="cat-service-btn-sub">Envío con cadete</span>
+                      <span className="cat-service-btn-sub">
+                        {cart.items.some(item => item.onlyTakeaway) ? 'No disponible p/ esta promo' : 'Envío con cadete'}
+                      </span>
                     </button>
                   </div>
                 </div>

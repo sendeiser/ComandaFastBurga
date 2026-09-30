@@ -297,6 +297,7 @@ export default function FastOrderPad({
       return { 
         ...it, 
         freeShipping: Boolean(it.freeShipping ?? match?.freeShipping),
+        onlyTakeaway: Boolean(it.onlyTakeaway ?? match?.onlyTakeaway),
         image: it.image || match?.image || '',
         emoji: it.emoji || match?.emoji || '🍔',
         id: 'item-' + Date.now() + '-' + Math.random() 
@@ -474,10 +475,13 @@ export default function FastOrderPad({
                   <div className="product-emoji-icon">{prod.emoji || '🍔'}</div>
                 )}
 
-                {(prod.freeShipping || prod.discountBadge) && (
+                {(prod.freeShipping || prod.onlyTakeaway || prod.discountBadge) && (
                   <div className="product-card-promo-tags" style={{ padding: '0 0.5rem' }}>
                     {prod.freeShipping && (
                       <span className="badge-promo-free-shipping">🛵 Envío Gratis</span>
+                    )}
+                    {prod.onlyTakeaway && (
+                      <span className="badge-promo-takeaway">🛍️ Solo Retiro</span>
                     )}
                     {prod.discountBadge && (
                       <span className="badge-promo-tag">🏷️ {prod.discountBadge}</span>
@@ -749,6 +753,24 @@ export default function FastOrderPad({
                   </div>
                 )}
 
+                {item.onlyTakeaway && (
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    background: 'rgba(139, 92, 246, 0.15)',
+                    color: '#a78bfa',
+                    border: '1px solid rgba(139, 92, 246, 0.4)',
+                    borderRadius: '4px',
+                    padding: '2px 6px',
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    margin: '3px 0'
+                  }}>
+                    🛍️ Solo Retiro en Local
+                  </div>
+                )}
+
                 {item.notes && (
                   <div style={{ fontSize: '0.75rem', fontStyle: 'italic', color: 'var(--accent-amber)' }}>
                     Nota: {item.notes}
@@ -787,6 +809,24 @@ export default function FastOrderPad({
                 <span style={{ fontWeight: 700 }}>
                   {hasFreeShippingPromo ? '¡GRATIS POR PROMO! 🛵' : `+$${effectiveDelivery.toLocaleString('es-AR')}`}
                 </span>
+              </div>
+            )}
+            {channel === 'whatsapp' && cartItems.some(i => i.onlyTakeaway) && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                color: '#f87171',
+                borderRadius: '6px',
+                padding: '5px 8px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                marginTop: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span>⚠️</span>
+                <span>Atención: El pedido incluye promos exclusivas de solo retiro.</span>
               </div>
             )}
             <div className="total-row-highlight">

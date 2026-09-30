@@ -548,6 +548,12 @@
   border-color: rgba(34, 197, 94, 0.3);
 }
 
+.cat-product-card-badge.takeaway-only {
+  color: #c084fc;
+  background: rgba(139, 92, 246, 0.16);
+  border-color: rgba(139, 92, 246, 0.45);
+}
+
 /* Image box on the right */
 .cat-product-card-image-box {
   position: relative;
@@ -1582,6 +1588,49 @@
   color: var(--cat-text-muted);
   font-weight: 500;
   margin-top: 2px;
+}
+
+.cat-service-btn.disabled-btn {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.85);
+  border-style: dashed;
+}
+
+.cat-service-btn.disabled-btn:hover {
+  border-color: var(--cat-border-strong);
+  background: var(--cat-surface);
+}
+
+.cat-takeaway-only-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: rgba(139, 92, 246, 0.14);
+  border: 1.5px solid rgba(139, 92, 246, 0.45);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  color: #e9d5ff;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.cat-takeaway-only-alert-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.cat-takeaway-only-alert-title {
+  font-weight: 800;
+  color: #f5f3ff;
+  font-size: 0.9rem;
+  margin-bottom: 2px;
+}
+
+.cat-takeaway-only-alert-desc {
+  color: #d8b4fe;
+  font-size: 0.82rem;
 }
 
 /* Forms in Checkout */
