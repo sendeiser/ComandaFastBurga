@@ -39,7 +39,7 @@
     "key": "catalogo_url",
     "icon": "Globe",
     "label": "Enlace a la Carta Web",
-    "value": "",
+    "value": "https://burgasystem.netlify.app/#catalog",
     "category": "business",
     "description": "URL de la carta digital para que los clientes vean fotos y promociones",
     "defaultValue": "https://comandafast.online"

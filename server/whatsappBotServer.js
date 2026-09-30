@@ -2204,6 +2204,179 @@ class WhatsAppBotServer {
     }
   }
 
+  /**
+   * Envía confirmación proactiva al WhatsApp del cliente cuando ingresa un pedido desde el Catálogo Web (#catalog)
+   * Informa al cliente que su pedido ya está en el sistema del POS y la cocina,
+   * envía los datos de pago (Transferencia o Efectivo) y pausa el bot automáticamente
+   * para que la cajera o encargado humano tome el control del chat.
+   * @param {Object} order Objeto de pedido normalizado
+   */
+  async sendCatalogOrderConfirmationToCustomer(order) {
+    if (!order) return { success: false, reason: 'order_missing' };
+
+    // Si el bot no está conectado y no es un JID simulador, no puede enviar por WhatsApp
+    const customerObj = typeof order.customer === 'object' && order.customer ? order.customer : {};
+    let targetJid = order.remoteJid || customerObj.remoteJid || null;
+    const phone = customerObj.phone || order.phone || order.customerPhone || null;
+
+    if (!targetJid && phone) {
+      targetJid = formatPhoneToRemoteJid(String(phone));
+    }
+
+    if (!targetJid) {
+      console.log(`ℹ️ [NOTIF CATALOGO DIRECTO]: Pedido #${order.orderNumber || order.id} no tiene teléfono ni remoteJid asociado.`);
+      return { success: false, reason: 'no_phone' };
+    }
+
+    const isSimulatorJid = !targetJid || targetJid.startsWith('sim_') || targetJid.startsWith('test_') || targetJid.includes('tester');
+    if (!isSimulatorJid && (!this.sock || this.status !== 'connected')) {
+      console.log(`ℹ️ [NOTIF CATALOGO DIRECTO]: Bot no conectado. No se pudo enviar WhatsApp proactivo a ${targetJid}.`);
+      return { success: false, reason: 'bot_disconnected' };
+    }
+
+    // Control anti-duplicados estricto: evitar enviar múltiples veces el mismo aviso
+    if (isStatusAlreadyNotified(order, 'catalogo_confirmado')) {
+      console.log(`ℹ️ [NOTIF CATALOGO DIRECTO]: Confirmación ya enviada previamente para pedido #${order.orderNumber || order.id}.`);
+      return { success: false, reason: 'already_notified' };
+    }
+
+    // Resolver plantilla, variables y datos del negocio
+    const tpls = getBotTemplates();
+    const vars = getBusinessContext();
+    const customerName = customerObj.name || (typeof order.customer === 'string' ? order.customer : 'Cliente') || 'Cliente';
+    const orderNum = order.orderNumber || order.code || (order.id ? String(order.id).slice(-4) : 'Comanda');
+
+    // Identificar método de entrega
+    const rawAddr = (customerObj.address || order.address || '').toString().toLowerCase().trim();
+    const isTakeAway = (
+      order.channel === 'mostrador' ||
+      order.deliveryType === 'local' ||
+      order.deliveryType === 'takeaway' ||
+      order.deliveryType === 'mostrador' ||
+      customerObj.deliveryType === 'local' ||
+      customerObj.deliveryType === 'takeaway' ||
+      customerObj.deliveryType === 'mostrador' ||
+      rawAddr.includes('retiro') ||
+      rawAddr.includes('mostrador') ||
+      rawAddr.includes('local')
+    );
+    const tipoEntrega = isTakeAway 
+      ? `Retiro en Local (${vars.direccion || 'Av. Belgrano 1234, Centro'})` 
+      : `Envío a Domicilio (${customerObj.address || order.address || 'tu domicilio'})`;
+
+    // Armar detalle de ítems
+    let detallePedido = '';
+    if (Array.isArray(order.items) && order.items.length > 0) {
+      const itemsList = order.items.map(it => {
+        const qty = it.qty || it.quantity || 1;
+        const name = it.name || 'Producto';
+        const mods = Array.isArray(it.selectedMods) && it.selectedMods.length > 0 
+          ? ` (${it.selectedMods.map(m => m.name || m).join(', ')})` 
+          : '';
+        const notes = it.notes ? ` _[${it.notes}]_` : '';
+        return `• *${qty}x* ${name}${mods}${notes}`;
+      }).join('\n');
+      detallePedido = `📋 *Detalle del Pedido:*\n${itemsList}`;
+    }
+
+    // Armar instrucciones de pago según paymentMethod
+    const payMethod = (order.paymentMethod || order.payment_method || customerObj.paymentMethod || 'efectivo').toString().toLowerCase();
+    const isTransfer = payMethod.includes('transf') || payMethod.includes('alias') || payMethod.includes('mp') || payMethod.includes('banco');
+
+    let instruccionesPago = '';
+    if (isTransfer) {
+      instruccionesPago = `💳 *DATOS PARA TRANSFERENCIA BANCARIA:* 🏦\n` +
+        `• *Alias:* \`${vars.alias_banco || 'comandafast.mp'}\`\n` +
+        `• *Banco / App:* ${vars.banco || 'Mercado Pago'}\n` +
+        `• *Titular:* ${vars.titular || vars.nombre_local}\n` +
+        `• *CBU / CVU:* \`${vars.cbu || '0000003100092138928374'}\`\n\n` +
+        `📸 *Por favor enviá una captura o comprobante de la transferencia por este chat para que la cajera confirme el pago.*`;
+    } else {
+      instruccionesPago = `💵 *PAGO EN EFECTIVO:*\n` +
+        `Abonás *$${Number(order.total || 0).toLocaleString('es-AR')}* en mano al recibir o retirar tu pedido.`;
+    }
+
+    const baseTemplate = tpls.template_catalog_direct_confirmation || DEFAULT_SERVER_TEMPLATES.template_catalog_direct_confirmation;
+
+    const finalMessage = baseTemplate
+      .replace(/{cliente}/gi, customerName)
+      .replace(/{pedido_id}/gi, String(orderNum))
+      .replace(/{nombre_local}/gi, vars.nombre_local)
+      .replace(/{total}/gi, Number(order.total || 0).toLocaleString('es-AR'))
+      .replace(/{tipo_entrega}/gi, tipoEntrega)
+      .replace(/{detalle_pedido}/gi, detallePedido)
+      .replace(/{instrucciones_pago}/gi, instruccionesPago)
+      .replace(/{direccion}/gi, vars.direccion || 'Nuestro Local')
+      .replace(/{horarios}/gi, vars.horarios || '')
+      .replace(/{demora}/gi, vars.demora || '30 a 45 min');
+
+    // Marcar en caché antes del envío para evitar concurrencia
+    markStatusNotified(order, 'catalogo_confirmado');
+
+    console.log(`🚀 [NOTIF CATALOGO DIRECTO]: Enviando confirmación de pedido #${orderNum} a ${targetJid} (${isTransfer ? 'Transferencia' : 'Efectivo'})...`);
+
+    let sendResult = await this.safeSendMessage(targetJid, { text: finalMessage });
+
+    if (!sendResult && phone) {
+      const phoneJid = formatPhoneToRemoteJid(String(phone));
+      if (phoneJid && phoneJid !== targetJid) {
+        console.log(`🔄 [NOTIF CATALOGO DIRECTO]: Reintentando a número directo ${phoneJid}...`);
+        sendResult = await this.safeSendMessage(phoneJid, { text: finalMessage });
+        if (sendResult) targetJid = phoneJid;
+      }
+    }
+
+    if (sendResult) {
+      // Pausa automática al bot para este cliente para que la cajera atienda libremente
+      const configuredMinutes = Number(tpls.human_mode_sleep_minutes) || 25;
+      pauseBotForCustomer(targetJid, configuredMinutes * 60 * 1000, 'pedido_catalogo_online');
+      console.log(`👤 [MODO HUMANO]: Bot pausado por ${configuredMinutes} min para ${targetJid} tras recibir pedido #${orderNum} del catálogo.`);
+
+      // Actualizar pedidos almacenados
+      try {
+        const stored = getStoredOrders();
+        const sIdx = stored.findIndex(o => o.id === order.id);
+        if (sIdx !== -1) {
+          if (!stored[sIdx].notifiedStatuses) stored[sIdx].notifiedStatuses = [];
+          if (!stored[sIdx].notifiedStatuses.includes('catalogo_confirmado')) {
+            stored[sIdx].notifiedStatuses.push('catalogo_confirmado');
+          }
+          fs.writeFileSync(ORDERS_FILE, JSON.stringify(stored, null, 2), 'utf-8');
+        }
+      } catch (_) {}
+
+      // Sincronizar hacia Supabase Cloud
+      if (order.id) {
+        const curTimestamps = order.statusTimestamps || {};
+        const curNotified = Array.isArray(curTimestamps.notifiedStatuses) ? [...curTimestamps.notifiedStatuses] : [];
+        if (!curNotified.includes('catalogo_confirmado')) {
+          curNotified.push('catalogo_confirmado');
+        }
+        fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${order.id}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            status_timestamps: {
+              ...curTimestamps,
+              notifiedStatuses: curNotified,
+              catalogoConfirmadoAt: new Date().toISOString()
+            },
+            updated_at: new Date().toISOString()
+          })
+        }).catch(() => {});
+      }
+
+      return { success: true, jid: targetJid };
+    } else {
+      console.warn(`⚠️ [NOTIF CATALOGO DIRECTO]: Falló el envío a ${targetJid}.`);
+      return { success: false, reason: 'send_failed' };
+    }
+  }
+
   async start(force = false) {
     if (this.sock && this.status === 'connected' && !force) {
       return { status: this.status, qrCode: this.qrCode };
@@ -4093,6 +4266,9 @@ async function syncCloudOrderStatuses() {
         if (isOldOrder || notified.includes(normSt)) {
           markStatusNotified(ord, normSt);
         }
+        if (isOldOrder || notified.includes('catalogo_confirmado')) {
+          markStatusNotified(ord, 'catalogo_confirmado');
+        }
       }
       isCloudOrdersInitialSeedDone = true;
       console.log(`☁️ [SUPABASE CLOUD ORDERS]: Inicialización completada. ${cloudNotifiedStatusCache.size} estados previos asegurados contra reenvío.`);
@@ -4101,6 +4277,40 @@ async function syncCloudOrderStatuses() {
 
     for (const ord of cloudOrders) {
       if (!ord || !ord.id) continue;
+
+      // 1. Detectar si es un pedido nuevo de catálogo online sin confirmar
+      const isCatalogOrder = (ord.source === 'catalogo_online' || ord.channel === 'catalogo_online');
+      if (isCatalogOrder && !isStatusAlreadyNotified(ord, 'catalogo_confirmado')) {
+        const timestamps = ord.status_timestamps || {};
+        const notifiedList = Array.isArray(timestamps.notifiedStatuses) ? timestamps.notifiedStatuses : [];
+        if (!notifiedList.includes('catalogo_confirmado')) {
+          const ordTime = new Date(ord.updated_at || ord.created_at || Date.now()).getTime();
+          if ((Date.now() - ordTime) < 24 * 60 * 60 * 1000) {
+            const normalizedCatalogOrder = {
+              id: ord.id,
+              orderNumber: ord.order_number || ord.orderNumber || (ord.id ? String(ord.id).slice(-4) : 'Comanda'),
+              channel: ord.channel || 'catalogo_online',
+              customer: ord.customer || {},
+              remoteJid: ord.customer?.remoteJid || null,
+              phone: ord.customer?.phone || null,
+              address: ord.customer?.address || null,
+              deliveryType: ord.channel === 'delivery' || ord.delivery_fee > 0 ? 'delivery' : (ord.customer?.deliveryType || 'mostrador'),
+              deliveryFee: Number(ord.delivery_fee || 0),
+              subtotal: Number(ord.subtotal || ord.total || 0),
+              total: Number(ord.total || 0),
+              items: Array.isArray(ord.items) ? ord.items : [],
+              paymentMethod: ord.payment_method || 'efectivo',
+              status: ord.status || 'pendiente',
+              statusTimestamps: timestamps
+            };
+
+            botServer.sendCatalogOrderConfirmationToCustomer(normalizedCatalogOrder).catch(e => {
+              console.warn(`[NOTIF CATALOGO CLOUD] Error enviando confirmación a pedido ${ord.id}:`, e.message);
+            });
+          }
+        }
+      }
+
       const targetStatus = (ord.status || '').toLowerCase();
       if (!['cocina', 'preparando', 'listo', 'entregado'].includes(targetStatus)) continue;
 
@@ -4553,7 +4763,8 @@ app.post('/api/orders', async (req, res) => {
     status: order.status || 'pendiente',
     statusTimestamps: order.statusTimestamps || { pendiente: Date.now() },
     createdAt: order.createdAt || new Date().toISOString(),
-    updatedAt: Date.now()
+    updatedAt: Date.now(),
+    source: order.source || 'pos'
   };
 
   // Guardar en orders.json
@@ -4564,6 +4775,14 @@ app.post('/api/orders', async (req, res) => {
   // Inyectar en la cola de pedidos pendientes para que cocina web, KDS y POS lo reciban
   if (!pendingOrdersForPos.some(o => o.id === normalizedOrder.id)) {
     pendingOrdersForPos.push(normalizedOrder);
+  }
+
+  // Si proviene del catálogo online o tiene datos de teléfono del cliente, enviar confirmación proactiva por WhatsApp
+  const isCatalog = order.source === 'catalogo_online' || order.channel === 'catalogo_online' || Boolean(normalizedOrder.customer?.phone);
+  if (isCatalog) {
+    botServer.sendCatalogOrderConfirmationToCustomer(normalizedOrder).catch(err => {
+      console.warn('⚠️ [NOTIF CATALOGO]: Error enviando confirmación por WhatsApp:', err.message);
+    });
   }
 
   console.log(`🛎️ [SYNC LOCAL] Pedido #${normalizedOrder.orderNumber} (${normalizedOrder.channel}) inyectado desde App Móvil/POS -> Sincronizado a cocina.`);

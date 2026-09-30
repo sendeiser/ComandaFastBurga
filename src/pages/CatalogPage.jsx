@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { supabaseSync, DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_ANON_KEY } from '../services/supabaseClient';
 import { storageService } from '../services/storageService';
+import { chatbotService } from '../services/chatbotService';
 import ProductModal from '../components/catalog/ProductModal';
 import '../styles/catalog.css';
 
@@ -510,8 +511,9 @@ export default function CatalogPage({ initialCashShift }) {
   const [settings, setSettings] = useState(() => {
     try {
       const local = storageService.getSettings();
+      const botSettings = chatbotService.getSettings();
       if (local && typeof local === 'object') {
-        const merged = { ...DEFAULT_SETTINGS, ...local };
+        const merged = { ...DEFAULT_SETTINGS, menu_mode: botSettings.menu_mode || 'catalog_direct', ...local };
         if (merged.telefono_whatsapp === '5493826451122' || !merged.telefono_whatsapp) {
           merged.telefono_whatsapp = DEFAULT_SETTINGS.telefono_whatsapp;
         }
@@ -523,7 +525,7 @@ export default function CatalogPage({ initialCashShift }) {
         }
         return merged;
       }
-      return DEFAULT_SETTINGS;
+      return { ...DEFAULT_SETTINGS, menu_mode: botSettings.menu_mode || 'catalog_direct' };
     } catch (_) {
       return DEFAULT_SETTINGS;
     }
@@ -595,6 +597,9 @@ export default function CatalogPage({ initialCashShift }) {
   const [customerAddress, setCustomerAddress] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('efectivo'); // 'efectivo' | 'transferencia'
+  const [orderSuccessData, setOrderSuccessData] = useState(null);
+  const [showOrderSuccessModal, setShowOrderSuccessModal] = useState(false);
+  const [copiedAlias, setCopiedAlias] = useState(false);
 
   const cart = useCart();
   const sectionRefs = useRef({});
@@ -663,7 +668,7 @@ export default function CatalogPage({ initialCashShift }) {
           return;
         }
 
-        const [prodsRes, settingsRes, imagesRes, metaRes] = await Promise.all([
+        const [prodsRes, settingsRes, imagesRes, metaRes, botTemplatesRes] = await Promise.all([
           fetch(`${SUPABASE_URL}/rest/v1/products?select=*&order=category.asc,name.asc`, {
             headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
           }),
@@ -674,6 +679,9 @@ export default function CatalogPage({ initialCashShift }) {
             headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
           }),
           fetch(`${SUPABASE_URL}/rest/v1/system_settings?id=eq.product_metadata&select=data`, {
+            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+          }),
+          fetch(`${SUPABASE_URL}/rest/v1/bot_config?id=eq.templates&limit=1`, {
             headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
           })
         ]);
@@ -724,17 +732,34 @@ export default function CatalogPage({ initialCashShift }) {
           }
         }
 
+        let updatedSettings = {};
         if (settingsRes.ok) {
           const sRows = await settingsRes.json();
           if (Array.isArray(sRows) && sRows.length > 0 && Array.isArray(sRows[0].data)) {
             const varMap = {};
             sRows[0].data.forEach(v => { if (v.key) varMap[v.key] = v.value ?? v.defaultValue; });
-            setSettings(prev => {
-              const updated = { ...prev, ...varMap };
-              try { storageService.saveSettings(updated); } catch (_) {}
-              return updated;
-            });
+            updatedSettings = { ...varMap };
           }
+        }
+
+        if (botTemplatesRes && botTemplatesRes.ok) {
+          const tRows = await botTemplatesRes.json();
+          if (Array.isArray(tRows) && tRows.length > 0 && tRows[0].data) {
+            const tData = tRows[0].data;
+            if (tData.menu_mode) updatedSettings.menu_mode = tData.menu_mode;
+            if (tData.bank_alias) updatedSettings.alias_banco = tData.bank_alias;
+            if (tData.bank_name) updatedSettings.banco = tData.bank_name;
+            if (tData.bank_holder) updatedSettings.titular = tData.bank_holder;
+            if (tData.bank_cbu) updatedSettings.cbu = tData.bank_cbu;
+          }
+        }
+
+        if (Object.keys(updatedSettings).length > 0) {
+          setSettings(prev => {
+            const final = { ...prev, ...updatedSettings };
+            try { storageService.saveSettings(final); } catch (_) {}
+            return final;
+          });
         }
       } catch (err) {
         console.warn('[CatalogPage] Error cargando datos de Supabase:', err.message);
@@ -1154,7 +1179,7 @@ export default function CatalogPage({ initialCashShift }) {
         }
       } catch (_) {}
 
-      // 4. Generar y abrir enlace de WhatsApp
+      // 4. Generar enlace de WhatsApp
       const waPhone = formatWhatsAppPhone(settings.telefono_whatsapp || settings.telefono_contacto);
       const message = generateWhatsAppMessage(
         cart.items,
@@ -1172,7 +1197,31 @@ export default function CatalogPage({ initialCashShift }) {
 
       const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(message)}`;
 
-      window.open(waUrl, '_blank');
+      const isDirectMode = settings.menu_mode === 'catalog_direct' || Boolean(customerPhone.trim());
+
+      if (isDirectMode) {
+        // Modo directo: la orden ya ingresó al POS y cocina. El Bot le envía el WhatsApp al cliente.
+        setOrderSuccessData({
+          orderNumber: nextNum,
+          customerName: customerName.trim(),
+          customerPhone: customerPhone.trim(),
+          customerAddress: serviceType === 'delivery' ? customerAddress.trim() : 'Retiro en Local (Mostrador)',
+          serviceType,
+          paymentMethod: paymentMethod || 'efectivo',
+          total: totalAmount,
+          subtotal: cart.subtotal,
+          deliveryFee,
+          items: [...cart.items],
+          waUrl
+        });
+        setShowOrderSuccessModal(true);
+      } else {
+        // Modo clásico: abrir WhatsApp directamente
+        try {
+          window.open(waUrl, '_blank');
+        } catch (_) {}
+      }
+
       cart.clearCart();
       setView('catalog');
       setCustomerName('');
@@ -1188,7 +1237,7 @@ export default function CatalogPage({ initialCashShift }) {
       } else {
         setServiceType('dine_in');
       }
-      showToast(`🎉 ¡Pedido #${nextNum} registrado y enviado a WhatsApp!`);
+      showToast(`🎉 ¡Pedido #${nextNum} enviado a cocina con éxito!`);
     } catch (err) {
       console.error('[CatalogPage] Error al procesar pedido:', err);
       showToast('❌ Ocurrió un error al procesar el pedido.');
@@ -2424,6 +2473,207 @@ export default function CatalogPage({ initialCashShift }) {
                   </button>
                 );
               })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 10. MODAL DE CONFIRMACIÓN DIRECTA AL POS Y WHATSAPP BOT */}
+      {showOrderSuccessModal && orderSuccessData && (
+        <div 
+          className="cat-modal-overlay" 
+          style={{ 
+            zIndex: 9999, 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            padding: '16px',
+            backgroundColor: 'rgba(0, 0, 0, 0.82)',
+            backdropFilter: 'blur(8px)'
+          }} 
+          onClick={() => setShowOrderSuccessModal(false)}
+        >
+          <div 
+            className="cat-order-success-modal"
+            style={{
+              background: '#161e26',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '24px',
+              maxWidth: '460px',
+              width: '100%',
+              padding: '26px 22px',
+              color: '#fff',
+              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.8)',
+              position: 'relative',
+              animation: 'catModalFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header Icon */}
+            <div style={{ textAlign: 'center', marginBottom: '18px' }}>
+              <div style={{
+                width: '68px',
+                height: '68px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.4))',
+                border: '2px solid #10b981',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#34d399',
+                fontSize: '2.2rem',
+                boxShadow: '0 0 30px rgba(16, 185, 129, 0.35)'
+              }}>
+                ✓
+              </div>
+              <h2 style={{ fontSize: '1.45rem', fontWeight: 900, marginTop: '14px', color: '#fff', letterSpacing: '-0.02em' }}>
+                ¡Pedido #{orderSuccessData.orderNumber} Recibido!
+              </h2>
+              <p style={{ fontSize: '0.88rem', color: '#94a3b8', marginTop: '4px', lineHeight: 1.4 }}>
+                Tu comanda ya ingresó al sistema de nuestra cocina y caja.
+              </p>
+            </div>
+
+            {/* Aviso Bot WhatsApp */}
+            <div style={{
+              background: 'rgba(37, 211, 102, 0.1)',
+              border: '1px solid rgba(37, 211, 102, 0.28)',
+              borderRadius: '14px',
+              padding: '12px 14px',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '12px'
+            }}>
+              <MessageCircle size={22} style={{ color: '#25D366', flexShrink: 0, marginTop: '2px' }} />
+              <div style={{ fontSize: '0.82rem', color: '#e2e8f0', lineHeight: 1.45 }}>
+                <strong style={{ color: '#34d399', display: 'block', marginBottom: '2px' }}>
+                  Aviso automático por WhatsApp
+                </strong>
+                {orderSuccessData.customerPhone ? (
+                  <span>
+                    El bot de WhatsApp te envió un mensaje a <strong>{orderSuccessData.customerPhone}</strong> con la confirmación del pedido.
+                  </span>
+                ) : (
+                  <span>
+                    Nuestra cocina ya tiene tu pedido en marcha. ¡Te avisaremos cuando esté listo!
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Instrucciones de Pago */}
+            {orderSuccessData.paymentMethod === 'transferencia' ? (
+              <div style={{
+                background: 'rgba(30, 41, 59, 0.7)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '16px',
+                padding: '14px 16px',
+                marginBottom: '20px'
+              }}>
+                <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#f59e0b', fontWeight: 800, marginBottom: '8px' }}>
+                  💳 Datos para Transferencia Bancaria
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', background: 'rgba(0,0,0,0.3)', padding: '10px 12px', borderRadius: '10px' }}>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Alias CBU / CVU</div>
+                    <div style={{ fontSize: '1rem', fontWeight: 800, color: '#38bdf8', fontFamily: 'monospace' }}>
+                      {settings.alias_banco || settings.bank_alias || 'Burgachamical.nx'}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    style={{
+                      background: copiedAlias ? '#10b981' : 'rgba(255, 255, 255, 0.12)',
+                      border: 'none',
+                      color: '#fff',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      padding: '7px 12px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                    onClick={() => {
+                      const alias = settings.alias_banco || settings.bank_alias || 'Burgachamical.nx';
+                      navigator.clipboard.writeText(alias);
+                      setCopiedAlias(true);
+                      setTimeout(() => setCopiedAlias(false), 2500);
+                    }}
+                  >
+                    {copiedAlias ? '¡Copiado! ✓' : 'Copiar'}
+                  </button>
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#cbd5e1', lineHeight: 1.6 }}>
+                  <div>• <strong>Banco / Billetera:</strong> {settings.banco || settings.bank_name || 'Naranja X'}</div>
+                  <div>• <strong>Titular:</strong> {settings.titular || settings.bank_holder || "Braian Carlos Zarate San Felipe"}</div>
+                  <div>• <strong>Total a transferir:</strong> ${Number(orderSuccessData.total).toLocaleString('es-AR')}</div>
+                </div>
+                <div style={{ fontSize: '0.73rem', color: '#94a3b8', marginTop: '8px', fontStyle: 'italic' }}>
+                  📸 Podés adjuntar el comprobante directamente en el chat de WhatsApp.
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                background: 'rgba(30, 41, 59, 0.7)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '16px',
+                padding: '14px 16px',
+                marginBottom: '20px'
+              }}>
+                <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#10b981', fontWeight: 800, marginBottom: '6px' }}>
+                  💵 Pago en Efectivo
+                </div>
+                <div style={{ fontSize: '0.88rem', color: '#cbd5e1', lineHeight: 1.5 }}>
+                  Abonás <strong>${Number(orderSuccessData.total).toLocaleString('es-AR')}</strong> al {orderSuccessData.serviceType === 'delivery' ? 'recibir tu pedido' : 'retirar en el local'}.
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {orderSuccessData.waUrl && (
+                <a
+                  href={orderSuccessData.waUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    background: '#25D366',
+                    color: '#fff',
+                    textDecoration: 'none',
+                    borderRadius: '14px',
+                    padding: '13px',
+                    fontWeight: 800,
+                    fontSize: '0.9rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 16px rgba(37, 211, 102, 0.4)'
+                  }}
+                >
+                  <MessageCircle size={20} />
+                  <span>Abrir WhatsApp con el Local</span>
+                </a>
+              )}
+              <button
+                type="button"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#fff',
+                  borderRadius: '14px',
+                  padding: '12px',
+                  fontWeight: 700,
+                  fontSize: '0.86rem',
+                  cursor: 'pointer'
+                }}
+                onClick={() => setShowOrderSuccessModal(false)}
+              >
+                Volver a la Carta
+              </button>
             </div>
           </div>
         </div>
