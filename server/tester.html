@@ -792,6 +792,7 @@
           
           <!-- Quick Action Chips -->
           <div class="quick-chips-bar">
+            <button type="button" class="chip-btn emerald" onclick="sendQuickText('Hola')">👋 HOLA</button>
             <button type="button" class="chip-btn emerald" onclick="sendQuickText('MENU')">🍔 MENÚ</button>
             <button type="button" class="chip-btn" onclick="sendQuickText('1')">1️⃣ CHEESE</button>
             <button type="button" class="chip-btn" onclick="sendQuickText('2')">2️⃣ BAJONERA</button>
@@ -876,9 +877,14 @@
         <!-- Simulación Pedido Web -->
         <div class="inspector-section">
           <div class="section-title">Test Rápido Catálogo Web</div>
-          <button type="button" class="btn-nav" id="btnSimulateWebOrder" style="width:100%;justify-content:center;font-size:0.75rem;padding:7px 10px;" title="Simular pedido entrante desde la carta web #catalog">
-            🛒 Inyectar Pedido Catálogo Web
-          </button>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <button type="button" class="btn-nav" id="btnSimulateWebOrder" style="width:100%;justify-content:center;font-size:0.75rem;padding:7px 10px;" title="Simular pedido entrante desde la carta web en Efectivo">
+              💵 Inyectar Pedido (Efectivo)
+            </button>
+            <button type="button" class="btn-nav" id="btnSimulateWebOrderTransfer" style="width:100%;justify-content:center;font-size:0.75rem;padding:7px 10px;background:rgba(99,102,241,0.15);color:#818cf8;border:1px solid rgba(99,102,241,0.3);" title="Simular pedido entrante desde la carta web con Transferencia">
+              💳 Inyectar Pedido (Transferencia)
+            </button>
+          </div>
         </div>
 
         <!-- Integración Cocina -->
@@ -1052,7 +1058,7 @@
       }
     }
 
-    function updateSessionInspector(session, biz) {
+    function updateSessionInspector(session, biz, isPaused, remainingPauseMinutes, pauseReason) {
       if (biz) {
         if (biz.nombre_local) {
           storeNameLabel.textContent = biz.nombre_local + ' Bot';
@@ -1063,17 +1069,29 @@
         if (biz.productsCount) document.getElementById('infoProductsCount').textContent = biz.productsCount + ' sincronizados';
       }
 
-      if (!session) {
+      if (isPaused) {
+        sessionStepBadge.className = 'step-badge';
+        sessionStepBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+        sessionStepBadge.style.color = '#f87171';
+        sessionStepBadge.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+        sessionStepBadge.textContent = `⏸️ PAUSADO (${remainingPauseMinutes}m) - Cajera`;
+      } else if (!session) {
         sessionStepBadge.className = 'step-badge idle';
+        sessionStepBadge.style.background = '';
+        sessionStepBadge.style.color = '';
+        sessionStepBadge.style.border = '';
         sessionStepBadge.textContent = 'IDLE (Inactivo)';
         cartCountBadge.textContent = '0 items';
         cartItemsBox.innerHTML = '<div class="cart-empty">El carrito está vacío.</div>';
         return;
+      } else {
+        const step = (session.step || 'IDLE').toUpperCase();
+        sessionStepBadge.textContent = step;
+        sessionStepBadge.className = `step-badge ${step.toLowerCase()}`;
+        sessionStepBadge.style.background = '';
+        sessionStepBadge.style.color = '';
+        sessionStepBadge.style.border = '';
       }
-
-      const step = (session.step || 'IDLE').toUpperCase();
-      sessionStepBadge.textContent = step;
-      sessionStepBadge.className = `step-badge ${step.toLowerCase()}`;
 
       const items = session.items || [];
       cartCountBadge.textContent = `${items.length} ${items.length === 1 ? 'item' : 'items'}`;
@@ -1113,7 +1131,7 @@
           if (data.messages && data.messages.length !== currentMessages.length) {
             renderMessages(data.messages);
           }
-          updateSessionInspector(data.session, data.businessInfo);
+          updateSessionInspector(data.session, data.businessInfo, data.isPaused, data.remainingPauseMinutes, data.pauseReason);
           if (data.botStatus === 'connected') {
             botStatusBadge.textContent = 'En Vivo (3002)';
             botStatusBadge.style.background = 'rgba(16, 185, 129, 0.18)';
@@ -1184,9 +1202,18 @@
     // SIMULAR PEDIDO DE CATÁLOGO WEB
     document.getElementById('btnSimulateWebOrder').addEventListener('click', () => {
       const clientName = (inputCustomerName.value || '').trim() || 'Martín Gómez';
-      const webOrderText = `🛍️ *Mi Pedido — ComandaFast*\n• 1x 4x4 — $ 15.000,00\n💵 *Subtotal:* $ 15.000,00\n💰 *TOTAL:* $ 15.000,00\n🚀 *Tipo de entrega:* Para llevar (Mostrador)\n💳 *Forma de pago:* Efectivo\n👤 *Nombre:* ${clientName}`;
+      const webOrderText = `🍔 *Mi Pedido #12 — ComandaFast*\n\n• 1x Doble Cheddar — $ 9.500,00\n\n💵 *Subtotal:* $ 9.500,00\n💰 *TOTAL:* $ 9.500,00\n\n🚀 *Tipo de entrega:* Para llevar / Mostrador 🏃\n💳 *Forma de pago:* Efectivo 💵\n👤 *Nombre:* ${clientName}`;
       sendMessage(webOrderText);
     });
+
+    const btnTransfer = document.getElementById('btnSimulateWebOrderTransfer');
+    if (btnTransfer) {
+      btnTransfer.addEventListener('click', () => {
+        const clientName = (inputCustomerName.value || '').trim() || 'Martín Gómez';
+        const webOrderText = `🍔 *Mi Pedido #15 — ComandaFast*\n\n• 1x Triple Bacon — $ 12.000,00\n\n💵 *Subtotal:* $ 12.000,00\n🛵 *Delivery:* $ 1.500,00\n💰 *TOTAL:* $ 13.500,00\n\n🚀 *Tipo de entrega:* Delivery con cadete 🛵\n💳 *Forma de pago:* Transferencia Bancaria / MP 🏦\n👤 *Nombre:* ${clientName}\n📍 *Dirección:* San Martín 450`;
+        sendMessage(webOrderText);
+      });
+    }
 
     // RESET SESSION
     document.getElementById('btnResetSession').addEventListener('click', async () => {

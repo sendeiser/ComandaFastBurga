@@ -1,5 +1,54 @@
 [
   {
+    "id": "ord-1790801968972",
+    "code": "CMD-12",
+    "orderNumber": 12,
+    "customer": {
+      "name": "Martin",
+      "phone": "",
+      "address": "Retiro en Local",
+      "remoteJid": "sim_cliente@s.whatsapp.net"
+    },
+    "remoteJid": "sim_cliente@s.whatsapp.net",
+    "channel": "catalogo_online",
+    "deliveryType": "local",
+    "deliveryFee": 0,
+    "subtotal": 9500,
+    "total": 9500,
+    "paymentMethod": "efectivo",
+    "paymentStatus": "pendiente_efectivo",
+    "paymentConfirmed": true,
+    "items": [
+      {
+        "id": "cat_1790801968973_0",
+        "qty": 1,
+        "name": "Doble Cheddar",
+        "unitPrice": 9500,
+        "notes": "",
+        "modifiers": []
+      }
+    ],
+    "notes": "",
+    "status": "cocina",
+    "notifiedStatuses": [
+      "cocina"
+    ],
+    "statusTimestamps": {
+      "readyAt": null,
+      "cookingAt": "2026-09-30T20:59:28.973Z",
+      "createdAt": "2026-09-30T20:59:28.973Z",
+      "deliveredAt": null,
+      "cocinaNotifiedAt": "2026-09-30T20:59:28.973Z",
+      "notifiedStatuses": [
+        "cocina"
+      ]
+    },
+    "createdAt": "2026-09-30T20:59:28.973+00:00",
+    "updatedAt": 1790801971118,
+    "source": "catalogo_online",
+    "tableNumber": ""
+  },
+  {
     "id": "CMD-24",
     "orderNumber": 24,
     "channel": "whatsapp",

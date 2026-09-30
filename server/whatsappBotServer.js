@@ -4968,11 +4968,18 @@ app.get('/api/bot/tester/state', (req, res) => {
   const session = customerSessions.get(normalizedJid) || null;
   const vars = getBusinessContext();
   const prods = getStoredProducts();
+  const pauseData = humanPausedChats.get(normalizedJid);
+  const now = Date.now();
+  const isPaused = pauseData && now < pauseData.pausedUntil;
+
   res.json({
     success: true,
     botStatus: botServer.status,
     botUser: botServer.connectedUser,
     jid: normalizedJid,
+    isPaused: Boolean(isPaused),
+    remainingPauseMinutes: isPaused ? Math.ceil((pauseData.pausedUntil - now) / 60000) : 0,
+    pauseReason: isPaused ? pauseData.reason : null,
     messages: chat?.messages || [],
     session: session ? {
       step: session.step,
