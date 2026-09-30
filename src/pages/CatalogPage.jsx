@@ -1090,9 +1090,20 @@ export default function CatalogPage({ initialCashShift }) {
     }
 
     if (!customerName.trim()) {
-      showToast('⚠️ Ingresá tu nombre');
+      showToast('⚠️ Ingresá tu nombre y apellido');
       return;
     }
+
+    const cleanPhone = customerPhone.replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.length < 8) {
+      showToast('⚠️ Ingresá tu número de WhatsApp para recibir la confirmación de tu pedido');
+      return;
+    }
+    if (cleanPhone.length < 10 && !cleanPhone.startsWith('54')) {
+      showToast('⚠️ Ingresá tu número con código de área (ej: 3826 430159 sin el 0 ni el 15)');
+      return;
+    }
+
     if (serviceType === 'delivery') {
       const hasTakeawayOnly = cart.items.some(item => item.onlyTakeaway);
       if (hasTakeawayOnly) {
@@ -1100,7 +1111,7 @@ export default function CatalogPage({ initialCashShift }) {
         return;
       }
       if (!customerAddress.trim()) {
-        showToast('⚠️ Ingresá tu dirección');
+        showToast('⚠️ Ingresá tu dirección de entrega');
         return;
       }
     }
@@ -1355,10 +1366,32 @@ export default function CatalogPage({ initialCashShift }) {
             <label className="cat-form-label">Nombre y Apellido *</label>
             <input className="cat-form-input" placeholder="Tu nombre" value={customerName} onChange={e => setCustomerName(e.target.value)} />
           </div>
-          {serviceType !== 'dine_in' && (
+          {serviceType !== 'dine_in' ? (
             <div className="cat-form-group">
-              <label className="cat-form-label">Teléfono de contacto</label>
-              <input className="cat-form-input" placeholder="Ej: 3826..." value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} type="tel" />
+              <label className="cat-form-label">
+                Teléfono / WhatsApp * <span style={{ fontSize: '0.74rem', fontWeight: 500, color: '#38bdf8' }}>(Para avisos de cocina y entrega)</span>
+              </label>
+              <input 
+                className="cat-form-input" 
+                placeholder="Ej: 3826 430159 (con código de área)" 
+                value={customerPhone} 
+                onChange={e => setCustomerPhone(e.target.value)} 
+                type="tel" 
+                required
+              />
+            </div>
+          ) : (
+            <div className="cat-form-group">
+              <label className="cat-form-label">
+                Teléfono / WhatsApp <span style={{ fontSize: '0.74rem', fontWeight: 400, color: '#94a3b8' }}>(Opcional)</span>
+              </label>
+              <input 
+                className="cat-form-input" 
+                placeholder="Ej: 3826 430159" 
+                value={customerPhone} 
+                onChange={e => setCustomerPhone(e.target.value)} 
+                type="tel" 
+              />
             </div>
           )}
           {serviceType === 'delivery' && (

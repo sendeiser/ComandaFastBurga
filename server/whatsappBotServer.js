@@ -704,10 +704,15 @@ function formatPhoneToRemoteJid(phone) {
 
   if (digits.startsWith('15') && digits.length >= 10) {
     digits = '549' + digits.slice(2);
-  } else if (digits.length === 10) {
-    digits = '549' + digits;
+  } else if (digits.length === 12 && /^\d{2,4}15\d{6,8}$/.test(digits)) {
+    const m = digits.match(/^(\d{2,4})15(\d{6,8})$/);
+    if (m) digits = '549' + m[1] + m[2];
   } else if (digits.startsWith('54') && !digits.startsWith('549')) {
     digits = '549' + digits.slice(2);
+  } else if (digits.length === 10) {
+    digits = '549' + digits;
+  } else if (!digits.startsWith('549') && digits.length > 8) {
+    digits = '549' + digits;
   }
 
   return `${digits}@s.whatsapp.net`;
