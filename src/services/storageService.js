@@ -399,18 +399,21 @@ export const storageService = {
       } catch (_) {}
     }
 
-    // 2. Intentar consultar al servidor local LAN (puerto 3002) por si hubo pedidos locales
+    // 2. Intentar consultar al servidor local LAN (puerto 3002) solo si estamos en red local / HTTP
     try {
       if (typeof window !== 'undefined' && window.location) {
-        const botHost = window.location.hostname || 'localhost';
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1200);
-        const res = await fetch(`http://${botHost}:3002/api/latest-order-number`, { signal: controller.signal }).catch(() => null);
-        clearTimeout(timeoutId);
-        if (res && res.ok) {
-          const data = await res.json().catch(() => null);
-          if (data && data.latestOrderNumber) {
-            this.updateOrderCounterIfHigher(data.latestOrderNumber);
+        const h = window.location.hostname;
+        const isLocal = (h === 'localhost' || h === '127.0.0.1' || h.startsWith('192.168.') || h.startsWith('10.')) && window.location.protocol === 'http:';
+        if (isLocal) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 800);
+          const res = await fetch(`http://${h}:3002/api/latest-order-number`, { signal: controller.signal }).catch(() => null);
+          clearTimeout(timeoutId);
+          if (res && res.ok) {
+            const data = await res.json().catch(() => null);
+            if (data && data.latestOrderNumber) {
+              this.updateOrderCounterIfHigher(data.latestOrderNumber);
+            }
           }
         }
       }

@@ -1937,7 +1937,13 @@ class WhatsAppBotServer {
    */
   async safeSendMessage(remoteJid, content, originalMsgKey = null, customDelay = null) {
     // Si es un chat simulado del Tester, registrar en liveChats y omitir envío por red Baileys
-    const isSimulatorJid = !remoteJid || remoteJid.startsWith('sim_') || remoteJid.startsWith('test_') || remoteJid.includes('tester');
+    const isSimulatorJid = !remoteJid || 
+      remoteJid.startsWith('sim') || 
+      remoteJid.startsWith('test') || 
+      remoteJid.includes('tester') || 
+      remoteJid.includes('simulator') ||
+      remoteJid.startsWith('001@');
+
     if (isSimulatorJid) {
       const textContent = typeof content === 'string' 
         ? content 
@@ -1953,8 +1959,8 @@ class WhatsAppBotServer {
       return { key: { remoteJid, id: `bot-${Date.now()}` } };
     }
 
-    if (!this.sock) {
-      console.warn(`[WHATSAPP BOT] Socket no inicializado para enviar a ${remoteJid}`);
+    if (!this.sock || this.status !== 'connected') {
+      console.warn(`[WHATSAPP BOT] Socket no conectado (estado: ${this.status}) para enviar a ${remoteJid}`);
       return null;
     }
 
@@ -5172,7 +5178,10 @@ app.post('/api/bot/tester/message', async (req, res) => {
     if (!text || typeof text !== 'string') {
       return res.status(400).json({ success: false, error: 'Texto requerido' });
     }
-    const normalizedJid = jid.includes('@') ? jid : `${jid.replace(/\D/g, '')}@s.whatsapp.net`;
+    const isSimRequest = jid.toLowerCase().includes('sim') || jid.toLowerCase().includes('test');
+    const normalizedJid = jid.includes('@') 
+      ? jid 
+      : (isSimRequest ? `${jid}@s.whatsapp.net` : `${jid.replace(/\D/g, '')}@s.whatsapp.net`);
     const fakeMsg = {
       key: { remoteJid: normalizedJid, id: `test-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, fromMe: false },
       message: { conversation: text.trim() },

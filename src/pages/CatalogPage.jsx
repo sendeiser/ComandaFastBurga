@@ -1026,15 +1026,18 @@ export default function CatalogPage({ initialCashShift }) {
         }
       }
 
-      // 3. Notificar al servidor LAN si está disponible
+      // 3. Notificar al servidor LAN si estamos en red local / HTTP
       try {
         if (typeof window !== 'undefined' && window.location) {
-          const botHost = window.location.hostname || 'localhost';
-          fetch(`http://${botHost}:3002/api/orders`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(orderPayload)
-          }).catch(() => {});
+          const h = window.location.hostname;
+          const isLocal = (h === 'localhost' || h === '127.0.0.1' || h.startsWith('192.168.') || h.startsWith('10.')) && window.location.protocol === 'http:';
+          if (isLocal) {
+            fetch(`http://${h}:3002/api/orders`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(orderPayload)
+            }).catch(() => {});
+          }
         }
       } catch (_) {}
 
@@ -1178,15 +1181,18 @@ export default function CatalogPage({ initialCashShift }) {
         }
       }
 
-      // 3. Notificar al servidor LAN si está disponible
+      // 3. Notificar al servidor LAN si estamos en red local / HTTP
       try {
         if (typeof window !== 'undefined' && window.location) {
-          const botHost = window.location.hostname || 'localhost';
-          fetch(`http://${botHost}:3002/api/orders`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(orderPayload)
-          }).catch(() => {});
+          const h = window.location.hostname;
+          const isLocal = (h === 'localhost' || h === '127.0.0.1' || h.startsWith('192.168.') || h.startsWith('10.')) && window.location.protocol === 'http:';
+          if (isLocal) {
+            fetch(`http://${h}:3002/api/orders`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(orderPayload)
+            }).catch(() => {});
+          }
         }
       } catch (_) {}
 
@@ -2559,97 +2565,141 @@ export default function CatalogPage({ initialCashShift }) {
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'center', 
-            padding: '16px',
-            backgroundColor: 'rgba(0, 0, 0, 0.82)',
-            backdropFilter: 'blur(8px)'
+            padding: '12px',
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(8px)',
+            overflowY: 'auto'
           }} 
           onClick={() => setShowOrderSuccessModal(false)}
         >
           <div 
             className="cat-order-success-modal"
             style={{
-              background: '#161e26',
+              background: '#131920',
               border: '1px solid rgba(255, 255, 255, 0.12)',
-              borderRadius: '24px',
-              maxWidth: '460px',
+              borderRadius: '20px',
+              maxWidth: '420px',
               width: '100%',
-              padding: '26px 22px',
+              maxHeight: 'calc(100dvh - 24px)',
+              overflowY: 'auto',
+              padding: '16px 18px',
               color: '#fff',
-              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.8)',
+              boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.85)',
               position: 'relative',
-              animation: 'catModalFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '11px',
+              animation: 'catModalFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
             onClick={e => e.stopPropagation()}
           >
-            {/* Header Icon */}
-            <div style={{ textAlign: 'center', marginBottom: '18px' }}>
-              <div style={{
-                width: '68px',
-                height: '68px',
+            {/* Botón Cerrar X Superior */}
+            <button
+              type="button"
+              onClick={() => setShowOrderSuccessModal(false)}
+              style={{
+                position: 'absolute',
+                top: '12px',
+                right: '12px',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: 'none',
                 borderRadius: '50%',
-                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.4))',
-                border: '2px solid #10b981',
-                display: 'inline-flex',
+                width: '30px',
+                height: '30px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#94a3b8',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              aria-label="Cerrar"
+            >
+              <X size={16} />
+            </button>
+
+            {/* Header Compacto con Ícono */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingRight: '28px' }}>
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(5, 150, 105, 0.45))',
+                border: '1.5px solid #10b981',
+                display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#34d399',
-                fontSize: '2.2rem',
-                boxShadow: '0 0 30px rgba(16, 185, 129, 0.35)'
+                fontSize: '1.35rem',
+                boxShadow: '0 0 18px rgba(16, 185, 129, 0.4)',
+                flexShrink: 0
               }}>
                 ✓
               </div>
-              <h2 style={{ fontSize: '1.45rem', fontWeight: 900, marginTop: '14px', color: '#fff', letterSpacing: '-0.02em' }}>
-                ¡Pedido #{orderSuccessData.orderNumber} Recibido!
-              </h2>
-              <p style={{ fontSize: '0.88rem', color: '#94a3b8', marginTop: '4px', lineHeight: 1.4 }}>
-                Tu comanda ya ingresó al sistema de nuestra cocina y caja.
-              </p>
+              <div style={{ textAlign: 'left' }}>
+                <h2 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', margin: 0, lineHeight: 1.2 }}>
+                  ¡Pedido #{orderSuccessData.orderNumber} Recibido!
+                </h2>
+                <p style={{ fontSize: '0.76rem', color: '#94a3b8', margin: '3px 0 0 0', lineHeight: 1.25 }}>
+                  Tu comanda ya ingresó al sistema de cocina y caja.
+                </p>
+              </div>
             </div>
 
-            {/* Aviso Bot WhatsApp */}
+            {/* Aviso Bot WhatsApp Compacto */}
             <div style={{
-              background: 'rgba(37, 211, 102, 0.1)',
-              border: '1px solid rgba(37, 211, 102, 0.28)',
-              borderRadius: '14px',
-              padding: '12px 14px',
-              marginBottom: '16px',
+              background: 'rgba(37, 211, 102, 0.08)',
+              border: '1px solid rgba(37, 211, 102, 0.25)',
+              borderRadius: '12px',
+              padding: '8px 12px',
               display: 'flex',
-              alignItems: 'flex-start',
-              gap: '12px'
+              alignItems: 'center',
+              gap: '10px'
             }}>
-              <MessageCircle size={22} style={{ color: '#25D366', flexShrink: 0, marginTop: '2px' }} />
-              <div style={{ fontSize: '0.82rem', color: '#e2e8f0', lineHeight: 1.45 }}>
-                <strong style={{ color: '#34d399', display: 'block', marginBottom: '2px' }}>
-                  Aviso automático por WhatsApp
-                </strong>
+              <MessageCircle size={18} style={{ color: '#25D366', flexShrink: 0 }} />
+              <div style={{ fontSize: '0.78rem', color: '#e2e8f0', lineHeight: 1.35 }}>
                 {orderSuccessData.customerPhone ? (
                   <span>
-                    El bot de WhatsApp te enviará un mensaje automático a <strong>{orderSuccessData.customerPhone}</strong> con la confirmación de tu pedido.
+                    Aviso automático de WhatsApp enviado a <strong style={{ color: '#34d399' }}>{orderSuccessData.customerPhone}</strong>.
                   </span>
                 ) : (
                   <span>
-                    Nuestra cocina ya tiene tu pedido en marcha. ¡Te avisaremos cuando esté listo!
+                    Tu pedido ya está en marcha. ¡Te avisaremos cuando esté listo!
                   </span>
                 )}
               </div>
             </div>
 
-            {/* Instrucciones de Pago */}
+            {/* Instrucciones de Pago Compactas */}
             {orderSuccessData.paymentMethod === 'transferencia' ? (
               <div style={{
-                background: 'rgba(30, 41, 59, 0.7)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: '16px',
-                padding: '14px 16px',
-                marginBottom: '20px'
+                background: 'rgba(22, 30, 42, 0.85)',
+                border: '1px solid rgba(255, 255, 255, 0.09)',
+                borderRadius: '14px',
+                padding: '11px 13px'
               }}>
-                <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#f59e0b', fontWeight: 800, marginBottom: '8px' }}>
-                  💳 Datos para Transferencia Bancaria
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', borderBottom: '1px solid rgba(255, 255, 255, 0.07)', paddingBottom: '6px' }}>
+                  <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#f59e0b', fontWeight: 800 }}>
+                    💳 Datos de Transferencia
+                  </span>
+                  <span style={{ fontSize: '0.94rem', fontWeight: 900, color: '#34d399' }}>
+                    Total: ${Number(orderSuccessData.total).toLocaleString('es-AR')}
+                  </span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', background: 'rgba(0,0,0,0.3)', padding: '10px 12px', borderRadius: '10px' }}>
+
+                {/* Box de Alias con botón copiar */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: 'rgba(0, 0, 0, 0.35)',
+                  padding: '7px 10px',
+                  borderRadius: '9px',
+                  marginBottom: '8px'
+                }}>
                   <div>
-                    <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Alias CBU / CVU</div>
-                    <div style={{ fontSize: '1rem', fontWeight: 800, color: '#38bdf8', fontFamily: 'monospace' }}>
+                    <div style={{ fontSize: '0.64rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Alias CBU / CVU</div>
+                    <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#38bdf8', fontFamily: 'monospace' }}>
                       {settings.alias_banco || settings.bank_alias || 'Burgachamical.nx'}
                     </div>
                   </div>
@@ -2659,14 +2709,14 @@ export default function CatalogPage({ initialCashShift }) {
                       background: copiedAlias ? '#10b981' : 'rgba(255, 255, 255, 0.12)',
                       border: 'none',
                       color: '#fff',
-                      fontSize: '0.75rem',
+                      fontSize: '0.72rem',
                       fontWeight: 700,
-                      padding: '7px 12px',
-                      borderRadius: '8px',
+                      padding: '5px 10px',
+                      borderRadius: '6px',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '5px'
+                      gap: '4px'
                     }}
                     onClick={() => {
                       const alias = settings.alias_banco || settings.bank_alias || 'Burgachamical.nx';
@@ -2678,86 +2728,82 @@ export default function CatalogPage({ initialCashShift }) {
                     {copiedAlias ? '¡Copiado! ✓' : 'Copiar'}
                   </button>
                 </div>
-                <div style={{ fontSize: '0.78rem', color: '#cbd5e1', lineHeight: 1.6 }}>
-                  <div>• <strong>Banco / Billetera:</strong> {settings.banco || settings.bank_name || 'Naranja X'}</div>
-                  <div>• <strong>Titular:</strong> {settings.titular || settings.bank_holder || "Braian Carlos Zarate San Felipe"}</div>
-                  <div>• <strong>Total a transferir:</strong> ${Number(orderSuccessData.total).toLocaleString('es-AR')}</div>
-                </div>
-                <div style={{ fontSize: '0.73rem', color: '#94a3b8', marginTop: '8px', fontStyle: 'italic' }}>
-                  📸 Podés adjuntar el comprobante directamente en el chat de WhatsApp.
+
+                <div style={{ fontSize: '0.74rem', color: '#cbd5e1', lineHeight: 1.45, display: 'flex', flexWrap: 'wrap', gap: '3px 12px' }}>
+                  <div><span style={{ color: '#94a3b8' }}>Banco:</span> <strong>{settings.banco || settings.bank_name || 'Naranja X'}</strong></div>
+                  <div><span style={{ color: '#94a3b8' }}>Titular:</span> <strong>{settings.titular || settings.bank_holder || "Braian Carlos Zarate"}</strong></div>
                 </div>
               </div>
             ) : (
               <div style={{
-                background: 'rgba(30, 41, 59, 0.7)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: '16px',
-                padding: '14px 16px',
-                marginBottom: '20px'
+                background: 'rgba(22, 30, 42, 0.85)',
+                border: '1px solid rgba(255, 255, 255, 0.09)',
+                borderRadius: '14px',
+                padding: '11px 13px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
               }}>
-                <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#10b981', fontWeight: 800, marginBottom: '6px' }}>
+                <div style={{ fontSize: '0.76rem', color: '#10b981', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   💵 Pago en Efectivo
                 </div>
-                <div style={{ fontSize: '0.88rem', color: '#cbd5e1', lineHeight: 1.5 }}>
-                  Abonás <strong>${Number(orderSuccessData.total).toLocaleString('es-AR')}</strong> al {orderSuccessData.serviceType === 'delivery' ? 'recibir tu pedido' : 'retirar en el local'}.
+                <div style={{ fontSize: '0.86rem', color: '#cbd5e1' }}>
+                  Abonás <strong style={{ color: '#34d399' }}>${Number(orderSuccessData.total).toLocaleString('es-AR')}</strong> al {orderSuccessData.serviceType === 'delivery' ? 'recibir' : 'retirar'}.
                 </div>
               </div>
             )}
 
-            {/* Respaldo Opcional por si el Bot no envía la notificación */}
+            {/* Acción de WhatsApp (Enviar Comprobante o Reenviar Pedido) */}
             {orderSuccessData.waUrl && (
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.03)',
-                border: '1px dashed rgba(37, 211, 102, 0.35)',
-                borderRadius: '16px',
-                padding: '14px',
-                marginBottom: '16px',
-                textAlign: 'center'
-              }}>
-                <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginBottom: '10px', lineHeight: 1.4 }}>
-                  💬 ¿No recibiste la notificación del bot? Podés enviar el pedido a nuestro WhatsApp manualmente:
-                </div>
-                <a
-                  href={orderSuccessData.waUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    background: '#25D366',
-                    color: '#fff',
-                    textDecoration: 'none',
-                    borderRadius: '12px',
-                    padding: '11px 18px',
-                    fontWeight: 800,
-                    fontSize: '0.88rem',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    boxShadow: '0 4px 14px rgba(37, 211, 102, 0.35)',
-                    width: '100%',
-                    boxSizing: 'border-box'
-                  }}
-                >
-                  <MessageCircle size={18} />
-                  <span>Enviar Pedido por WhatsApp (Opcional)</span>
-                </a>
-              </div>
+              <a
+                href={orderSuccessData.waUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  background: 'rgba(37, 211, 102, 0.12)',
+                  border: '1px solid rgba(37, 211, 102, 0.45)',
+                  color: '#25D366',
+                  textDecoration: 'none',
+                  borderRadius: '12px',
+                  padding: '10px 14px',
+                  fontWeight: 800,
+                  fontSize: '0.82rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxSizing: 'border-box',
+                  width: '100%',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <MessageCircle size={17} />
+                <span>
+                  {orderSuccessData.paymentMethod === 'transferencia' 
+                    ? 'Enviar Comprobante por WhatsApp' 
+                    : 'Enviar Pedido por WhatsApp (Opcional)'}
+                </span>
+              </a>
             )}
 
-            {/* Botón principal para cerrar y volver */}
+            {/* Botón Principal para Volver */}
             <button
               type="button"
               style={{
                 background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
                 border: 'none',
                 color: '#fff',
-                borderRadius: '14px',
-                padding: '13px',
+                borderRadius: '12px',
+                padding: '11px',
                 fontWeight: 800,
-                fontSize: '0.9rem',
+                fontSize: '0.88rem',
                 cursor: 'pointer',
                 width: '100%',
-                boxShadow: '0 4px 16px rgba(239, 68, 68, 0.35)'
+                boxShadow: '0 4px 14px rgba(239, 68, 68, 0.35)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px'
               }}
               onClick={() => setShowOrderSuccessModal(false)}
             >
